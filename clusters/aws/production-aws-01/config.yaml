@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: production-aws-01
+  namespace: openshift-gitops
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/pecorawal/gitops-infra.git'
+    targetRevision: HEAD
+    path: charts/cluster-deploy
+    helm:
+      values: |
+        clusterName: "prod-aws-01"
+        baseDomain: ""
+        region: "us-east-1"
+        cloudCredentials: "aws-creds-secret"
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: prod-aws-01 # Namespace onde o Hive criará o cluster
+  syncPolicy:
+    automated:
+      prune: true

@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: acm-apps-managed
+  namespace: openshift-gitops
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/pecorawal/gitops-infra.git'
+    targetRevision: main
+    path: clusters-apps/ # Onde estão as definições dos clusters
+    directory:
+      recurse: true
+  destination:
+    server: 'https://kubernetes.default.svc' # Deploy no Hub Cluster
+    namespace: openshift-gitops
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

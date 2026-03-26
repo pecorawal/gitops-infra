@@ -1,9 +1,12 @@
-apiVersion: apps.open-cluster-management.io/v1
-kind: PlacementRule
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
 metadata:
-  name: apply-to-prod
+  name: all-managed-clusters
+  namespace: openshift-gitops
 spec:
-  clusterSelector:
-    matchLabels:
-      environment: production
-      usage: pci-compliant
+  predicates:
+    - requiredClusterSelector:
+        labelSelector:
+          matchLabels:
+            # Esta label é o gatilho: qualquer cluster com ela será alvo do GitOps
+            usage: gitops-managed
