@@ -1,0 +1,21 @@
+apiVersion: hive.openshift.io/v1
+kind: ClusterDeployment
+metadata:
+  name: {{ .Values.clusterName }}
+  namespace: {{ .Values.clusterName }}
+  annotations:
+    # Annotation para integração com GitOps/Webhook
+    gitops.io/managed-by: "acm-gitops"
+spec:
+  baseDomain: {{ .Values.baseDomain }}
+  clusterName: {{ .Values.clusterName }}
+  platform:
+    aws: # Exemplo para AWS
+      credentialsSecretRef:
+        name: {{ .Values.cloudCredentials }}
+      region: {{ .Values.region }}
+  provisioning:
+    installConfigSecretRef:
+      name: {{ .Values.clusterName }}-install-config
+  pullSecretRef:
+    name: pull-secret

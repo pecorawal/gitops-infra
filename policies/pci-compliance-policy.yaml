@@ -1,0 +1,20 @@
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: policy-limitrange
+  annotations:
+    policy.open-cluster-management.io/categories: SystemAndInformationIntegrity
+spec:
+  remediationAction: enforce # 'enforce' aplica a correção, 'inform' apenas avisa
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: v1
+        kind: LimitRange
+        metadata:
+          name: container-mem-limit
+        spec:
+          limits:
+            - default:
+                memory: 512Mi
+              type: Container

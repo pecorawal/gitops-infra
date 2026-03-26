@@ -1,0 +1,8 @@
+apiVersion: apps.open-cluster-management.io/v1
+kind: Channel
+metadata:
+  name: cluster-gitops-channel
+  namespace: cluster-gitops-repo
+spec:
+  type: GitHub
+  pathname: https://github.com/pecorawal/gitops-infra.git
