@@ -1,12 +1,12 @@
 i# Informações básicas do Cluster
 clusterName: "aro-br-prod-01"
 cloudType: "Azure" # Usado no ManagedCluster vendor e ProviderConnection
-baseDomain: "brazilsouth.aroapp.io"
+baseDomain: "eastus.aroapp.io"
 
 # Labels de Governança (Onde a mágica do ACM acontece)
 labels:
   env: "production"
-  region: "brazilsouth"
+  region: "eastus"
   vendor: "OpenShift"
   cloud: "Azure"
   criticality: "high"
@@ -24,7 +24,7 @@ addons:
 # Credenciais de Nuvem (Opcional se você usar Auto-Import)
 # Estas chaves devem bater com o que seu Helm Chart espera para o Secret
 cloudCredentials:
-  subscriptionId: "XXXX-XXXX-XXXX-XXXX"
-  tenantId: "YYYY-YYYY-YYYY-YYYY"
-  clientId: "ZZZZ-ZZZZ-ZZZZ-ZZZZ"
-  clientSecret: "REPLACE_WITH_VAULT_REFERENCE" # Use preferencialmente o ArgoCD Vault Plugin aqui
+  subscriptionId: "HIDDEN"
+  tenantId: "HIDDEN"
+  clientId: "HIDDEN"
+  clientSecret: "HIDDEN" # Use preferencialmente o ArgoCD Vault Plugin aqui
