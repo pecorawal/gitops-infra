@@ -1,0 +1,16 @@
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: policy-ensure-gitops-label
+  namespace: open-cluster-management-global-set
+spec:
+  remediationAction: enforce # Ele vai forçar a label se ela sumir
+  policy-templates:
+    - objectDefinition:
+        apiVersion: cluster.open-cluster-management.io/v1
+        kind: ManagedCluster
+        metadata:
+          name: {{ .Values.clusterName }}
+          labels:
+            managed-by: argocd
+            status: imported

@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: import-external-clusters
+  namespace: openshift-gitops
+spec:
+  generators:
+    - git:
+        repoURL: 'https://github.com/pecorawal/gitops-infra.git'
+        revision: HEAD
+        # O gerador busca arquivos de valores para cada cluster
+        files:
+          - path: "clusters/*/values.yaml"
+  template:
+    metadata:
+      name: 'import-{{path.basename}}' # Nome dinâmico baseado na pasta
+    spec:
+      project: default
+      source:
+        repoURL: 'https://github.com/pecorawal/gitops-infra.git'
+        targetRevision: main
+        path: templates/import-cluster # O Helm Chart que criamos antes
+        helm:
+          valueFiles:
+            - '{{path}}/values.yaml'
+      destination:
+        server: 'https://kubernetes.default.svc'
+        namespace: open-cluster-management
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
