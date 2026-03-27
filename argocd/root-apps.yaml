@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: 'https://github.com/pecorawal/gitops-infra.git'
     targetRevision: main
-    path: clusters-apps/ # Onde estão as definições dos clusters
+    path: clusters-apps/ # Onde estão as definições dos apps
     directory:
       recurse: true
   destination:
