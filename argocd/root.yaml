@@ -8,7 +8,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'https://github.com/seu-usuario/gitops-infra.git'
+    repoURL: 'https://github.com/pecorawal/gitops-infra.git'
     targetRevision: HEAD
     path: bootstrap/ # Pasta que contém o seu ApplicationSet
   destination:
