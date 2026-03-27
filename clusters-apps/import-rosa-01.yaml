@@ -6,8 +6,8 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'https://github.com/seu-usuario/gitops-infra.git'
-    targetRevision: HEAD
+    repoURL: 'https://github.com/pecorawal/gitops-infra.git'
+    targetRevision: main
     path: templates/import-cluster
     helm:
       values: |
