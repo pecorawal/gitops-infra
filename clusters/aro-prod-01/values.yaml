@@ -1,4 +1,4 @@
-i# Informações básicas do Cluster
+# Informações básicas do Cluster
 clusterName: "aro-br-prod-01"
 cloudType: "Azure" # Usado no ManagedCluster vendor e ProviderConnection
 baseDomain: "eastus.aroapp.io"
