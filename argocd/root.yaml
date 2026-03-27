@@ -9,7 +9,7 @@ spec:
   project: default
   source:
     repoURL: 'https://github.com/pecorawal/gitops-infra.git'
-    targetRevision: HEAD
+    targetRevision: main
     path: bootstrap/ # Pasta que contém o seu ApplicationSet
   destination:
     server: 'https://kubernetes.default.svc'
