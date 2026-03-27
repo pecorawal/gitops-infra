@@ -10,7 +10,7 @@ spec:
         revision: HEAD
         # O gerador busca arquivos de valores para cada cluster
         files:
-          - path: "clusters/*/values.yaml"
+          - path: "clusters/*"
   template:
     metadata:
       name: 'import-{{path.basename}}' # Nome dinâmico baseado na pasta
@@ -19,7 +19,7 @@ spec:
       source:
         repoURL: 'https://github.com/pecorawal/gitops-infra.git'
         targetRevision: main
-        path: templates/import-cluster # O Helm Chart que criamos antes
+        path: charts/import-cluster # O Helm Chart que criamos antes
         helm:
           valueFiles:
             - '{{path}}/values.yaml'
