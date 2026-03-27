@@ -1,0 +1,10 @@
+apiVersion: cluster.open-cluster-management.io/v1
+kind: ManagedCluster
+metadata:
+  name: {{ .Values.clusterName }}
+  labels:
+    # Esta label vincula o cluster ao Set que o ArgoCD pode ver
+    cluster.open-cluster-management.io/clusterset: global-clusters
+    {{- toYaml .Values.labels | nindent 4 }}
+spec:
+  hubAcceptsClient: true
