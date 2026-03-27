@@ -1,30 +1,20 @@
-# Informações básicas do Cluster
-clusterName: "aro-br-prod-01"
-cloudType: "Azure" # Usado no ManagedCluster vendor e ProviderConnection
+clusterName: "aro-prod-01"
+cloudType: "Azure"
 baseDomain: "eastus.aroapp.io"
-
-# Labels de Governança (Onde a mágica do ACM acontece)
 labels:
   env: "production"
   region: "eastus"
   vendor: "OpenShift"
   cloud: "Azure"
   criticality: "high"
-  # Gatilho para o ArgoCD enxergar este cluster como destino de apps
   apps.open-cluster-management.io/replicate-to-argocd: "true"
-  # Gatilho para Políticas de Conformidade do ACM
   compliance: "pci-dss"
-
-# Configurações de Add-ons do ACM
 addons:
   policyController: true
   searchCollector: true
   applicationManager: true
-
-# Credenciais de Nuvem (Opcional se você usar Auto-Import)
-# Estas chaves devem bater com o que seu Helm Chart espera para o Secret
 cloudCredentials:
-  subscriptionId: "HIDDEN"
-  tenantId: "HIDDEN"
-  clientId: "HIDDEN"
-  clientSecret: "HIDDEN" # Use preferencialmente o ArgoCD Vault Plugin aqui
+  subscriptionId: "REPLACE_IN_CLUSTER"
+  tenantId: "REPLACE_IN_CLUSTER"
+  clientId: "REPLACE_IN_CLUSTER"
+  clientSecret: "REPLACE_IN_CLUSTER"
