@@ -7,7 +7,7 @@ spec:
   generators:
     - git:
         repoURL: 'https://github.com/pecorawal/gitops-infra.git'
-        revision: HEAD
+        revision: main
         # O gerador busca arquivos de valores para cada cluster
         files:
           - path: "clusters/*"
@@ -22,7 +22,7 @@ spec:
         path: charts/import-cluster # O Helm Chart que criamos antes
         helm:
           valueFiles:
-            - '{{path}}/values.yaml'
+            - '../../{{path}}/values.yaml'
       destination:
         server: 'https://kubernetes.default.svc'
         namespace: open-cluster-management

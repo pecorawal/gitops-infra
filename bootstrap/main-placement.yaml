@@ -8,5 +8,5 @@ spec:
     - requiredClusterSelector:
         labelSelector:
           matchLabels:
-            # Esta label é o gatilho: qualquer cluster com ela será alvo do GitOps
-            usage: gitops-managed
+            # Seleciona os clusters que marcamos com essa label no Helm
+            apps.open-cluster-management.io/replicate-to-argocd: "true"
