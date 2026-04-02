@@ -1,12 +1,12 @@
 # Informações básicas do Cluster ROSA
-clusterName: "rosa-us-east-01"
+clusterName: "rosa-5zbzk"
 cloudType: "AWS"        # Define o provider como AWS no ACM
-baseDomain: "p1.openshiftapps.com"
+baseDomain: "p3.openshiftapps.com"
 
 # Labels de Governança e Automação
 labels:
   env: "staging"
-  region: "us-east-1"
+  region: "us-east-2"
   vendor: "OpenShift"
   cloud: "AWS"
   # Label que faz o ArgoCD importar este cluster como um 'Destination'
@@ -28,4 +28,4 @@ addons:
 cloudCredentials:
   aws_access_key_id: "PLACEHOLDER"
   aws_secret_access_key: "PLACEHOLDER"
-  region: "us-east-1"
+  region: "us-east-2"
