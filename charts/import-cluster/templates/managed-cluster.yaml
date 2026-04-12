@@ -1,15 +1,16 @@
 apiVersion: cluster.open-cluster-management.io/v1
 kind: ManagedCluster
 metadata:
+  name: {{ .Values.clusterName }}
   annotations:
     common.io/cluster-cloud-connection: {{ .Values.clusterName }}-auth
     {{- with .Values.annotations }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
-  name: {{ .Values.clusterName }}
   labels:
+    vendor: OpenShift
     # Vincula ao Set que o ArgoCD tem permissão de ver
-    cluster.open-cluster-management.io/clusterset: global-clusters
+    #cluster.open-cluster-management.io/clusterset: global-clusters
     # Faz o ACM criar o Secret de conexão no namespace do ArgoCD automaticamente
     apps.open-cluster-management.io/replicate-to-argocd: "true"
     {{- with .Values.labels }}
