@@ -22,7 +22,8 @@ addons:
   searchCollector: true
   applicationManager: true
   certPolicyController: true
-
+cluster:
+  apiServerUrl: "https://api.jmbquzwd.eastus.aroapp.io:6443"
 # Credenciais para Auto-Import (Opcional)
 # O ACM usará estas chaves para injetar o agente no ROSA remotamente
 cloudCredentials:
