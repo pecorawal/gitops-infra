@@ -5,41 +5,28 @@ metadata:
   namespace: openshift-gitops
 spec:
   generators:
-    # Mapeamento dinâmico baseado nas labels do cluster (ACM)
+    # 1. O gerador vai varrer os clusters
     - clusters:
         selector:
-          matchLabels:
-            env: '{{environment}}' 
-        values:
-          environment: dev
-    - clusters:
-        selector:
-          matchLabels:
-            env: '{{environment}}'
-        values:
-          environment: qa
-    - clusters:
-        selector:
-          matchLabels:
-            env: '{{environment}}'
-        values:
-          environment: production
-  
+          matchExpressions:
+            # 2. Ele vai selecionar QUALQUER cluster que tenha a label "env" (seja dev, qa ou prod)
+            - key: env
+              operator: Exists
   template:
     metadata:
-      # Nomeia as aplicações no ArgoCD (ex: pagamentos-api-prod)
-      name: 'pagamentos-api-{{values.environment}}'
+      # 3. Nome único no ArgoCD (Ex: pagamentos-api-local-cluster)
+      # Usar o nome do cluster evita conflito se você tiver 2 clusters de dev!
+      name: 'pagamentos-api-{{name}}'
     spec:
       project: default
       source:
-        # AQUI ESTÁ O NOVO REPOSITÓRIO FOCADO EM HELM
-        repoURL: 'https://github.com/pecorawal/gitops-workloads-helm.git'
+        repoURL: 'https://github.com/sua-org/gitops-workloads-helm.git'
         targetRevision: main
         path: 'apps/pagamentos-api'
         helm:
-          # Injeta dinamicamente: values-dev.yaml, values-qa.yaml, etc.
           valueFiles:
-            - 'values-{{values.environment}}.yaml'
+            # 4. A MÁGICA: Ele injeta o valor da label dinamicamente (values-dev.yaml)
+            - 'values-{{metadata.labels.env}}.yaml'
       destination:
         server: '{{server}}'
         namespace: pagamentos
