@@ -1,51 +1,51 @@
-#apiVersion: argoproj.io/v1alpha1
-#kind: ApplicationSet
-#metadata:
-#  name: pagamentos-api-appset
-#  namespace: openshift-gitops
-#spec:
-#  generators:
-#    # Mapeamento dinâmico baseado nas labels do cluster (ACM)
-#    - clusters:
-#        selector:
-#          matchLabels:
-#            env: '{{environment}}' 
-#        values:
-#          environment: dev
-#    - clusters:
-#        selector:
-#          matchLabels:
-#            env: '{{environment}}'
-#        values:
-#          environment: qa
-#    - clusters:
-#        selector:
-#          matchLabels:
-#            env: '{{environment}}'
-#        values:
-#          environment: production
-#  
-#  template:
-#    metadata:
-#      # Nomeia as aplicações no ArgoCD (ex: pagamentos-api-prod)
-#      name: 'pagamentos-api-{{values.environment}}'
-#    spec:
-#      project: default
-#      source:
-#        # AQUI ESTÁ O NOVO REPOSITÓRIO FOCADO EM HELM
-#        repoURL: 'https://github.com/sua-org/gitops-workloads-helm.git'
-#        targetRevision: main
-#        path: 'apps/pagamentos-api'
-#        helm:
-#          # Injeta dinamicamente: values-dev.yaml, values-qa.yaml, etc.
-#          valueFiles:
-#            - 'values-{{values.environment}}.yaml'
-#      destination:
-#        server: '{{server}}'
-#        namespace: pagamentos
-#      syncPolicy:
-#        automated:
-#          prune: true
-#          selfHeal: true
-#        syncOptions:
-#          - CreateNamespace=true
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: pagamentos-api-appset
+  namespace: openshift-gitops
+spec:
+  generators:
+    # Mapeamento dinâmico baseado nas labels do cluster (ACM)
+    - clusters:
+        selector:
+          matchLabels:
+            env: '{{environment}}' 
+        values:
+          environment: dev
+    - clusters:
+        selector:
+          matchLabels:
+            env: '{{environment}}'
+        values:
+          environment: qa
+    - clusters:
+        selector:
+          matchLabels:
+            env: '{{environment}}'
+        values:
+          environment: production
+  
+  template:
+    metadata:
+      # Nomeia as aplicações no ArgoCD (ex: pagamentos-api-prod)
+      name: 'pagamentos-api-{{values.environment}}'
+    spec:
+      project: default
+      source:
+        # AQUI ESTÁ O NOVO REPOSITÓRIO FOCADO EM HELM
+        repoURL: 'https://github.com/sua-org/gitops-workloads-helm.git'
+        targetRevision: main
+        path: 'apps/pagamentos-api'
+        helm:
+          # Injeta dinamicamente: values-dev.yaml, values-qa.yaml, etc.
+          valueFiles:
+            - 'values-{{values.environment}}.yaml'
+      destination:
+        server: '{{server}}'
+        namespace: pagamentos
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
