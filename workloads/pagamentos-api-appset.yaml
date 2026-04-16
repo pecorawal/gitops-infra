@@ -20,7 +20,7 @@ spec:
     spec:
       project: default
       source:
-        repoURL: 'https://github.com/sua-org/gitops-workloads-helm.git'
+        repoURL: 'https://github.com/pecorawal/gitops-workloads-helm.git'
         targetRevision: main
         path: 'apps/pagamentos-api'
         helm:
