@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: checkout-frontend-appset
+  namespace: openshift-gitops
+spec:
+  generators:
+    # 1. O gerador vai varrer os clusters
+    - clusters:
+        selector:
+          matchExpressions:
+            # 2. Ele vai selecionar QUALQUER cluster que tenha a label "env" (seja dev, qa ou prod)
+            - key: env
+              operator: Exists
+  template:
+    metadata:
+      # 3. Nome único no ArgoCD (Ex: pagamentos-api-local-cluster)
+      # Usar o nome do cluster evita conflito se você tiver 2 clusters de dev!
+      name: 'checkout-frontend-{{name}}'
+    spec:
+      project: default
+      source:
+        repoURL: 'https://github.com/pecorawal/gitops-workloads-helm.git'
+        targetRevision: main
+        path: 'apps/checkout-frontend'
+        helm:
+          valueFiles:
+            # 4. A MÁGICA: Ele injeta o valor da label dinamicamente (values-dev.yaml)
+            - 'values-{{metadata.labels.env}}.yaml'
+      destination:
+        server: '{{server}}'
+        namespace: checkout
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
