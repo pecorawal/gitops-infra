@@ -1,6 +1,6 @@
 clusterName: "openenv-hlcqg"
 cloudType: "Azure"
-baseDomain: "eastus.aroapp.io"
+baseDomain: "westus.aroapp.io"
 labels:
   env: "production"
   region: "eastus"
