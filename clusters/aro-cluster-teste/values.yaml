@@ -18,9 +18,3 @@ addons:
   searchCollector: true
   applicationManager: true
 
-#externalSecrets:
-#  vaultKeys:
-#    clientId: "CLIENTID"     # Nome da chave dentro da Azure Vault
-#    clientSecret: "CLIENTOPASSWD"   # Nome da chave dentro da Azure Vault
-#    tenantId: "TENANT"
-#    subscriptionId: "SUBSCRIPTION"
