@@ -1,8 +1,9 @@
 clusterName: "aro-cluster-teste"
 cloudType: "Azure"
 baseDomain: "eastus.aroapp.io"
-cloudProvider: "ARO"
+cloudProvider: "Azure"
 environment: "test"
+apps.open-cluster-management.io/replicate-to-argocd: "true"
 labels:
   env: "prod"
   region: "eastus"
