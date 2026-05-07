@@ -1,0 +1,8 @@
+# O nome exato do cluster (usado para criar o Namespace no Hub, o ManagedCluster e buscar no Vault)
+clusterName: rosahcp-qa
+
+# Provedor de nuvem (usado como label no ManagedCluster para facilitar filtros no ACM)
+cloudProvider: ROSA
+
+# Ambiente (usado como label no ManagedCluster)
+environment: qa
