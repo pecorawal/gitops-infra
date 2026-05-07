@@ -1,0 +1,24 @@
+clusterName: "aro-cluster-teste"
+cloudType: "Azure"
+baseDomain: "eastus.aroapp.io"
+cloudProvider: "ARO"
+environment: "test"
+labels:
+  env: "prod"
+  region: "eastus"
+  vendor: "OpenShift"
+  cloud: "Azure"
+  criticality: "high"
+  apps.open-cluster-management.io/replicate-to-argocd: "true"
+  compliance: "pci-dss"
+addons:
+  policyController: true
+  searchCollector: true
+  applicationManager: true
+
+#externalSecrets:
+#  vaultKeys:
+#    clientId: "CLIENTID"     # Nome da chave dentro da Azure Vault
+#    clientSecret: "CLIENTOPASSWD"   # Nome da chave dentro da Azure Vault
+#    tenantId: "TENANT"
+#    subscriptionId: "SUBSCRIPTION"
