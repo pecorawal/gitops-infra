@@ -3,6 +3,7 @@ cloudType: "Azure"
 baseDomain: "eastus.aroapp.io"
 cloudProvider: "Azure"
 environment: "test"
+clusterSet: "global-clusters"
 apps.open-cluster-management.io/replicate-to-argocd: "true"
 labels:
   env: "prod"

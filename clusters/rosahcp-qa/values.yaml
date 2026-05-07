@@ -6,3 +6,5 @@ cloudProvider: ROSA
 
 # Ambiente (usado como label no ManagedCluster)
 environment: qa
+clusterSet: global-clusters
+vendor: OpenShift
