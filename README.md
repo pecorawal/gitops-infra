@@ -1,3 +1,8 @@
-# Repository to to use as sample to deploy Red Hat Openshift using GitOps and Red Hat ACM.
+#Repositório de Infraestrutura de cluster gerenciados pelo Red Hat ACM através de GitOps.
 
-Repository sample to demonstrate RedHat Openshift Gitops (argocd) to deploy clusters
+Neste repositório está a definição de um OpenShift GitOps para importação e orquestração de clusters no Red Hat Advanced Cluster Management for Kubernetes.
+
+<!-- readme-tree start -->
+
+
+
