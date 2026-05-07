@@ -1,4 +1,4 @@
-clusterName: "openenv-b26q8"
+clusterName: "clusterprod"
 cloudType: "Azure"
 baseDomain: "eastus.aroapp.io"
 cloudProvider: "ARO"
