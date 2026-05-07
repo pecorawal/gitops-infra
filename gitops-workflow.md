@@ -107,3 +107,26 @@ oc create secret generic aro-prod-01-auth \
   --from-literal=osServicePrincipal.clientSecret='PLACEHOLDER' \
   --from-literal=osServicePrincipal.subscriptionId="683e1ca71fcb" \
   --from-literal=osServicePrincipal.tenantId="redhat0.joedoe.com"
+
+
+
+
+# importação dos clusters
+
+Resumo Rápido das Extrações Puras (Sem Tokens Efêmeros):
+
+## ARO:
+´´´
+ az aro get-admin-kubeconfig --name <nome> --resource-group <rg> --file kubeconfig-puro
+´´´
+
+## ROSA: 
+´´´
+rosa download kubeconfig --cluster=<nome> (Gera um kubeconfig limpo no diretório atual).
+´´´
+
+## GCP/IPI: 
+´´´
+Fica no diretório da instalação (<dir>/auth/kubeconfig).
+´´´
+
