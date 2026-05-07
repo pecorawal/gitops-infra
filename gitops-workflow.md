@@ -121,9 +121,45 @@ Resumo Rápido das Extrações Puras (Sem Tokens Efêmeros):
 ´´´
 
 ## ROSA: 
+
+1. Criar o usuário e obter a URL da API
+´´´ 
+rosa create admin --cluster rosahcp-qa
 ´´´
-rosa download kubeconfig --cluster=<nome> (Gera um kubeconfig limpo no diretório atual).
+
+2. Faça o login no cluster ROSA:
+
 ´´´
+oc login <URL-DA-API> --username cluster-admin --password <SENHA>
+´´´ 
+
+3. Isole e extraia o Kubeconfig do ROSA:
+
+´´´
+oc config view --minify --flatten > nomeDoCluster-kubeconfig
+´´´
+
+O --minify garante que apenas o cluster atual vá para o arquivo.
+
+O --flatten garante que os dados do certificado (CA) fiquem embutidos na string, e não como caminhos locais do seu computador.
+
+4. Converta para Base64 para salvar no Vault:
+
+´´´
+cat nomeDoCluster-kubeconfig | base64 -w 0 > nomeDoCluster-kubeconfig_base64.txt
+´´´
+5. Insira no Vault Externo (ex: Aro Key Vault).
+
+A chave criada deve respeitar o nome do cluster que será criado em ./clusters/<dir-nomeDoCluster>/values.yaml
+
+Exemplo: 
+    nomeDoCluster: rosahcp-qa (nome da chave clusterName dentro do arquivo values.yaml)
+
+Então a chave a ser criada deve ser 
+**rosahcp-qa-kubeconfig**
+e o valor dentro da chave é o conteudo do arquivo **rosahcp-qa-kubeconfig_base64.txt**
+
+
 
 ## GCP/IPI: 
 ´´´
@@ -140,5 +176,8 @@ cat kubeconfig-puro | base64 -w 0 > kubeconfig_base64.txt
 Copie todo o conteudo do arquivo kubeconfig_base64.txt para um *secrets* dentro do seu vault externo, por exemplo ARO Key Vault
 
 A chave criada deve ter OBRIGATORIAMENTE, o *{nomeDoClusterNoACM}-kubeconfig* e o valor (secret value) é o conteúdo do arquivo gerado kubeconfig_base64.txt
+
+
+
 
 
