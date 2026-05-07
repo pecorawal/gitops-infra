@@ -5,5 +5,12 @@ metadata:
   labels:
     cloud: {{ .Values.cloudProvider }} # Ex: ROSA, ARO, GCP
     env: {{ .Values.environment }}
+    cluster.open-cluster-management.io/clusterset: {{ .Values.clusterSet | default "global-clusters" }}
+    agent.open-cluster-management.io/klusterlet-deploy-mode: "Default"
+    apps.open-cluster-management.io/replicate-to-argocd: "true"
+    {{- with .Values.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+
 spec:
   hubAcceptsClient: true
