@@ -33,6 +33,9 @@ Neste repositório está a definição de um OpenShift GitOps para importação 
 │           ├── 01-external-secret-kubeconfig.yaml
 │           ├── 02-managed-cluster.yaml
 │           └── placement.yaml
+├── clusters
+│   └── aro-cluster-teste
+│       └── values.yaml
 ├── gitops-workflow.md
 ├── policies
 │   ├── enforce-gitops-labels.yaml
@@ -42,6 +45,6 @@ Neste repositório está a definição de um OpenShift GitOps para importação 
     ├── checkout-frontend-api-appset.yaml
     └── pagamentos-api-appset.yaml
 
-12 directories, 25 files
+14 directories, 26 files
 ```
 <!-- readme-tree end -->
