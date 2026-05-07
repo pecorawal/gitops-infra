@@ -1,0 +1,9 @@
+apiVersion: cluster.open-cluster-management.io/v1
+kind: ManagedCluster
+metadata:
+  name: {{ .Values.clusterName }}
+  labels:
+    cloud: {{ .Values.cloudProvider }} # Ex: ROSA, ARO, GCP
+    env: {{ .Values.environment }}
+spec:
+  hubAcceptsClient: true

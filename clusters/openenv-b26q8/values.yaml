@@ -1,6 +1,8 @@
 clusterName: "openenv-b26q8"
 cloudType: "Azure"
 baseDomain: "eastus.aroapp.io"
+cloudProvider: "ARO"
+environment: "prod"
 labels:
   env: "prod"
   region: "eastus"
