@@ -130,3 +130,15 @@ rosa download kubeconfig --cluster=<nome> (Gera um kubeconfig limpo no diretóri
 Fica no diretório da instalação (<dir>/auth/kubeconfig).
 ´´´
 
+
+No seu terminal linux/mac, execute:
+
+´´´
+cat kubeconfig-puro | base64 -w 0 > kubeconfig_base64.txt
+´´´
+
+Copie todo o conteudo do arquivo kubeconfig_base64.txt para um *secrets* dentro do seu vault externo, por exemplo ARO Key Vault
+
+A chave criada deve ter OBRIGATORIAMENTE, o *{nomeDoClusterNoACM}-kubeconfig* e o valor (secret value) é o conteúdo do arquivo gerado kubeconfig_base64.txt
+
+
