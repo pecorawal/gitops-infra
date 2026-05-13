@@ -16,6 +16,7 @@ labels:
   criticality: "high"
   apps.open-cluster-management.io/replicate-to-argocd: "true"
   compliance: "pci-dss"
+  reimport: "true"
 addons:
   policyController: true
   searchCollector: true
