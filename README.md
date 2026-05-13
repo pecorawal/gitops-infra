@@ -34,9 +34,7 @@ Neste repositório está a definição de um OpenShift GitOps para importação 
 │           ├── 02-managed-cluster.yaml
 │           └── placement.yaml
 ├── clusters
-│   ├── aro-cluster-teste
-│   │   └── values.yaml
-│   └── rosahcp-qa
+│   └── aro-cluster-teste
 │       └── values.yaml
 ├── gitops-workflow.md
 ├── policies
@@ -47,6 +45,6 @@ Neste repositório está a definição de um OpenShift GitOps para importação 
     ├── checkout-frontend-api-appset.yaml
     └── pagamentos-api-appset.yaml
 
-15 directories, 27 files
+14 directories, 26 files
 ```
 <!-- readme-tree end -->
