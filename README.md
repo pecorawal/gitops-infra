@@ -34,7 +34,7 @@ Neste repositório está a definição de um OpenShift GitOps para importação 
 │           ├── 02-managed-cluster.yaml
 │           └── placement.yaml
 ├── clusters
-│   └── aro-cluster-teste
+│   └── rosaqa
 │       └── values.yaml
 ├── gitops-workflow.md
 ├── policies
