@@ -1,0 +1,6 @@
+{{- if and .Values.ingress.enabled .Values.ingress.private.enabled }}
+# IngressController PRIVADO -- Load Balancer interno da Azure.
+# Publica *.{{ .Values.ingress.private.domain }} na Azure Private DNS Zone
+# (via ExternalDNS, wave 40).
+{{ include "ingress-controllers.controller" (dict "ic" .Values.ingress.private "wave" "0") }}
+{{- end }}

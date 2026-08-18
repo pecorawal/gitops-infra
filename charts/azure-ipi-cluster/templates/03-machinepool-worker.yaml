@@ -1,0 +1,26 @@
+{{- if .Values.provision.enabled }}
+# Pool de workers gerenciado pelo Hive depois da instalacao. E por aqui que se
+# escala o cluster: mude provision.compute.replicas e commite.
+apiVersion: hive.openshift.io/v1
+kind: MachinePool
+metadata:
+  name: {{ .Values.clusterName }}-worker
+  namespace: {{ .Values.clusterName }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  clusterDeploymentRef:
+    name: {{ .Values.clusterName }}
+  name: worker
+  replicas: {{ .Values.provision.compute.replicas }}
+  platform:
+    azure:
+      type: {{ .Values.provision.compute.type }}
+      osDisk:
+        diskSizeGB: {{ .Values.provision.compute.osDisk.diskSizeGB }}
+        diskType: {{ .Values.provision.compute.osDisk.diskType }}
+      {{- with .Values.provision.compute.zones }}
+      zones:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

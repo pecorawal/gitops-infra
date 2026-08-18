@@ -1,0 +1,26 @@
+externalDNS:
+  enabled: false
+  azure:
+    subscriptionId: ""
+    tenantId: ""
+    aadClientId: ""
+    # Deixe SEMPRE vazio no Git. Se preenchido (via --set ou values local), o
+    # chart gera os Secrets azure.json; se vazio, ele espera que os Secrets
+    # configSecretName ja existam no namespace external-dns-operator.
+    aadClientSecret: ""
+  private:
+    enabled: false
+    name: private
+    routerName: private
+    domain: ""
+    resourceGroup: ""
+    zoneId: ""
+    configSecretName: azure-config-file-private
+  public:
+    enabled: false
+    name: public
+    routerName: public
+    domain: ""
+    resourceGroup: ""
+    zoneId: ""
+    configSecretName: azure-config-file-public

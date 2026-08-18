@@ -1,0 +1,5 @@
+apiVersion: v2
+name: cluster-bundle
+description: App-of-Apps -- gera as Applications de provisionamento e day-2 de um cluster
+type: application
+version: 0.1.0

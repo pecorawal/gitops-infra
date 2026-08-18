@@ -1,0 +1,39 @@
+{{- if .Values.provision.enabled }}
+# O objeto que dispara o provisionamento. O Hive cria um Job de instalacao no
+# namespace do cluster e roda o openshift-install com o install-config acima.
+apiVersion: hive.openshift.io/v1
+kind: ClusterDeployment
+metadata:
+  name: {{ .Values.clusterName }}
+  namespace: {{ .Values.clusterName }}
+  annotations:
+    gitops.io/managed-by: "acm-gitops"
+    argocd.argoproj.io/sync-wave: "0"
+  labels:
+    cloud: Azure
+    vendor: OpenShift
+    cluster.open-cluster-management.io/clusterset: {{ .Values.clusterSet | default "global-clusters" }}
+spec:
+  baseDomain: {{ .Values.baseDomain }}
+  clusterName: {{ .Values.clusterName }}
+  installed: false
+  platform:
+    azure:
+      # Secret da Credential do ACM (chave osServicePrincipal.json).
+      credentialsSecretRef:
+        name: {{ .Values.provision.credentialsSecret }}
+      region: {{ .Values.provision.azure.region }}
+      baseDomainResourceGroupName: {{ .Values.provision.azure.baseDomainResourceGroupName }}
+      cloudName: {{ .Values.provision.azure.cloudName }}
+  provisioning:
+    installConfigSecretRef:
+      name: {{ .Values.clusterName }}-install-config
+    imageSetRef:
+      name: {{ .Values.provision.imageSetRef }}
+    sshPrivateKeySecretRef:
+      # Vazio no values = reusa a propria Credential do ACM, que ja traz a
+      # chave sob o nome ssh-privatekey.
+      name: {{ .Values.provision.sshPrivateKeySecretRef | default .Values.provision.credentialsSecret }}
+  pullSecretRef:
+    name: {{ .Values.provision.pullSecretRef }}
+{{- end }}

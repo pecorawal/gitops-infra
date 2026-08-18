@@ -1,0 +1,35 @@
+ingress:
+  enabled: false
+  default:
+    isolateByLabel: false
+    labelKey: router
+  private:
+    enabled: false
+    name: private
+    domain: ""
+    replicas: 2
+    scope: Internal
+    routeSelector:
+      key: router
+      value: private
+    namespaceSelector: {}
+    nodePlacement: {}
+    certificate:
+      enabled: false
+      issuer: internal-ca
+      secretName: private-ingress-tls
+  public:
+    enabled: false
+    name: public
+    domain: ""
+    replicas: 2
+    scope: External
+    routeSelector:
+      key: router
+      value: public
+    namespaceSelector: {}
+    nodePlacement: {}
+    certificate:
+      enabled: false
+      issuer: letsencrypt-prod
+      secretName: public-ingress-tls

@@ -1,0 +1,17 @@
+{{- if and .Values.certManager.enabled .Values.certManager.internalCA.enabled }}
+# ClusterIssuer "internal-ca": emite certificados assinados pela CA interna.
+# Use para nomes que NAO sao resolviveis publicamente (ex: ingress privado).
+# Os clients precisam confiar na CA raiz -- extraia com:
+#   oc get secret {{ .Values.certManager.internalCA.caSecretName }} -n cert-manager \
+#     -o jsonpath='{.data.tls\.crt}' | base64 -d > internal-ca.crt
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: internal-ca
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  ca:
+    secretName: {{ .Values.certManager.internalCA.caSecretName }}
+{{- end }}

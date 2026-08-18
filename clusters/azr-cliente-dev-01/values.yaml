@@ -1,0 +1,276 @@
+# =============================================================================
+#  ARQUIVO ÚNICO DE CONFIGURAÇÃO DO CLUSTER
+# =============================================================================
+#  Este é o ÚNICO arquivo que você precisa editar.
+#  O nome do diretório que contém este arquivo DEVE ser igual a clusterName.
+#
+#  Preencha todos os campos marcados como <PREENCHER> e vire os interruptores
+#  "enabled: true" camada por camada. O ArgoCD fica escutando este arquivo e
+#  materializa cada camada assim que ela é habilitada.
+#
+#  Ordem recomendada:
+#    1) provision.enabled    -> cria o cluster       (~40 min)
+#    2) operators.enabled    -> instala os operators
+#    3) certManager.enabled  -> emite os certificados
+#    4) ingress.enabled      -> cria os IngressControllers
+#    5) externalDNS.enabled  -> publica os registros de DNS
+#
+#  Guia completo: docs/cliente/
+# =============================================================================
+
+
+# =============================================================================
+#  IDENTIDADE DO CLUSTER
+# =============================================================================
+clusterName: azr-cliente-dev-01     # == nome deste diretório, do namespace no hub e do ManagedCluster
+baseDomain: "<PREENCHER>"           # domínio base, ex: cliente.com.br
+environment: dev
+clusterSet: global-clusters
+cloudProvider: Azure
+
+labels:
+  env: "dev"
+  region: "brazilsouth"
+  vendor: "OpenShift"
+  cloud: "Azure"
+  criticality: "high"
+  compliance: "pci-dss"
+  # NÃO REMOVA a label abaixo: é ela que faz o ACM registrar este cluster
+  # como destino de deploy no ArgoCD (via GitOpsCluster + Placement).
+  apps.open-cluster-management.io/replicate-to-argocd: "true"
+
+addons:
+  policyController: true
+  searchCollector: true
+  applicationManager: true
+  certPolicyController: true
+
+
+# =============================================================================
+#  1. PROVISIONAMENTO -- OpenShift IPI na Azure (Hive / openshift-install)
+# =============================================================================
+provision:
+  enabled: false                    # <-- vire para true SÓ depois de preencher tudo abaixo
+
+  # Versão do OpenShift. Liste as disponíveis no hub com:
+  #   oc get clusterimageset
+  imageSetRef: "img4.18.20-multi-appsub"
+
+  # Nome do Secret da Credential do ACM (Credentials > Add > Microsoft Azure).
+  # A Credential DEVE ter sido criada no namespace <clusterName>.
+  # Contém osServicePrincipal.json e ssh-privatekey.
+  credentialsSecret: "<PREENCHER>"
+
+  # Pull secret no formato que o Hive exige (.dockerconfigjson).
+  # Criado uma única vez -- ver docs/cliente/01-pre-requisitos.md passo 3.
+  pullSecretRef: "azr-cliente-dev-01-pull-secret"
+
+  # Chave SSH para acesso aos nós. Vazio = usa a ssh-privatekey da Credential do ACM.
+  sshPrivateKeySecretRef: ""
+
+  # Internal = API e ingress default só acessíveis pela VNet (cluster privado).
+  # External = API e ingress default publicados na internet.
+  publish: Internal
+
+  azure:
+    region: "brazilsouth"
+    cloudName: AzurePublicCloud
+
+    # Resource Group onde está a Azure DNS Zone PÚBLICA do baseDomain.
+    baseDomainResourceGroupName: "<PREENCHER>"
+
+    # ---- BYO VNet: a VNet e as subnets já existem e NÃO são criadas pelo installer ----
+    networkResourceGroupName: "<PREENCHER>"   # RG que contém a VNet
+    virtualNetwork: "<PREENCHER>"             # nome da VNet
+    controlPlaneSubnet: "<PREENCHER>"         # subnet dos masters
+    computeSubnet: "<PREENCHER>"              # subnet dos workers
+
+    # UserDefinedRouting = a saída para a internet passa pela sua rota/firewall.
+    # Use Loadbalancer se não houver UDR configurado na subnet.
+    outboundType: UserDefinedRouting
+
+  networking:
+    networkType: OVNKubernetes
+    clusterNetwork: "10.128.0.0/14"
+    hostPrefix: 23
+    serviceNetwork: "172.30.0.0/16"
+    machineNetwork: "<PREENCHER>"             # CIDR da VNet acima, ex: 10.0.0.0/16
+
+  controlPlane:
+    replicas: 3
+    type: Standard_D8s_v3
+    osDisk:
+      diskSizeGB: 1024
+      diskType: Premium_LRS
+    zones: ["1", "2", "3"]
+
+  compute:
+    replicas: 3
+    type: Standard_D4s_v3
+    osDisk:
+      diskSizeGB: 512
+      diskType: Premium_LRS
+    zones: ["1", "2", "3"]
+
+  fips: false
+
+
+# =============================================================================
+#  2. OPERATORS -- instalados no cluster provisionado (spoke)
+# =============================================================================
+operators:
+  enabled: false
+
+  certManager:
+    channel: stable-v1
+    source: redhat-operators
+
+  externalDNS:
+    channel: stable-v1
+    source: redhat-operators
+
+
+# =============================================================================
+#  3. CERT-MANAGER -- ClusterIssuers e certificados
+# =============================================================================
+certManager:
+  enabled: false
+
+  # ClusterIssuer "letsencrypt-prod": ACME com desafio DNS01 na Azure DNS Zone
+  # pública. Funciona mesmo para nomes que só resolvem internamente, desde que
+  # o domínio esteja delegado publicamente (o registro TXT _acme-challenge é público).
+  acme:
+    enabled: true
+    email: "<PREENCHER>"
+    server: "https://acme-v02.api.letsencrypt.org/directory"
+    # Para testes use o staging (não conta na cota, mas o cert não é confiável):
+    # server: "https://acme-staging-v02.api.letsencrypt.org/directory"
+    azureDNS:
+      subscriptionID: "<PREENCHER>"
+      tenantID: "<PREENCHER>"
+      resourceGroupName: "<PREENCHER>"   # RG da Azure DNS Zone PÚBLICA
+      hostedZoneName: "<PREENCHER>"      # ex: cliente.com.br
+      environment: AzurePublicCloud
+      clientID: "<PREENCHER>"            # appId do Service Principal
+      # O clientSecret NUNCA vai para o Git. Ele vem do Secret abaixo, criado
+      # à mão no namespace cert-manager -- ver docs/cliente/03-day2-ingress-dns-certs.md
+      clientSecretRef:
+        name: azuredns-config
+        key: client-secret
+
+  # ClusterIssuer "internal-ca": CA própria, para nomes que não são resolvíveis
+  # publicamente. Exige distribuir a CA raiz nos clients.
+  internalCA:
+    enabled: true
+    selfSigned: true                     # true  = gera a CA raiz dentro do cluster
+                                         # false = usa um Secret tls.crt/tls.key já existente
+    caSecretName: internal-ca-key-pair
+    commonName: "Cliente Internal CA"
+    durationHours: 87600                 # 10 anos
+
+  # Certificados de aplicação. O Secret gerado pode ser referenciado
+  # em spec.tls.externalCertificate da Route ou montado no pod.
+  appCertificates: []
+    # - name: checkout-tls
+    #   namespace: pagamentos
+    #   issuer: letsencrypt-prod         # letsencrypt-prod | internal-ca
+    #   secretName: checkout-tls
+    #   dnsNames:
+    #     - "checkout.public.apps.azr-cliente-dev-01.cliente.com.br"
+
+
+# =============================================================================
+#  4. INGRESS CONTROLLERS -- um privado e um público, além do default
+# =============================================================================
+ingress:
+  enabled: false
+
+  default:
+    # Uma Route é admitida por TODO IngressController cujo routeSelector casa.
+    # O IngressController "default" vem com routeSelector vazio, ou seja, admite
+    # tudo -- inclusive as rotas que você marcou como private/public.
+    # Com isolateByLabel=true o default passa a recusar qualquer Route que tenha
+    # a label abaixo, garantindo o isolamento. Rotas do console/OAuth não têm
+    # essa label e continuam funcionando normalmente no default.
+    isolateByLabel: true
+    labelKey: router
+
+  # ---- IngressController PRIVADO: Load Balancer interno da Azure ----
+  private:
+    enabled: true
+    name: private
+    domain: "<PREENCHER>"           # ex: private.apps.azr-cliente-dev-01.cliente.com.br
+    replicas: 2
+    scope: Internal
+    # LABEL DE ADMISSÃO: só Routes com esta label entram neste IngressController.
+    routeSelector:
+      key: router
+      value: private
+    # Opcional: restringe também por namespace. Ex:
+    #   namespaceSelector: { environment: producao }
+    namespaceSelector: {}
+    # Opcional: fixa os routers em nós específicos. Ex:
+    #   nodePlacement: { node-role.kubernetes.io/infra: "" }
+    nodePlacement: {}
+    certificate:
+      enabled: true
+      issuer: internal-ca           # internal-ca | letsencrypt-prod
+      secretName: private-ingress-tls
+
+  # ---- IngressController PÚBLICO: Load Balancer público da Azure ----
+  public:
+    enabled: true
+    name: public
+    domain: "<PREENCHER>"           # ex: public.apps.azr-cliente-dev-01.cliente.com.br
+    replicas: 2
+    scope: External
+    routeSelector:
+      key: router
+      value: public
+    namespaceSelector: {}
+    nodePlacement: {}
+    certificate:
+      enabled: true
+      issuer: letsencrypt-prod      # internal-ca | letsencrypt-prod
+      secretName: public-ingress-tls
+
+
+# =============================================================================
+#  5. EXTERNAL DNS -- uma instância por zona / por IngressController
+# =============================================================================
+externalDNS:
+  enabled: false
+
+  azure:
+    subscriptionId: "<PREENCHER>"
+    tenantId: "<PREENCHER>"
+    aadClientId: "<PREENCHER>"      # appId do Service Principal
+    # DEIXE SEMPRE VAZIO NO GIT.
+    # Os Secrets azure.json (um por zona) são criados fora do repositório por
+    # docs/cliente/scripts/criar-secrets-day2.sh, que lê exatamente os valores
+    # acima e pede o client secret interativamente.
+    aadClientSecret: ""
+
+  # ---- Azure PRIVATE DNS Zone <- rotas do IngressController privado ----
+  private:
+    enabled: true
+    name: private
+    routerName: private             # DEVE casar com ingress.private.name
+    domain: "<PREENCHER>"           # DEVE casar com ingress.private.domain
+    resourceGroup: "<PREENCHER>"    # RG da Private DNS Zone
+    # Resource ID completo da zona privada:
+    #   /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Network/privateDnsZones/<zona>
+    zoneId: "<PREENCHER>"
+    configSecretName: azure-config-file-private
+
+  # ---- Azure PUBLIC DNS Zone <- rotas do IngressController público ----
+  public:
+    enabled: true
+    name: public
+    routerName: public              # DEVE casar com ingress.public.name
+    domain: "<PREENCHER>"           # DEVE casar com ingress.public.domain
+    resourceGroup: "<PREENCHER>"    # RG da Azure DNS Zone pública
+    # Resource ID completo da zona pública:
+    #   /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Network/dnszones/<zona>
+    zoneId: "<PREENCHER>"
+    configSecretName: azure-config-file-public

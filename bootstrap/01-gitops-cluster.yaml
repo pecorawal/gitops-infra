@@ -1,0 +1,28 @@
+# ---------------------------------------------------------------------------
+#  A COLA ENTRE O ACM E O ARGOCD
+# ---------------------------------------------------------------------------
+#  Sem este objeto o ArgoCD nunca conhece os clusters gerenciados: ele varre a
+#  Placement abaixo (bootstrap/main-placement.yaml), pega todo ManagedCluster
+#  com a label apps.open-cluster-management.io/replicate-to-argocd=true e cria
+#  o Secret de cluster correspondente em openshift-gitops.
+#
+#  E esse Secret que faz "destination.name: <clusterName>" funcionar nas
+#  Applications de day-2 geradas por charts/cluster-bundle.
+#
+#  Conferir depois de aplicar:
+#    oc get secret -n openshift-gitops -l argocd.argoproj.io/secret-type=cluster
+# ---------------------------------------------------------------------------
+apiVersion: apps.open-cluster-management.io/v1beta1
+kind: GitOpsCluster
+metadata:
+  name: gitops-cluster
+  namespace: openshift-gitops
+spec:
+  argoServer:
+    cluster: local-cluster
+    argoNamespace: openshift-gitops
+  placementRef:
+    kind: Placement
+    apiVersion: cluster.open-cluster-management.io/v1beta1
+    name: all-managed-clusters
+    namespace: openshift-gitops

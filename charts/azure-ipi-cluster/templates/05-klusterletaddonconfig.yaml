@@ -1,0 +1,24 @@
+{{- if .Values.provision.enabled }}
+# Addons do ACM instalados no cluster assim que ele e importado.
+apiVersion: agent.open-cluster-management.io/v1
+kind: KlusterletAddonConfig
+metadata:
+  name: {{ .Values.clusterName }}
+  namespace: {{ .Values.clusterName }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  clusterName: {{ .Values.clusterName }}
+  clusterNamespace: {{ .Values.clusterName }}
+  clusterLabels:
+    cloud: {{ .Values.cloudProvider | default "Azure" }}
+    vendor: OpenShift
+  applicationManager:
+    enabled: {{ .Values.addons.applicationManager }}
+  policyController:
+    enabled: {{ .Values.addons.policyController }}
+  searchCollector:
+    enabled: {{ .Values.addons.searchCollector }}
+  certPolicyController:
+    enabled: {{ .Values.addons.certPolicyController }}
+{{- end }}

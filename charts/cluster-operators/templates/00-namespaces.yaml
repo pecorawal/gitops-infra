@@ -1,0 +1,18 @@
+{{- if .Values.operators.enabled }}
+# Namespaces dos operators e dos operandos.
+# cert-manager-operator  -> operator | cert-manager         -> operando
+# external-dns-operator  -> operator e operando no mesmo ns
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cert-manager-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: external-dns-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+{{- end }}

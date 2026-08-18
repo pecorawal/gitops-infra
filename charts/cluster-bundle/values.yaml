@@ -1,0 +1,21 @@
+# Valores injetados pelo ApplicationSet (bootstrap/02-appset-cliente.yaml).
+# Nao edite aqui -- o arquivo do cliente e clusters/<cluster>/values.yaml.
+global:
+  repoURL: "https://github.com/pecorawal/gitops-infra.git"
+  targetRevision: cliente
+  # Caminho, a partir da raiz do repo, do values.yaml do cluster.
+  valuesPath: "clusters/azr-cliente-dev-01/values.yaml"
+  argoNamespace: openshift-gitops
+  project: default
+
+clusterName: ""
+provision:
+  enabled: false
+operators:
+  enabled: false
+certManager:
+  enabled: false
+ingress:
+  enabled: false
+externalDNS:
+  enabled: false

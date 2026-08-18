@@ -1,0 +1,26 @@
+{{- if .Values.provision.enabled }}
+# Registra o cluster no ACM. Clusters provisionados pelo Hive sao importados
+# automaticamente -- nao existe auto-import-secret / kubeconfig aqui, ao
+# contrario de charts/import-cluster.
+#
+# A label apps.open-cluster-management.io/replicate-to-argocd e o que faz o
+# GitOpsCluster registrar este cluster como destino de deploy no ArgoCD, que
+# por sua vez habilita todas as Applications de day-2.
+apiVersion: cluster.open-cluster-management.io/v1
+kind: ManagedCluster
+metadata:
+  name: {{ .Values.clusterName }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  labels:
+    cloud: {{ .Values.cloudProvider | default "Azure" }}
+    vendor: OpenShift
+    env: {{ .Values.environment | default "dev" | quote }}
+    cluster.open-cluster-management.io/clusterset: {{ .Values.clusterSet | default "global-clusters" }}
+    apps.open-cluster-management.io/replicate-to-argocd: "true"
+    {{- with .Values.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  hubAcceptsClient: true
+{{- end }}

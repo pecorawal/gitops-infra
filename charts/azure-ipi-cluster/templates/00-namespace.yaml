@@ -1,0 +1,15 @@
+{{- if .Values.provision.enabled }}
+# Namespace do cluster no hub. Abriga a Credential do ACM, o ClusterDeployment
+# e todos os objetos do Hive.
+# Prune=false: apagar a Application NAO pode apagar este namespace junto com a
+# Credential do ACM que voce criou dentro dele.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.clusterName }}
+  labels:
+    cluster.open-cluster-management.io/managedCluster: {{ .Values.clusterName }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+    argocd.argoproj.io/sync-options: Prune=false
+{{- end }}

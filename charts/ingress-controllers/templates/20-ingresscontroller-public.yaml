@@ -1,0 +1,6 @@
+{{- if and .Values.ingress.enabled .Values.ingress.public.enabled }}
+# IngressController PUBLICO -- Load Balancer publico da Azure.
+# Publica *.{{ .Values.ingress.public.domain }} na Azure DNS Zone publica
+# (via ExternalDNS, wave 40).
+{{ include "ingress-controllers.controller" (dict "ic" .Values.ingress.public "wave" "0") }}
+{{- end }}

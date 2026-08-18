@@ -1,0 +1,35 @@
+{{- if .Values.provision.enabled }}
+# WAVE 0 -- HUB. Cria o ClusterDeployment (Hive) que provisiona o cluster
+# OpenShift IPI na Azure e o registra como ManagedCluster no ACM.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: provision-{{ .Values.clusterName }}
+  namespace: {{ .Values.global.argoNamespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    # Sem este finalizer, apagar a Application deixaria o cluster orfao na Azure.
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ .Values.global.project }}
+  source:
+    {{- include "bundle.source" (dict "root" . "chart" "azure-ipi-cluster") | nindent 4 }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.clusterName }}
+  # O Hive escreve nestes campos durante e depois do provisionamento.
+  # Sem ignoreDifferences o selfHeal entraria em loop revertendo o Hive.
+  ignoreDifferences:
+    - group: hive.openshift.io
+      kind: ClusterDeployment
+      jsonPointers:
+        - /spec/installed
+        - /spec/clusterMetadata
+        - /spec/provisioning/installerImageOverride
+    - group: hive.openshift.io
+      kind: MachinePool
+      jsonPointers:
+        - /spec/replicas
+  {{- include "bundle.syncPolicy" . | nindent 2 }}
+{{- end }}

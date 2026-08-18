@@ -1,0 +1,21 @@
+{{- if .Values.operators.enabled }}
+# WAVE 10 -- SPOKE. Instala cert-manager Operator e ExternalDNS Operator
+# no cluster recem-provisionado.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: operators-{{ .Values.clusterName }}
+  namespace: {{ .Values.global.argoNamespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  project: {{ .Values.global.project }}
+  source:
+    {{- include "bundle.source" (dict "root" . "chart" "cluster-operators") | nindent 4 }}
+  destination:
+    # destination.name = nome do ManagedCluster. O ACM registra o spoke no
+    # ArgoCD com esse nome via GitOpsCluster (bootstrap/01-gitops-cluster.yaml).
+    name: {{ .Values.clusterName }}
+    namespace: openshift-operators
+  {{- include "bundle.syncPolicy" . | nindent 2 }}
+{{- end }}

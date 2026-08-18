@@ -1,0 +1,12 @@
+operators:
+  enabled: false
+  certManager:
+    channel: stable-v1
+    source: redhat-operators
+    sourceNamespace: openshift-marketplace
+    installPlanApproval: Automatic
+  externalDNS:
+    channel: stable-v1
+    source: redhat-operators
+    sourceNamespace: openshift-marketplace
+    installPlanApproval: Automatic

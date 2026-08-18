@@ -1,0 +1,5 @@
+{{- if and .Values.externalDNS.enabled .Values.externalDNS.private.enabled }}
+# ExternalDNS PRIVADO -- publica as Routes do IngressController
+# "{{ .Values.externalDNS.private.routerName }}" na Azure PRIVATE DNS Zone.
+{{ include "external-dns-config.instance" (dict "zone" .Values.externalDNS.private) }}
+{{- end }}

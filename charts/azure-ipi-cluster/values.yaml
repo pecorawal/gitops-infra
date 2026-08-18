@@ -1,0 +1,50 @@
+# Defaults. Os valores reais vem de clusters/<cluster>/values.yaml.
+clusterName: ""
+environment: dev
+baseDomain: ""
+clusterSet: global-clusters
+cloudProvider: Azure
+labels: {}
+addons:
+  policyController: true
+  searchCollector: true
+  applicationManager: true
+  certPolicyController: true
+
+provision:
+  enabled: false
+  imageSetRef: ""
+  credentialsSecret: ""
+  pullSecretRef: ""
+  sshPrivateKeySecretRef: ""
+  publish: Internal
+  fips: false
+  azure:
+    region: ""
+    cloudName: AzurePublicCloud
+    baseDomainResourceGroupName: ""
+    networkResourceGroupName: ""
+    virtualNetwork: ""
+    controlPlaneSubnet: ""
+    computeSubnet: ""
+    outboundType: UserDefinedRouting
+  networking:
+    networkType: OVNKubernetes
+    clusterNetwork: "10.128.0.0/14"
+    hostPrefix: 23
+    serviceNetwork: "172.30.0.0/16"
+    machineNetwork: ""
+  controlPlane:
+    replicas: 3
+    type: Standard_D8s_v3
+    osDisk:
+      diskSizeGB: 1024
+      diskType: Premium_LRS
+    zones: ["1", "2", "3"]
+  compute:
+    replicas: 3
+    type: Standard_D4s_v3
+    osDisk:
+      diskSizeGB: 512
+      diskType: Premium_LRS
+    zones: ["1", "2", "3"]

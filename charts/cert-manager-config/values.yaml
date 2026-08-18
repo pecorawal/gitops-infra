@@ -1,0 +1,39 @@
+clusterName: ""
+certManager:
+  enabled: false
+  acme:
+    enabled: false
+    email: ""
+    server: "https://acme-v02.api.letsencrypt.org/directory"
+    azureDNS:
+      subscriptionID: ""
+      tenantID: ""
+      resourceGroupName: ""
+      hostedZoneName: ""
+      environment: AzurePublicCloud
+      clientID: ""
+      clientSecretRef:
+        name: azuredns-config
+        key: client-secret
+  internalCA:
+    enabled: false
+    selfSigned: true
+    caSecretName: internal-ca-key-pair
+    commonName: "Internal CA"
+    durationHours: 87600
+  appCertificates: []
+ingress:
+  private:
+    enabled: false
+    domain: ""
+    certificate:
+      enabled: false
+      issuer: internal-ca
+      secretName: private-ingress-tls
+  public:
+    enabled: false
+    domain: ""
+    certificate:
+      enabled: false
+      issuer: letsencrypt-prod
+      secretName: public-ingress-tls

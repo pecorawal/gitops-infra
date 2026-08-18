@@ -1,0 +1,55 @@
+# ---------------------------------------------------------------------------
+#  MOTOR DO FLUXO CLIENTE
+# ---------------------------------------------------------------------------
+#  Varre clusters/*/values.yaml e, para cada arquivo encontrado, cria uma
+#  Application "bundle-<cluster>" que renderiza charts/cluster-bundle -- o
+#  app dos apps, que por sua vez emite as Applications de provisionamento e
+#  de day-2 conforme os interruptores "enabled" do values.yaml.
+#
+#  Adicionar um cluster novo = criar clusters/<nome>/values.yaml e commitar.
+# ---------------------------------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cliente-clusters
+  namespace: openshift-gitops
+spec:
+  goTemplate: false
+  generators:
+    - git:
+        repoURL: 'https://github.com/pecorawal/gitops-infra.git'
+        revision: cliente
+        files:
+          - path: "clusters/*/values.yaml"
+  template:
+    metadata:
+      name: 'bundle-{{path.basename}}'
+    spec:
+      project: default
+      source:
+        repoURL: 'https://github.com/pecorawal/gitops-infra.git'
+        targetRevision: cliente
+        path: charts/cluster-bundle
+        helm:
+          releaseName: '{{path.basename}}'
+          # ../../ leva de charts/cluster-bundle ate a raiz do repositorio.
+          valueFiles:
+            - '../../{{path}}/values.yaml'
+          parameters:
+            # Repassados as Applications filhas para que elas apontem para o
+            # mesmo repo/revisao e para o mesmo values.yaml deste cluster.
+            - name: global.repoURL
+              value: 'https://github.com/pecorawal/gitops-infra.git'
+            - name: global.targetRevision
+              value: 'cliente'
+            - name: global.valuesPath
+              value: '{{path}}/values.yaml'
+      destination:
+        server: 'https://kubernetes.default.svc'
+        namespace: openshift-gitops
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

@@ -1,0 +1,35 @@
+{{- if and .Values.ingress.enabled .Values.ingress.default.isolateByLabel }}
+# ---------------------------------------------------------------------------
+#  ISOLAMENTO DO IngressController "default"
+# ---------------------------------------------------------------------------
+#  Uma Route e admitida por TODO IngressController cujo routeSelector casa com
+#  ela. O "default" nasce com routeSelector vazio, ou seja, admite tudo -- e
+#  isso inclui as rotas que voce marcou com router=private, que passariam a
+#  ser servidas tambem pelo ingress default.
+#
+#  O patch abaixo faz o default recusar qualquer Route que tenha a label
+#  "{{ .Values.ingress.default.labelKey }}", seja qual for o valor. Rotas do
+#  console, OAuth e demais rotas de plataforma nao tem essa label e continuam
+#  funcionando normalmente.
+#
+#  ServerSideApply: o ArgoCD altera apenas o campo routeSelector, sem assumir
+#  a posse do objeto inteiro (que pertence ao ingress-operator).
+#
+#  Para reverter:
+#    oc patch ingresscontroller default -n openshift-ingress-operator \
+#      --type=json -p '[{"op":"remove","path":"/spec/routeSelector"}]'
+# ---------------------------------------------------------------------------
+apiVersion: operator.openshift.io/v1
+kind: IngressController
+metadata:
+  name: default
+  namespace: openshift-ingress-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+    argocd.argoproj.io/sync-options: ServerSideApply=true
+spec:
+  routeSelector:
+    matchExpressions:
+      - key: {{ .Values.ingress.default.labelKey }}
+        operator: DoesNotExist
+{{- end }}
