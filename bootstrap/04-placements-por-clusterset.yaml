@@ -7,7 +7,7 @@
 #
 #  As duas abaixo servem para segmentar por ambiente: ACM Policies que so devem
 #  valer em producao, janelas de manutencao distintas, ou ApplicationSets de
-#  workload que precisem separar prod de non-prod.
+#  workload que precisem separar producao de nao-producao.
 #
 #  Exemplo de uso num ApplicationSet:
 #    generators:
@@ -15,16 +15,16 @@
 #          configMapRef: acm-placement
 #          labelSelector:
 #            matchLabels:
-#              cluster.open-cluster-management.io/placement: prod-clusters
+#              cluster.open-cluster-management.io/placement: pro-clusters
 # ---------------------------------------------------------------------------
 apiVersion: cluster.open-cluster-management.io/v1beta1
 kind: Placement
 metadata:
-  name: prod-clusters
+  name: pro-clusters
   namespace: openshift-gitops
 spec:
   clusterSets:
-    - prod
+    - pro
   predicates:
     - requiredClusterSelector:
         labelSelector:
@@ -34,11 +34,11 @@ spec:
 apiVersion: cluster.open-cluster-management.io/v1beta1
 kind: Placement
 metadata:
-  name: non-prod-clusters
+  name: non-pro-clusters
   namespace: openshift-gitops
 spec:
   clusterSets:
-    - non-prod
+    - non-pro
   predicates:
     - requiredClusterSelector:
         labelSelector:

@@ -183,9 +183,9 @@ labels:
 # ou
 clusterSets:
   byEnv:
-    sandbox: non-prod      # 2. mapeie o env novo
+    sandbox: non-pro       # 2. mapeie o env novo
 # ou
-clusterSet: "non-prod"     # 3. force o set, ignorando o mapa
+clusterSet: "non-pro"      # 3. force o set, ignorando o mapa
 ```
 
 ## O ApplicationSet não gerou nada

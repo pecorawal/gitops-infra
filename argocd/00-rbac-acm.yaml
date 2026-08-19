@@ -65,9 +65,9 @@ rules:
 
   # 'bind': exigido para criar um ManagedClusterSetBinding.
   # 'join':  exigido para por a label cluster.open-cluster-management.io/clusterset
-  #          num ManagedCluster -- e o que decide prod vs non-prod.
+  #          num ManagedCluster -- e o que decide pro vs non-pro.
   # Para restringir a sets especificos, acrescente:
-  #   resourceNames: ["prod", "non-prod"]
+  #   resourceNames: ["pro", "non-pro"]
   - apiGroups: ["cluster.open-cluster-management.io"]
     resources: ["managedclustersets/bind", "managedclustersets/join"]
     verbs: ["create"]
