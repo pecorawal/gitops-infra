@@ -21,15 +21,15 @@
 apiVersion: cluster.open-cluster-management.io/v1beta2
 kind: ManagedClusterSetBinding
 metadata:
-  name: prod
+  name: pro
   namespace: openshift-gitops
 spec:
-  clusterSet: prod
+  clusterSet: pro
 ---
 apiVersion: cluster.open-cluster-management.io/v1beta2
 kind: ManagedClusterSetBinding
 metadata:
-  name: non-prod
+  name: non-pro
   namespace: openshift-gitops
 spec:
-  clusterSet: non-prod
+  clusterSet: non-pro
