@@ -34,17 +34,23 @@ cloudProvider: Azure
 #
 #  Para o vinculo funcionar, o set precisa estar ligado ao namespace
 #  openshift-gitops por um ManagedClusterSetBinding -- ja aplicado em
-#  bootstrap/03-cluster-set-bindings.yaml para prod e non-prod.
+#  bootstrap/03-cluster-set-bindings.yaml para pro e non-pro.
+#
+#  A ESQUERDA do mapa e o valor de labels.env (o AMBIENTE).
+#  A DIREITA e o nome do ManagedClusterSet como ele existe no ACM.
+#  Confira os nomes reais com: oc get managedclusterset
 # ---------------------------------------------------------------------------
 clusterSets:
-  default: non-prod          # usado quando labels.env nao consta no mapa abaixo
+  default: non-pro           # usado quando labels.env nao consta no mapa abaixo
   byEnv:
-    prod: prod
-    non-prod: non-prod
-    # atalhos, para nao obrigar o env a ser literalmente "non-prod"
-    dev: non-prod
-    qa: non-prod
-    hml: non-prod
+    prod: pro
+    pro: pro
+    non-prod: non-pro
+    non-pro: non-pro
+    # atalhos, para nao obrigar o env a ser literalmente "non-pro"
+    dev: non-pro
+    qa: non-pro
+    hml: non-pro
 
 # Escape hatch: preencha para ignorar o mapeamento acima e forcar um set.
 clusterSet: ""

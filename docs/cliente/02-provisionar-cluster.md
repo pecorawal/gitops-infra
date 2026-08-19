@@ -31,26 +31,32 @@ Sobre a topologia escolhida:
 
 ## 2.3 Escolher o ManagedClusterSet pelo `env`
 
-Os ManagedClusterSets **`prod`** e **`non-prod`** já existem no ACM. Este
+Os ManagedClusterSets **`pro`** e **`non-pro`** já existem no ACM. Este
 repositório **não os cria** — de propósito, para que um `prune` do ArgoCD nunca
 possa apagar um agrupamento de clusters de produção. O que o `values.yaml`
 decide é em qual deles o cluster entra, a partir de `labels.env`:
 
 ```yaml
 clusterSets:
-  default: non-prod          # usado quando labels.env não consta no mapa
+  default: non-pro           # usado quando labels.env não consta no mapa
   byEnv:
-    prod: prod
-    non-prod: non-prod
-    dev: non-prod
-    qa: non-prod
-    hml: non-prod
+    prod: pro                # <ambiente>: <nome do ManagedClusterSet no ACM>
+    pro: pro
+    non-prod: non-pro
+    non-pro: non-pro
+    dev: non-pro
+    qa: non-pro
+    hml: non-pro
 
 clusterSet: ""               # escape hatch: preenchido, ignora o mapeamento
 
 labels:
   env: "dev"                 # <-- é isto que decide
 ```
+
+À **esquerda** do mapa fica o valor de `labels.env` (o ambiente); à **direita**,
+o nome do `ManagedClusterSet` como ele existe no ACM. Os dois não precisam
+coincidir — aqui `env: prod` leva ao set chamado `pro`.
 
 Resolução, em ordem:
 
@@ -86,18 +92,19 @@ oc get managedclusterset
 oc get managedclusterset
 ```
 
-Se o seu ACM usa nomes diferentes de `prod` / `non-prod`, mude em **dois**
+Se o seu ACM usa nomes diferentes de `pro` / `non-pro`, mude em **três**
 lugares:
 
 1. `clusterSets.byEnv` e `clusterSets.default` em `clusters/<cluster>/values.yaml`
 2. `bootstrap/03-cluster-set-bindings.yaml`, que vincula os sets ao namespace
    `openshift-gitops`
+3. `bootstrap/04-placements-por-clusterset.yaml`, no campo `spec.clusterSets`
 
 O vínculo é obrigatório: sem o `ManagedClusterSetBinding`, a `Placement`
 `all-managed-clusters` não enxerga os clusters do set, o `GitOpsCluster` não os
 registra no ArgoCD e nenhuma Application de day-2 encontra destino.
 
-> Também são criadas as Placements `prod-clusters` e `non-prod-clusters`
+> Também são criadas as Placements `pro-clusters` e `non-pro-clusters`
 > (`bootstrap/04-placements-por-clusterset.yaml`), úteis para segmentar ACM
 > Policies e ApplicationSets de workload por ambiente. A Placement
 > `all-managed-clusters` continua cobrindo os dois sets — é ela que o

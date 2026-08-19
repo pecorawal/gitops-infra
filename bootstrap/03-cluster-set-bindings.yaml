@@ -1,7 +1,7 @@
 # ---------------------------------------------------------------------------
 #  VINCULO DOS ManagedClusterSets AO NAMESPACE DO ARGOCD
 # ---------------------------------------------------------------------------
-#  Os ManagedClusterSets "prod" e "non-prod" JA EXISTEM no ACM e nao sao criados
+#  Os ManagedClusterSets "pro" e "non-pro" JA EXISTEM no ACM e nao sao criados
 #  por este repositorio -- de proposito, para que um prune do ArgoCD nunca possa
 #  apagar um agrupamento de clusters de producao.
 #
@@ -12,7 +12,7 @@
 #
 #  Uma Placement sem spec.clusterSets seleciona a partir de TODOS os sets
 #  vinculados ao seu namespace -- por isso a Placement existente continua
-#  cobrindo prod e non-prod sem alteracao.
+#  cobrindo pro e non-pro sem alteracao.
 #
 #  Se os nomes dos sets no seu ACM forem outros, mude aqui E em
 #  clusterSets.byEnv de clusters/<cluster>/values.yaml. Confira com:

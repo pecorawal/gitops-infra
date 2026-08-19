@@ -47,9 +47,12 @@ O `ManagedClusterSet` em que o cluster entra é decidido por `labels.env`:
 
 | `labels.env` | ManagedClusterSet |
 |---|---|
-| `prod` | `prod` |
-| `non-prod`, `dev`, `qa`, `hml` | `non-prod` |
+| `prod`, `pro` | `pro` |
+| `non-prod`, `non-pro`, `dev`, `qa`, `hml` | `non-pro` |
 | qualquer outro | `clusterSets.default` (ou falha, se vazio) |
+
+O nome do ambiente e o nome do set não precisam coincidir: `env: prod` leva ao
+`ManagedClusterSet` chamado `pro`.
 
 Os dois sets já existem no ACM e **não são criados por este repositório** — só
 vinculados ao namespace `openshift-gitops`
