@@ -38,6 +38,22 @@ argocd/root-cliente.yaml            (aplicado UMA vez, na mão)
 
 As cinco Applications filhas leem **o mesmo** `clusters/<cluster>/values.yaml`.
 
+## Agrupamento por ambiente
+
+O `ManagedClusterSet` em que o cluster entra é decidido por `labels.env`:
+
+| `labels.env` | ManagedClusterSet |
+|---|---|
+| `prod` | `prod` |
+| `non-prod`, `dev`, `qa`, `hml` | `non-prod` |
+| qualquer outro | `clusterSets.default` (ou falha, se vazio) |
+
+Os dois sets já existem no ACM e **não são criados por este repositório** — só
+vinculados ao namespace `openshift-gitops`
+(`bootstrap/03-cluster-set-bindings.yaml`). O mapa é editável em
+`clusterSets.byEnv` no values do cluster. Detalhes em
+[2.3](02-provisionar-cluster.md#23-escolher-o-managedclusterset-pelo-env).
+
 ## Os interruptores
 
 Cada bloco do `values.yaml` tem um `enabled:`. Enquanto ele for `false`, o chart

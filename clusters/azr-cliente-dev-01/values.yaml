@@ -24,11 +24,34 @@
 # =============================================================================
 clusterName: azr-cliente-dev-01     # == nome deste diretório, do namespace no hub e do ManagedCluster
 baseDomain: "cgibs.gov.br"          # domínio base (Azure DNS Zone pública)
-environment: dev
-clusterSet: global-clusters
 cloudProvider: Azure
 
+# ---------------------------------------------------------------------------
+#  ManagedClusterSet -- decidido por labels.env
+# ---------------------------------------------------------------------------
+#  Os dois ManagedClusterSets ja existem no ACM e NAO sao criados por este
+#  repositorio. O que este values decide e em qual deles o cluster entra.
+#
+#  Para o vinculo funcionar, o set precisa estar ligado ao namespace
+#  openshift-gitops por um ManagedClusterSetBinding -- ja aplicado em
+#  bootstrap/03-cluster-set-bindings.yaml para prod e non-prod.
+# ---------------------------------------------------------------------------
+clusterSets:
+  default: non-prod          # usado quando labels.env nao consta no mapa abaixo
+  byEnv:
+    prod: prod
+    non-prod: non-prod
+    # atalhos, para nao obrigar o env a ser literalmente "non-prod"
+    dev: non-prod
+    qa: non-prod
+    hml: non-prod
+
+# Escape hatch: preencha para ignorar o mapeamento acima e forcar um set.
+clusterSet: ""
+
 labels:
+  # env DECIDE O CLUSTERSET (ver clusterSets acima). Valor obrigatorio:
+  # se nao resolver nenhum set, a renderizacao do chart falha de proposito.
   env: "dev"
   region: "brazilsouth"
   vendor: "OpenShift"

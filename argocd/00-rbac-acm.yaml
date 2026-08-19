@@ -39,19 +39,42 @@ rules:
       - placementdecisions
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
-  # Subrecurso virtual exigido pelo webhook
-  # "managedclustersetbindingvalidators.admission.cluster.open-cluster-management.io".
-  # Criar um ManagedClusterSetBinding exige 'create' em managedclustersets/bind
-  # para o ManagedClusterSet referenciado -- e o erro
-  # "is not allowed to bind cluster set global-clusters".
+  # ------------------------------------------------------------------------
+  #  SUBRECURSOS VIRTUAIS
+  #  Nao existem na API de discovery. Sao checados pelos webhooks do OCM via
+  #  SubjectAccessReview, com exatamente estes atributos (fonte:
+  #  open-cluster-management-io/ocm, pkg/registration/webhook/):
   #
+  #    v1/managedcluster_validating.go:144
+  #      Group=register.open-cluster-management.io Resource=managedclusters
+  #      Subresource=accept Verb=update
+  #    v1/managedcluster_validating.go:233
+  #      Group=cluster.open-cluster-management.io  Resource=managedclustersets
+  #      Subresource=join   Verb=create
+  #    v1beta2/managedclustersetbinding_validating.go:65
+  #      Group=cluster.open-cluster-management.io  Resource=managedclustersets
+  #      Subresource=bind   Verb=create
+  #
+  #  ATENCAO AO VERIFICAR: "oc auth can-i" NAO consegue expressar estas checagens.
+  #  O kubectl trata o que vem depois da barra como NOME do objeto, e com
+  #  --subresource o restmapper resolve managedclusters para o grupo real
+  #  cluster.open-cluster-management.io, nunca para register... (que e sintetico).
+  #  Um "no" ali NAO significa que a permissao esta faltando.
+  #  Use: ./docs/cliente/scripts/verificar-rbac-acm.sh
+  # ------------------------------------------------------------------------
+
+  # 'bind': exigido para criar um ManagedClusterSetBinding.
+  # 'join':  exigido para por a label cluster.open-cluster-management.io/clusterset
+  #          num ManagedCluster -- e o que decide prod vs non-prod.
   # Para restringir a sets especificos, acrescente:
-  #   resourceNames: ["global-clusters"]
+  #   resourceNames: ["prod", "non-prod"]
   - apiGroups: ["cluster.open-cluster-management.io"]
     resources: ["managedclustersets/bind", "managedclustersets/join"]
     verbs: ["create"]
 
-  # hubAcceptsClient: true no ManagedCluster passa por este subrecurso.
+  # 'accept': exigido por hubAcceptsClient: true no ManagedCluster.
+  # O grupo register.open-cluster-management.io e sintetico: nao ha CRD nem
+  # recurso servido com esse nome, ele so aparece na SubjectAccessReview.
   - apiGroups: ["register.open-cluster-management.io"]
     resources: ["managedclusters/accept"]
     verbs: ["update"]

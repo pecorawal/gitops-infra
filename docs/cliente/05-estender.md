@@ -337,10 +337,25 @@ oc annotate application bundle-<cluster> -n openshift-gitops \
 
 ---
 
-## 5.6 Erros comuns ao estender
+## 5.6 Adicionar um ManagedClusterSet novo
+
+Se surgir um terceiro agrupamento (ex.: `dr`), são três lugares:
+
+1. crie o `ManagedClusterSet` no ACM (console ou `oc`) — **não** versione o
+   objeto, para que um `prune` não possa apagá-lo;
+2. `bootstrap/03-cluster-set-bindings.yaml`: mais um `ManagedClusterSetBinding`
+   para `openshift-gitops`;
+3. `clusters/<cluster>/values.yaml`: mais uma entrada em `clusterSets.byEnv`.
+
+Opcionalmente, mais uma `Placement` em
+`bootstrap/04-placements-por-clusterset.yaml` para segmentar policies e workloads.
+
+## 5.7 Erros comuns ao estender
 
 | Sintoma | Causa |
 |---|---|
+| `helm template` falha com "ManagedClusterSet indefinido" | `labels.env` não está em `clusterSets.byEnv` e `clusterSets.default` está vazio |
+| Cluster provisionado mas invisível no ArgoCD | falta o `ManagedClusterSetBinding` do set em `openshift-gitops` |
 | Application nova não aparece | faltou o interruptor em `charts/cluster-bundle/values.yaml`, ou o `if` no template |
 | `no matches for kind ... in version ...` | CR aplicado antes do operador; falta `SkipDryRunOnMissingResource=true` ou wave maior |
 | ArgoCD fica revertendo o objeto | outro controlador escreve nele; adicione `ignoreDifferences` na Application |

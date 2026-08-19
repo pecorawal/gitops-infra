@@ -3,9 +3,15 @@
 # automaticamente -- nao existe auto-import-secret / kubeconfig aqui, ao
 # contrario de charts/import-cluster.
 #
-# A label apps.open-cluster-management.io/replicate-to-argocd e o que faz o
-# GitOpsCluster registrar este cluster como destino de deploy no ArgoCD, que
-# por sua vez habilita todas as Applications de day-2.
+# Duas labels sao estruturais:
+#
+#   cluster.open-cluster-management.io/clusterset
+#     define em qual ManagedClusterSet o cluster entra. Resolvida a partir de
+#     labels.env pelo helper em _clusterset.tpl.
+#
+#   apps.open-cluster-management.io/replicate-to-argocd
+#     faz o GitOpsCluster registrar este cluster como destino de deploy no
+#     ArgoCD, o que habilita todas as Applications de day-2.
 apiVersion: cluster.open-cluster-management.io/v1
 kind: ManagedCluster
 metadata:
@@ -15,9 +21,9 @@ metadata:
   labels:
     cloud: {{ .Values.cloudProvider | default "Azure" }}
     vendor: OpenShift
-    env: {{ .Values.environment | default "dev" | quote }}
-    cluster.open-cluster-management.io/clusterset: {{ .Values.clusterSet | default "global-clusters" }}
+    cluster.open-cluster-management.io/clusterset: {{ include "azure-ipi-cluster.clusterSet" . }}
     apps.open-cluster-management.io/replicate-to-argocd: "true"
+    {{- /* labels.env entra pelo bloco abaixo; nao repetir a chave aqui */}}
     {{- with .Values.labels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}

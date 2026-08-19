@@ -47,6 +47,8 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 │   ├── 00-namespaces.yaml
 │   ├── 01-gitops-cluster.yaml
 │   ├── 02-appset-cliente.yaml
+│   ├── 03-cluster-set-bindings.yaml
+│   ├── 04-placements-por-clusterset.yaml
 │   ├── app-set-import.yaml
 │   ├── channel.yaml
 │   ├── cluster-set-binding.yaml
@@ -61,6 +63,7 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 │   │   │   ├── 03-machinepool-worker.yaml
 │   │   │   ├── 04-managedcluster.yaml
 │   │   │   ├── 05-klusterletaddonconfig.yaml
+│   │   │   ├── _clusterset.tpl
 │   │   │   └── _installconfig.tpl
 │   │   ├── Chart.yaml
 │   │   └── values.yaml
@@ -120,7 +123,8 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 ├── docs
 │   └── cliente
 │       ├── scripts
-│       │   └── criar-secrets-day2.sh
+│       │   ├── criar-secrets-day2.sh
+│       │   └── verificar-rbac-acm.sh
 │       ├── 00-visao-geral.md
 │       ├── 01-pre-requisitos.md
 │       ├── 02-provisionar-cluster.md
@@ -140,6 +144,6 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 ├── README.md
 └── gitops-workflow.md
 
-28 directories, 76 files
+28 directories, 80 files
 ```
 <!-- readme-tree end -->

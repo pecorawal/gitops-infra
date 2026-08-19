@@ -47,6 +47,66 @@ O segundo não é um erro de RBAC comum: quem nega é o webhook
 subrecurso virtual `managedclustersets/bind`. Dar `patch` em `managedclustersets`
 **não** basta — a regra do subrecurso é obrigatória.
 
+### "managedclusters/accept continua sem update" — provavelmente é o comando
+
+Se você checou com:
+
+```bash
+oc auth can-i update managedclusters.register.open-cluster-management.io/accept --as="$SA"
+```
+
+o `no` é **falso negativo**. Esse comando não checa o que você pensa:
+
+1. o `kubectl` trata o que vem depois da `/` como **nome do objeto**, não como
+   subrecurso — a checagem vira "posso dar update no ManagedCluster chamado
+   `accept`?", que o `ClusterRole` de fato não permite;
+2. com `--subresource=accept`, o restmapper resolve `managedclusters` para o
+   grupo real `cluster.open-cluster-management.io` — mas o webhook checa o grupo
+   **`register.open-cluster-management.io`**, que é sintético e não existe na API
+   de discovery.
+
+Use o script, que monta a `SubjectAccessReview` igual ao webhook:
+
+```bash
+./docs/cliente/scripts/verificar-rbac-acm.sh
+```
+
+Ou, na mão:
+
+```bash
+oc create -f - -o jsonpath='{.status.allowed}{"\n"}' <<'YAML'
+apiVersion: authorization.k8s.io/v1
+kind: SubjectAccessReview
+spec:
+  user: system:serviceaccount:openshift-gitops:openshift-gitops-argocd-application-controller
+  groups:
+    - system:serviceaccounts
+    - system:serviceaccounts:openshift-gitops
+    - system:authenticated
+  resourceAttributes:
+    group: register.open-cluster-management.io
+    resource: managedclusters
+    subresource: accept
+    verb: update
+YAML
+```
+
+Precisa imprimir `true`.
+
+As três checagens que **só** funcionam por `SubjectAccessReview`:
+
+| Grupo | Recurso | Subrecurso | Verbo | Exigido por |
+|---|---|---|---|---|
+| `register.open-cluster-management.io` | `managedclusters` | `accept` | `update` | `hubAcceptsClient: true` |
+| `cluster.open-cluster-management.io` | `managedclustersets` | `bind` | `create` | `ManagedClusterSetBinding` |
+| `cluster.open-cluster-management.io` | `managedclustersets` | `join` | `create` | label `clusterset` no `ManagedCluster` |
+
+(Atributos conferidos em `open-cluster-management-io/ocm`,
+`pkg/registration/webhook/v1/managedcluster_validating.go` e
+`pkg/registration/webhook/v1beta2/managedclustersetbinding_validating.go`.)
+
+Se a `SubjectAccessReview` realmente retornar `false`, aí sim é RBAC:
+
 ### O erro persiste depois de aplicar o RBAC
 
 ```bash
@@ -83,6 +143,50 @@ oc get secret -n openshift-gitops -l argocd.argoproj.io/secret-type=cluster
 
 Sem `apps.open-cluster-management.io/replicate-to-argocd=true` no `ManagedCluster`,
 o `GitOpsCluster` não cria o Secret e o ArgoCD não enxerga o cluster.
+
+## O cluster subiu mas nunca aparece no ArgoCD (clusterset)
+
+Depois de `GitOpsCluster` e label `replicate-to-argocd`, o terceiro motivo é o
+`ManagedClusterSet`:
+
+```bash
+oc get managedcluster <cluster> --show-labels | tr ',' '\n' | grep clusterset
+oc get managedclustersetbinding -n openshift-gitops
+oc get placementdecision -n openshift-gitops -l cluster.open-cluster-management.io/placement=all-managed-clusters -o yaml
+```
+
+| Situação | Causa |
+|---|---|
+| label `clusterset` ausente | `helm template` foi renderizado antes do mapeamento existir |
+| label aponta para um set inexistente | nome errado em `clusterSets.byEnv` — confira com `oc get managedclusterset` |
+| set existe, mas sem `ManagedClusterSetBinding` em `openshift-gitops` | falta aplicar `bootstrap/03-cluster-set-bindings.yaml` |
+| `PlacementDecision` vazia | a Placement não enxerga o set: é sempre um dos dois casos acima |
+
+Uma Placement sem `spec.clusterSets` seleciona a partir de **todos** os sets
+vinculados ao seu namespace. Se o binding não existe, o set é invisível para ela
+— e o cluster nunca vira destino no ArgoCD.
+
+## O `helm template` falha com "ManagedClusterSet indefinido"
+
+```
+ManagedClusterSet indefinido para o cluster "azr-cliente-prod-01".
+  labels.env = "sandbox"
+  clusterSets.byEnv nao tem essa chave e clusterSets.default esta vazio.
+```
+
+É proposital: sem clusterset o cluster seria provisionado e ficaria órfão do
+ArgoCD. Escolha uma saída:
+
+```yaml
+labels:
+  env: "prod"              # 1. use um env já mapeado
+# ou
+clusterSets:
+  byEnv:
+    sandbox: non-prod      # 2. mapeie o env novo
+# ou
+clusterSet: "non-prod"     # 3. force o set, ignorando o mapa
+```
 
 ## O ApplicationSet não gerou nada
 
