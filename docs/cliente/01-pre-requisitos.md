@@ -72,7 +72,82 @@ oc get clusterimageset | grep 4.18
 
 O nome que aparecer (ex.: `img4.18.20-multi-appsub`) vai em `provision.imageSetRef`.
 
-## 1.6 Aplicar o root — uma única vez
+## 1.6 Dar ao ArgoCD permissão sobre as APIs do ACM e do Hive
+
+Por padrão a ServiceAccount do ArgoCD **não** tem RBAC para `ManagedClusterSet`,
+`Channel`, `ClusterDeployment` e companhia. Sem este passo, a primeira
+sincronização falha com mensagens do tipo:
+
+```
+channels.apps.open-cluster-management.io is forbidden: User
+  "system:serviceaccount:openshift-gitops:openshift-gitops-argocd-application-controller"
+  cannot create resource "channels" in namespace "cluster-gitops-repo"
+
+managedclustersets/bind.apps "global-clusters" is forbidden: user ... is not
+  allowed to bind cluster set "global-clusters"
+
+managedclustersets.cluster.open-cluster-management.io "global-clusters" is
+  forbidden: User ... cannot patch resource "managedclustersets" at the cluster scope
+```
+
+Aplique como **cluster-admin**:
+
+```bash
+oc apply -f argocd/00-rbac-acm.yaml
+```
+
+Isso cria o `ClusterRole` **`openshift-gitops-acm-manager`** e o vincula às
+ServiceAccounts `openshift-gitops-argocd-application-controller` (escrita) e
+`openshift-gitops-argocd-server` (leitura, para a árvore de recursos na UI).
+
+> **Por que este arquivo não está em `bootstrap/`**
+>
+> O Kubernetes impede escalonamento de privilégio: uma ServiceAccount não pode
+> criar um `ClusterRole` com permissões que ela mesma não tem. Se o ArgoCD
+> tentasse aplicar este manifesto, seria negado. Por isso ele fica fora do que o
+> ArgoCD sincroniza.
+
+Confirme antes de seguir:
+
+```bash
+SA=system:serviceaccount:openshift-gitops:openshift-gitops-argocd-application-controller
+
+oc auth can-i patch  managedclustersets.cluster.open-cluster-management.io       --as="$SA"
+oc auth can-i create managedclustersets.cluster.open-cluster-management.io/bind  --as="$SA"
+oc auth can-i create channels.apps.open-cluster-management.io -n cluster-gitops-repo --as="$SA"
+oc auth can-i create clusterdeployments.hive.openshift.io -n default             --as="$SA"
+oc auth can-i update managedclusters.register.open-cluster-management.io/accept  --as="$SA"
+```
+
+Os cinco precisam responder `yes`.
+
+### Se preferir o caminho curto
+
+Alguns ambientes simplesmente dão `cluster-admin` ao ArgoCD:
+
+```bash
+oc adm policy add-cluster-role-to-user cluster-admin \
+  -z openshift-gitops-argocd-application-controller -n openshift-gitops
+```
+
+Funciona, mas dá ao ArgoCD poder total sobre o hub. O `ClusterRole` acima cobre
+exatamente o que este repositório usa — prefira ele.
+
+### Se o `can-i` continuar dando `no` depois de aplicar
+
+O operador do OpenShift GitOps só concede permissões de escopo de cluster às
+instâncias listadas em `ARGOCD_CLUSTER_CONFIG_NAMESPACES`:
+
+```bash
+oc get subscription -n openshift-operators openshift-gitops-operator \
+  -o jsonpath='{.spec.config.env}' | python3 -m json.tool
+```
+
+`openshift-gitops` precisa constar da lista. Se não constar, o `ClusterRoleBinding`
+acima pode ser sobrescrito pelo operador — inclua o namespace e aguarde o
+reinício do controlador.
+
+## 1.7 Aplicar o root — uma única vez
 
 ```bash
 oc apply -f argocd/root-cliente.yaml

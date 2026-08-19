@@ -12,6 +12,7 @@ Esta branch entrega o fluxo completo, dirigido por **um único `values.yaml` por
 4. **cert-manager** — `ClusterIssuer` ACME/DNS01 emitindo os wildcards `*.cgibs.gov.br` e `*.pri.cgibs.gov.br`
 
 ```bash
+oc apply -f argocd/00-rbac-acm.yaml       # RBAC do ArgoCD sobre ACM/Hive (cluster-admin)
 oc apply -f argocd/root-cliente.yaml      # uma única vez
 cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 # preencher os <PREENCHER>, virar os enabled: true, commitar
@@ -38,6 +39,7 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 │   └── workflows
 │       └── readme-tree.yaml
 ├── argocd
+│   ├── 00-rbac-acm.yaml
 │   ├── root-apps.yaml
 │   ├── root-cliente.yaml
 │   └── root-clusters.yaml
@@ -123,7 +125,8 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 │       ├── 01-pre-requisitos.md
 │       ├── 02-provisionar-cluster.md
 │       ├── 03-day2-ingress-dns-certs.md
-│       └── 04-troubleshooting.md
+│       ├── 04-troubleshooting.md
+│       └── 05-estender.md
 ├── imports
 │   └── rosaqa
 │       └── values.yaml
@@ -137,6 +140,6 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 ├── README.md
 └── gitops-workflow.md
 
-28 directories, 74 files
+28 directories, 76 files
 ```
 <!-- readme-tree end -->

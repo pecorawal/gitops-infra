@@ -1,5 +1,74 @@
 # 4. Troubleshooting
 
+## "one or more synchronization tasks completed unsuccessfully" — `is forbidden`
+
+O sintoma mais comum logo depois de aplicar `root-cliente.yaml`:
+
+```
+channels.apps.open-cluster-management.io is forbidden: User
+  "system:serviceaccount:openshift-gitops:openshift-gitops-argocd-application-controller"
+  cannot create resource "channels" in namespace "cluster-gitops-repo"
+
+managedclustersets/bind.apps "global-clusters" is forbidden: user ... is not
+  allowed to bind cluster set "global-clusters"
+
+managedclustersets.cluster.open-cluster-management.io "global-clusters" is
+  forbidden: User ... cannot patch resource "managedclustersets" at the cluster scope
+```
+
+**Causa:** o passo [1.6](01-pre-requisitos.md#16-dar-ao-argocd-permissão-sobre-as-apis-do-acm-e-do-hive)
+não foi executado. A ServiceAccount do ArgoCD não tem RBAC para as APIs do ACM.
+
+**Correção:**
+
+```bash
+oc apply -f argocd/00-rbac-acm.yaml
+```
+
+Depois force a re-sincronização (o ArgoCD já está tentando de novo com backoff,
+mas isso acelera):
+
+```bash
+oc annotate application cliente-bootstrap -n openshift-gitops \
+  argocd.argoproj.io/refresh=hard --overwrite
+```
+
+Note que os três erros são de naturezas diferentes e todos são cobertos pelo
+mesmo `ClusterRole`:
+
+| Erro | Regra que resolve |
+|---|---|
+| `cannot create resource "channels"` | `apiGroups: [apps.open-cluster-management.io]` |
+| `not allowed to bind cluster set` | `resources: [managedclustersets/bind]`, verbo `create` |
+| `cannot patch resource "managedclustersets"` | `resources: [managedclustersets]`, verbo `patch` |
+
+O segundo não é um erro de RBAC comum: quem nega é o webhook
+`managedclustersetbindingvalidators`, que faz um `SubjectAccessReview` no
+subrecurso virtual `managedclustersets/bind`. Dar `patch` em `managedclustersets`
+**não** basta — a regra do subrecurso é obrigatória.
+
+### O erro persiste depois de aplicar o RBAC
+
+```bash
+SA=system:serviceaccount:openshift-gitops:openshift-gitops-argocd-application-controller
+oc auth can-i create managedclustersets.cluster.open-cluster-management.io/bind --as="$SA"
+oc get clusterrolebinding openshift-gitops-acm-manager -o yaml
+```
+
+Se o `can-i` responde `no` com o binding presente, verifique
+`ARGOCD_CLUSTER_CONFIG_NAMESPACES` no Subscription do operador — instâncias fora
+dessa lista não recebem permissões de escopo de cluster e o operador pode
+reconciliar por cima do binding.
+
+### O `Channel` é mesmo necessário?
+
+`bootstrap/channel.yaml` pertence ao modelo de aplicação por *subscription* do
+ACM e **não é consumido por nada** neste fluxo, que é todo ArgoCD. Se você não
+usa o modelo de subscription do ACM, pode remover `bootstrap/channel.yaml` e
+`bootstrap/00-namespaces.yaml` da branch — um erro a menos e uma permissão a
+menos. Foram mantidos por virem do fluxo original em `main`.
+
+
 ## As Applications de day-2 estão em erro "Cluster not found"
 
 **Esperado** enquanto o cluster não terminou de ser provisionado e registrado.

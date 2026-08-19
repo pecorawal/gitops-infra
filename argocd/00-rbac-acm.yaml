@@ -1,0 +1,119 @@
+# ---------------------------------------------------------------------------
+#  RBAC DO ARGOCD SOBRE AS APIs DO ACM E DO HIVE
+# ---------------------------------------------------------------------------
+#  APLICAR ANTES de argocd/root-cliente.yaml, como cluster-admin:
+#
+#    oc apply -f argocd/00-rbac-acm.yaml
+#    oc apply -f argocd/root-cliente.yaml
+#
+#  POR QUE ISTO NAO PODE ESTAR EM bootstrap/
+#  O Kubernetes impede escalonamento de privilegio: uma ServiceAccount nao pode
+#  criar um ClusterRole com permissoes que ela mesma nao possui. Se o ArgoCD
+#  tentasse aplicar este arquivo, seria negado. Por isso ele fica fora do que o
+#  ArgoCD sincroniza e e aplicado uma unica vez por um humano com cluster-admin.
+#
+#  SEM ISTO voce vera, ao sincronizar o root:
+#    channels.apps.open-cluster-management.io is forbidden: User
+#      "system:serviceaccount:openshift-gitops:openshift-gitops-argocd-application-controller"
+#      cannot create resource "channels" ...
+#    managedclustersets/bind.apps "global-clusters" is forbidden: user ... is not
+#      allowed to bind cluster set "global-clusters"
+#    managedclustersets.cluster.open-cluster-management.io "global-clusters" is
+#      forbidden: User ... cannot patch resource "managedclustersets" at the cluster scope
+# ---------------------------------------------------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: openshift-gitops-acm-manager
+  labels:
+    app.kubernetes.io/part-of: argocd
+rules:
+  # ---- Registro e agrupamento de clusters ----
+  # managedclustersets: o erro "cannot patch ... at the cluster scope" vem daqui
+  - apiGroups: ["cluster.open-cluster-management.io"]
+    resources:
+      - managedclusters
+      - managedclustersets
+      - managedclustersetbindings
+      - placements
+      - placementdecisions
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Subrecurso virtual exigido pelo webhook
+  # "managedclustersetbindingvalidators.admission.cluster.open-cluster-management.io".
+  # Criar um ManagedClusterSetBinding exige 'create' em managedclustersets/bind
+  # para o ManagedClusterSet referenciado -- e o erro
+  # "is not allowed to bind cluster set global-clusters".
+  #
+  # Para restringir a sets especificos, acrescente:
+  #   resourceNames: ["global-clusters"]
+  - apiGroups: ["cluster.open-cluster-management.io"]
+    resources: ["managedclustersets/bind", "managedclustersets/join"]
+    verbs: ["create"]
+
+  # hubAcceptsClient: true no ManagedCluster passa por este subrecurso.
+  - apiGroups: ["register.open-cluster-management.io"]
+    resources: ["managedclusters/accept"]
+    verbs: ["update"]
+
+  # ---- Modelo de aplicacao do ACM ----
+  # channels: o erro "cannot create resource channels in namespace
+  # cluster-gitops-repo" vem daqui. GitOpsCluster (a cola ACM<->ArgoCD) tambem
+  # esta neste grupo.
+  - apiGroups: ["apps.open-cluster-management.io"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # ---- Addons e klusterlet ----
+  - apiGroups: ["agent.open-cluster-management.io"]
+    resources: ["klusterletaddonconfigs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["addon.open-cluster-management.io"]
+    resources: ["managedclusteraddons", "clustermanagementaddons"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["work.open-cluster-management.io"]
+    resources: ["manifestworks"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["internal.open-cluster-management.io"]
+    resources: ["managedclusterinfos"]
+    verbs: ["get", "list", "watch"]
+
+  # ---- Governanca (diretorio policies/) ----
+  - apiGroups: ["policy.open-cluster-management.io"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # ---- Provisionamento (Hive) ----
+  # ClusterDeployment, MachinePool, ClusterImageSet, ClusterPool, ClusterClaim.
+  # Ainda nao apareceu no erro porque a wave 0 so roda depois do bootstrap,
+  # mas seria o proximo bloqueio.
+  - apiGroups: ["hive.openshift.io", "extensions.hive.openshift.io"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # ---- Recursos de base usados pelos charts ----
+  # Namespace do cluster, Secret de install-config, pull secret.
+  - apiGroups: [""]
+    resources: ["namespaces", "secrets", "serviceaccounts", "configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+# O application-controller e quem aplica os manifestos: precisa de escrita.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: openshift-gitops-acm-manager
+  labels:
+    app.kubernetes.io/part-of: argocd
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: openshift-gitops-acm-manager
+subjects:
+  - kind: ServiceAccount
+    name: openshift-gitops-argocd-application-controller
+    namespace: openshift-gitops
+  # O servidor precisa ler os mesmos recursos para montar a arvore de recursos
+  # na interface; sem isto a UI mostra os objetos do ACM como "Unknown".
+  - kind: ServiceAccount
+    name: openshift-gitops-argocd-server
+    namespace: openshift-gitops
