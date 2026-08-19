@@ -7,9 +7,9 @@ Neste repositório está a definição de um OpenShift GitOps para importação 
 Esta branch entrega o fluxo completo, dirigido por **um único `values.yaml` por cluster**:
 
 1. **Provisionamento** — cluster OpenShift IPI na Azure (BYO VNet, privado) via Hive/ACM
-2. **IngressControllers** — um privado (LB interno) e um público (LB externo), com admissão de rota por label
+2. **IngressControllers** — privado (LB interno, `pri.cgibs.gov.br`) e público (LB externo, `cgibs.gov.br`), separados pela label `ingress-type`; o `default` fica reservado às aplicações internas do OpenShift
 3. **ExternalDNS** — uma instância para a Azure Private DNS Zone e outra para a Azure DNS Zone pública
-4. **cert-manager** — ClusterIssuers (ACME/Azure DNS e CA interna) e os certificados dos ingress e das aplicações
+4. **cert-manager** — `ClusterIssuer` ACME/DNS01 emitindo os wildcards `*.cgibs.gov.br` e `*.pri.cgibs.gov.br`
 
 ```bash
 oc apply -f argocd/root-cliente.yaml      # uma única vez
@@ -17,7 +17,8 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 # preencher os <PREENCHER>, virar os enabled: true, commitar
 ```
 
-📖 **Guia completo: [`docs/cliente/`](docs/cliente/00-visao-geral.md)**
+📖 **Guia completo: [`docs/cliente/`](docs/cliente/00-visao-geral.md)** — inclui
+[como adicionar novos operadores, manifestos e camadas](docs/cliente/05-estender.md).
 
 | Diretório | Papel |
 |---|---|

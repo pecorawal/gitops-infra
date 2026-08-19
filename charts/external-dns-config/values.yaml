@@ -15,6 +15,7 @@ externalDNS:
     domain: ""
     resourceGroup: ""
     zoneId: ""
+    excludeDomains: []
     configSecretName: azure-config-file-private
   public:
     enabled: false
@@ -23,4 +24,5 @@ externalDNS:
     domain: ""
     resourceGroup: ""
     zoneId: ""
+    excludeDomains: []
     configSecretName: azure-config-file-public

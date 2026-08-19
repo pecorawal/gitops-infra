@@ -35,6 +35,16 @@ spec:
     - filterType: Include
       matchType: Pattern
       pattern: {{ printf ".*\\.%s" ($z.domain | replace "." "\\.") | quote }}
+    {{- /*
+      Exclusoes. Necessarias quando o dominio de outro router e SUBDOMINIO deste:
+      sem excluir, o filtro .*\.cgibs\.gov\.br tambem casaria com
+      app.pri.cgibs.gov.br e as duas instancias disputariam o mesmo registro.
+    */}}
+    {{- range $z.excludeDomains }}
+    - filterType: Exclude
+      matchType: Pattern
+      pattern: {{ printf ".*\\.%s" (. | replace "." "\\.") | quote }}
+    {{- end }}
   zones:
     - {{ $z.zoneId | quote }}
 {{- end -}}

@@ -52,39 +52,61 @@ certManager:
   enabled: true
 ```
 
-São criados dois `ClusterIssuer`:
+### Um único issuer para os dois wildcards
 
-**`letsencrypt-prod`** — ACME com desafio DNS01 na Azure DNS Zone pública.
-Funciona também para nomes que só resolvem dentro da VNet: o registro TXT
-`_acme-challenge` é criado na zona **pública**, e é só ele que o Let's Encrypt
-consulta. Requisito: o domínio precisa estar delegado publicamente.
+O `ClusterIssuer` **`letsencrypt-prod`** usa desafio **DNS01 na Azure DNS Zone
+pública** (`cgibs.gov.br`) e emite:
 
-**`internal-ca`** — CA própria. Com `internalCA.selfSigned: true` a cadeia é
-montada dentro do cluster (`selfsigned-bootstrap` → `Certificate` raiz → `internal-ca`).
-Não depende de internet, mas os clients precisam confiar na CA raiz:
+| Certificado | Namespace | Usado por |
+|---|---|---|
+| `*.cgibs.gov.br` (`public-ingress-tls`) | `openshift-ingress` | `defaultCertificate` do IC público |
+| `*.pri.cgibs.gov.br` (`private-ingress-tls`) | `openshift-ingress` | `defaultCertificate` do IC privado |
 
-```bash
-oc get secret internal-ca-key-pair -n cert-manager \
-  -o jsonpath='{.data.tls\.crt}' | base64 -d > internal-ca.crt
+O wildcard **privado também sai do Let's Encrypt**, e isso funciona porque o
+desafio DNS01 não precisa que o nome final seja resolvível na internet — ele só
+precisa do registro TXT:
+
+```
+_acme-challenge.pri.cgibs.gov.br   TXT   <token>      ← gravado na zona PÚBLICA
 ```
 
-Para usar uma CA corporativa em vez da gerada: `selfSigned: false` e crie o Secret
-`internal-ca-key-pair` (`tls.crt` + `tls.key`) no namespace `cert-manager`.
+O Let's Encrypt consulta esse TXT na zona pública `cgibs.gov.br`, valida, e emite
+o certificado. O nome `app.pri.cgibs.gov.br` continua existindo **apenas** na
+Azure Private DNS Zone, alcançável só de dentro da VNet.
 
-Qual issuer cada ingress usa é escolhido em
-`ingress.<private|public>.certificate.issuer`.
+> **Requisito para isso funcionar**
+>
+> ```bash
+> dig +short NS pri.cgibs.gov.br
+> ```
+>
+> Não pode retornar nada. Se `pri.cgibs.gov.br` estiver delegado publicamente a
+> outro servidor de nomes, o TXT gravado em `cgibs.gov.br` não será encontrado e a
+> emissão falha. Nesse caso, delegue a validação com `cnameStrategy` ou ligue a
+> CA interna (abaixo).
 
-Os certificados dos ingress são emitidos **no namespace `openshift-ingress`** —
-é de lá que o IngressController lê `spec.defaultCertificate`.
+Os `Certificate` são criados **no namespace `openshift-ingress`** — é de lá que o
+IngressController lê `spec.defaultCertificate`.
 
 ```bash
 oc get clusterissuer
-oc get certificate -A
-oc describe certificate public-ingress-tls -n openshift-ingress
+oc get certificate -n openshift-ingress
+oc describe certificate private-ingress-tls -n openshift-ingress
 ```
 
-> Para testar sem gastar a cota do Let's Encrypt, use o servidor de staging em
-> `certManager.acme.server` (o certificado emitido não será confiável).
+> Enquanto testa, use o servidor de staging em `certManager.acme.server` para não
+> gastar a cota do Let's Encrypt (50 certificados por domínio por semana). O
+> certificado emitido não será confiável.
+
+### CA interna (desligada)
+
+`certManager.internalCA.enabled: false` nesta arquitetura — os dois ingress usam
+certificados ACME confiáveis e nada precisa ser distribuído aos clients.
+
+O chart continua capaz de montar a cadeia (`selfsigned-bootstrap` → `Certificate`
+raiz → `ClusterIssuer internal-ca`) caso um ambiente futuro não tenha domínio
+delegado publicamente. Para ligar: `internalCA.enabled: true` e aponte
+`ingress.private.certificate.issuer: internal-ca`.
 
 ## 3.4 IngressControllers
 
@@ -95,11 +117,16 @@ ingress:
   enabled: true
 ```
 
-- **`private`** — `scope: Internal` (Azure Internal Load Balancer). Só é alcançável
-  de dentro da VNet.
-- **`public`** — `scope: External` (Azure Public Load Balancer).
-- Ambos com `dnsManagementPolicy: Unmanaged`: quem cria os registros é o ExternalDNS,
-  não o ingress-operator. Sem isso os dois brigam pelos mesmos registros.
+| | `private` | `public` | `default` |
+|---|---|---|---|
+| Domínio | `pri.cgibs.gov.br` | `cgibs.gov.br` | `apps.<cluster>.cgibs.gov.br` |
+| `scope` | `Internal` (Azure Internal LB) | `External` (Azure Public LB) | conforme `publish` |
+| Admite | `ingress-type: private` | `ingress-type: public` | o resto |
+| Certificado | `*.pri.cgibs.gov.br` | `*.cgibs.gov.br` | do cluster |
+| DNS | Azure Private DNS Zone | Azure DNS Zone | — |
+
+Ambos com `dnsManagementPolicy: Unmanaged`: quem cria os registros é o ExternalDNS,
+não o ingress-operator. Sem isso os dois brigam pelos mesmos registros.
 
 ### A label de admissão
 
@@ -107,32 +134,36 @@ ingress:
 ingress:
   private:
     routeSelector:
-      key: router          # a chave da label
-      value: private       # o valor exigido
+      key: ingress-type      # a chave da label
+      value: private         # o valor exigido
 ```
 
-Só entram nesse IngressController as Routes que carreguem `router: private`.
+Só entram nesse IngressController as Routes que carreguem `ingress-type: private`.
 
-### Isolamento do IngressController default
+### O IngressController default fica com o OpenShift
 
-Uma Route é admitida por **todo** IngressController cujo `routeSelector` case com
-ela. O `default` nasce com selector vazio, ou seja, admite tudo — inclusive as suas
-rotas privadas, que passariam a ser servidas também pelo ingress default.
-
-Por isso `ingress.default.isolateByLabel: true` aplica ao `default`:
+`ingress.default.isolateByLabel: true` aplica ao `default`:
 
 ```yaml
 routeSelector:
   matchExpressions:
-    - key: router
-      operator: DoesNotExist
+    - key: ingress-type
+      operator: NotIn
+      values: [public, private]
 ```
 
-O default passa a recusar qualquer Route que tenha a label `router`. Rotas do
-console, do OAuth e demais rotas de plataforma não têm essa label e continuam
-funcionando normalmente.
+Duas consequências, ambas desejadas:
 
-Para desligar, use `isolateByLabel: false`. Para reverter à mão:
+1. Rotas com `ingress-type: private` ou `public` **não** são mais admitidas pelo
+   default — sem isso elas seriam servidas por dois routers ao mesmo tempo.
+2. Rotas **sem** a label continuam no default. `NotIn` no seletor de labels do
+   Kubernetes casa também com objetos que não têm a chave, então console, OAuth
+   e demais rotas de plataforma seguem funcionando sem alteração.
+
+Uma rota com `ingress-type: interno` (ou qualquer outro valor) também vai para o
+default — é assim que se publica uma aplicação interna do OpenShift sem expô-la.
+
+Para reverter à mão:
 
 ```bash
 oc patch ingresscontroller default -n openshift-ingress-operator \
@@ -161,23 +192,38 @@ Duas instâncias, uma por IngressController:
 source:
   type: OpenShiftRoute
   openshiftRouteOptions:
-    routerName: private        # só olha as Routes deste router
+    routerName: private        # só olha as Routes admitidas por este router
 ```
 
 O que separa a zona privada da pública **não** é o provider (é `Azure` nos dois
 casos) e sim o resource ID em `spec.zones`:
 
 ```
-/subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Network/privateDnsZones/<zona>   → Private DNS
-/subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Network/dnszones/<zona>          → DNS pública
+/subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Network/privateDnsZones/pri.cgibs.gov.br
+/subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Network/dnszones/cgibs.gov.br
 ```
-
-Pegue os IDs com:
 
 ```bash
-az network private-dns zone show -n <zona> -g <rg> --query id -o tsv
-az network dns         zone show -n <zona> -g <rg> --query id -o tsv
+az network private-dns zone show -n pri.cgibs.gov.br -g <rg> --query id -o tsv
+az network dns         zone show -n cgibs.gov.br     -g <rg> --query id -o tsv
 ```
+
+### A exclusão do subdomínio privado
+
+`pri.cgibs.gov.br` é **subdomínio** de `cgibs.gov.br`. O filtro da instância
+pública (`.*\.cgibs\.gov\.br`) casaria também com `app.pri.cgibs.gov.br`. Por
+isso o values traz:
+
+```yaml
+externalDNS:
+  public:
+    excludeDomains:
+      - "pri.cgibs.gov.br"
+```
+
+que gera um `filterType: Exclude` no CR. Na prática as duas instâncias já estão
+separadas por `routerName`, mas a exclusão é a garantia explícita de que nenhuma
+instância vai mexer nos registros da outra.
 
 Verificar:
 
@@ -188,7 +234,10 @@ oc logs -n external-dns-operator deploy/external-dns-private -f
 
 ## 3.6 Publicar uma aplicação
 
-Basta rotular a Route:
+### Com Route (recomendado)
+
+Os dois wildcards já são o certificado padrão dos routers, então **na maioria dos
+casos basta a label** — nenhum `Certificate` precisa ser pedido:
 
 ```yaml
 apiVersion: route.openshift.io/v1
@@ -197,39 +246,100 @@ metadata:
   name: checkout
   namespace: pagamentos
   labels:
-    router: public          # ou: router: private
+    ingress-type: private          # ou: ingress-type: public
 spec:
-  host: checkout.public.apps.azr-cliente-prod-01.cliente.com.br
+  host: checkout.pri.cgibs.gov.br  # um nível sob o domínio -> coberto pelo wildcard
   to:
     kind: Service
     name: checkout
+  port:
+    targetPort: 8080
   tls:
     termination: edge
+    insecureEdgeTerminationPolicy: Redirect
 ```
 
 A partir daí, sem mais nenhuma ação:
 
-1. o IngressController `public` admite a rota;
-2. o ExternalDNS cria o registro na Azure DNS Zone pública apontando para o LB público;
-3. o certificado wildcard `*.public.apps...` do cert-manager já cobre o host.
+1. o IngressController `private` admite a rota (label bate com o `routeSelector`);
+2. o ExternalDNS cria `checkout.pri.cgibs.gov.br` na Azure Private DNS Zone
+   apontando para o LB interno;
+3. o wildcard `*.pri.cgibs.gov.br` já serve o TLS.
 
-### Certificado dedicado para uma aplicação
+Conferir qual router admitiu:
 
-Se a aplicação precisar de certificado próprio (host fora do wildcard, ou chave
-separada), declare em `certManager.appCertificates`:
+```bash
+oc get route checkout -n pagamentos -o jsonpath='{.status.ingress[*].routerName}'; echo
+```
+
+### Com Ingress
+
+Um objeto `Ingress` é convertido em `Route` pelo route-controller-manager, e a
+Route gerada **herda as labels do Ingress** — então `ingress-type` funciona pelos
+dois caminhos. Com a anotação `cert-manager.io/cluster-issuer`, o cert-manager
+emite o certificado automaticamente (ingress-shim):
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: checkout
+  namespace: pagamentos
+  labels:
+    ingress-type: private
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    # Sem esta anotação, a label é copiada apenas na CRIAÇÃO da Route.
+    # Com ela, alterar a label no Ingress também atualiza a Route existente.
+    route.openshift.io/reconcile-labels: "true"
+spec:
+  ingressClassName: openshift-default
+  tls:
+    - hosts:
+        - checkout.pri.cgibs.gov.br
+      secretName: checkout-tls
+  rules:
+    - host: checkout.pri.cgibs.gov.br
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: checkout
+                port:
+                  number: 8080
+```
+
+> **Atenção à anotação `route.openshift.io/reconcile-labels`.** No
+> route-controller-manager, a Route recebe `Labels: ingress.Labels` no momento em
+> que é criada, mas as labels só continuam sendo reconciliadas nas atualizações se
+> essa anotação estiver como `"true"`. Sem ela, trocar `private` por `public` no
+> Ingress não move a rota de router. Confirme com:
+>
+> ```bash
+> oc get route -n pagamentos -l ingress-type=private --show-labels
+> ```
+
+### Certificado dedicado, via GitOps
+
+Se a aplicação precisar de certificado próprio (host fora do wildcard, chave
+separada, ou exigência de auditoria), declare em `certManager.appCertificates`:
 
 ```yaml
 certManager:
   appCertificates:
-    - name: checkout-tls
-      namespace: pagamentos
-      issuer: letsencrypt-prod      # ou internal-ca
-      secretName: checkout-tls
+    - name: portal-tls
+      namespace: portal
+      issuer: letsencrypt-prod
+      secretName: portal-tls
       dnsNames:
-        - "checkout.cliente.com.br"
+        - "portal.cgibs.gov.br"
+        - "www.portal.cgibs.gov.br"    # dois níveis: fora do wildcard
 ```
 
 O namespace precisa existir — quem o cria são os ApplicationSets de `workloads/`,
 que usam `CreateNamespace=true`.
 
 ➡️ [4. Troubleshooting](04-troubleshooting.md)
+➡️ [5. Estender: novos operadores, manifestos e camadas](05-estender.md)

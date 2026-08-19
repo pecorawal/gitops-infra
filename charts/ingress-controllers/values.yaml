@@ -2,7 +2,10 @@ ingress:
   enabled: false
   default:
     isolateByLabel: false
-    labelKey: router
+    labelKey: ingress-type
+    reservedValues:
+      - public
+      - private
   private:
     enabled: false
     name: private
@@ -10,13 +13,13 @@ ingress:
     replicas: 2
     scope: Internal
     routeSelector:
-      key: router
+      key: ingress-type
       value: private
     namespaceSelector: {}
     nodePlacement: {}
     certificate:
       enabled: false
-      issuer: internal-ca
+      issuer: letsencrypt-prod
       secretName: private-ingress-tls
   public:
     enabled: false
@@ -25,7 +28,7 @@ ingress:
     replicas: 2
     scope: External
     routeSelector:
-      key: router
+      key: ingress-type
       value: public
     namespaceSelector: {}
     nodePlacement: {}

@@ -23,7 +23,7 @@
 #  IDENTIDADE DO CLUSTER
 # =============================================================================
 clusterName: azr-cliente-dev-01     # == nome deste diretório, do namespace no hub e do ManagedCluster
-baseDomain: "<PREENCHER>"           # domínio base, ex: cliente.com.br
+baseDomain: "cgibs.gov.br"          # domínio base (Azure DNS Zone pública)
 environment: dev
 clusterSet: global-clusters
 cloudProvider: Azure
@@ -137,8 +137,20 @@ certManager:
   enabled: false
 
   # ClusterIssuer "letsencrypt-prod": ACME com desafio DNS01 na Azure DNS Zone
-  # pública. Funciona mesmo para nomes que só resolvem internamente, desde que
-  # o domínio esteja delegado publicamente (o registro TXT _acme-challenge é público).
+  # PÚBLICA. É este issuer que emite os DOIS wildcards:
+  #
+  #   *.cgibs.gov.br       -> IngressController público
+  #   *.pri.cgibs.gov.br   -> IngressController privado
+  #
+  # Sim, o wildcard privado também sai daqui. O desafio DNS01 grava o TXT
+  # _acme-challenge.pri.cgibs.gov.br na zona PÚBLICA cgibs.gov.br, e é só esse
+  # registro que o Let's Encrypt consulta -- o nome final continua resolvendo
+  # apenas na Private DNS Zone.
+  #
+  # REQUISITO: pri.cgibs.gov.br NÃO pode estar delegado publicamente para outro
+  # servidor. Se estiver, o TXT não seria encontrado. Confirme com:
+  #   dig +short NS pri.cgibs.gov.br
+  # (não deve retornar nada; a zona autoritativa tem que ser cgibs.gov.br)
   acme:
     enabled: true
     email: "<PREENCHER>"
@@ -149,62 +161,72 @@ certManager:
       subscriptionID: "<PREENCHER>"
       tenantID: "<PREENCHER>"
       resourceGroupName: "<PREENCHER>"   # RG da Azure DNS Zone PÚBLICA
-      hostedZoneName: "<PREENCHER>"      # ex: cliente.com.br
+      hostedZoneName: "cgibs.gov.br"     # zona pública: atende os dois wildcards
       environment: AzurePublicCloud
       clientID: "<PREENCHER>"            # appId do Service Principal
       # O clientSecret NUNCA vai para o Git. Ele vem do Secret abaixo, criado
-      # à mão no namespace cert-manager -- ver docs/cliente/03-day2-ingress-dns-certs.md
+      # no namespace cert-manager por docs/cliente/scripts/criar-secrets-day2.sh
       clientSecretRef:
         name: azuredns-config
         key: client-secret
 
-  # ClusterIssuer "internal-ca": CA própria, para nomes que não são resolvíveis
-  # publicamente. Exige distribuir a CA raiz nos clients.
+  # CA interna -- NÃO utilizada nesta arquitetura.
+  # Os dois ingress usam certificados ACME confiáveis, então nada precisa ser
+  # distribuído aos clients. Mantida desligada para o caso de um ambiente
+  # futuro sem domínio delegado publicamente.
   internalCA:
-    enabled: true
-    selfSigned: true                     # true  = gera a CA raiz dentro do cluster
-                                         # false = usa um Secret tls.crt/tls.key já existente
+    enabled: false
+    selfSigned: true
     caSecretName: internal-ca-key-pair
-    commonName: "Cliente Internal CA"
-    durationHours: 87600                 # 10 anos
+    commonName: "CGIBS Internal CA"
+    durationHours: 87600
 
-  # Certificados de aplicação. O Secret gerado pode ser referenciado
-  # em spec.tls.externalCertificate da Route ou montado no pod.
+  # Certificados de aplicação.
+  # Os wildcards acima já cobrem qualquer host de um nível sob os dois domínios,
+  # então só declare aqui aplicações que precisem de certificado PRÓPRIO
+  # (host fora do wildcard, chave separada, ou exigência de auditoria).
   appCertificates: []
     # - name: checkout-tls
     #   namespace: pagamentos
-    #   issuer: letsencrypt-prod         # letsencrypt-prod | internal-ca
+    #   issuer: letsencrypt-prod
     #   secretName: checkout-tls
     #   dnsNames:
-    #     - "checkout.public.apps.azr-cliente-dev-01.cliente.com.br"
-
+    #     - "checkout.pri.cgibs.gov.br"
 
 # =============================================================================
 #  4. INGRESS CONTROLLERS -- um privado e um público, além do default
+# =============================================================================
+#  A separação é feita pela label "ingress-type" na Route:
+#
+#    ingress-type: private   -> IC private  -> LB interno  -> Private DNS Zone
+#    ingress-type: public    -> IC public   -> LB público  -> Azure DNS Zone
+#    qualquer outro valor    -> IC default  -> aplicações internas do OpenShift
+#    sem a label             -> IC default  (console, oauth, ...)
 # =============================================================================
 ingress:
   enabled: false
 
   default:
-    # Uma Route é admitida por TODO IngressController cujo routeSelector casa.
-    # O IngressController "default" vem com routeSelector vazio, ou seja, admite
-    # tudo -- inclusive as rotas que você marcou como private/public.
-    # Com isolateByLabel=true o default passa a recusar qualquer Route que tenha
-    # a label abaixo, garantindo o isolamento. Rotas do console/OAuth não têm
-    # essa label e continuam funcionando normalmente no default.
+    # O IngressController default fica RESERVADO às aplicações internas do
+    # OpenShift. Com isolateByLabel=true ele passa a admitir apenas Routes cuja
+    # label "ingress-type" seja DIFERENTE de public e private (ou que não
+    # tenham a label -- é assim que o seletor NotIn do Kubernetes funciona).
     isolateByLabel: true
-    labelKey: router
+    labelKey: ingress-type
+    reservedValues:
+      - public
+      - private
 
   # ---- IngressController PRIVADO: Load Balancer interno da Azure ----
   private:
     enabled: true
     name: private
-    domain: "<PREENCHER>"           # ex: private.apps.azr-cliente-dev-01.cliente.com.br
+    domain: "pri.cgibs.gov.br"      # domínio da Azure PRIVATE DNS Zone
     replicas: 2
-    scope: Internal
-    # LABEL DE ADMISSÃO: só Routes com esta label entram neste IngressController.
+    scope: Internal                 # Azure Internal Load Balancer
+    # LABEL DE ADMISSÃO: só Routes com ingress-type=private entram aqui.
     routeSelector:
-      key: router
+      key: ingress-type
       value: private
     # Opcional: restringe também por namespace. Ex:
     #   namespaceSelector: { environment: producao }
@@ -214,26 +236,25 @@ ingress:
     nodePlacement: {}
     certificate:
       enabled: true
-      issuer: internal-ca           # internal-ca | letsencrypt-prod
+      issuer: letsencrypt-prod      # wildcard *.pri.cgibs.gov.br
       secretName: private-ingress-tls
 
   # ---- IngressController PÚBLICO: Load Balancer público da Azure ----
   public:
     enabled: true
     name: public
-    domain: "<PREENCHER>"           # ex: public.apps.azr-cliente-dev-01.cliente.com.br
+    domain: "cgibs.gov.br"          # domínio da Azure DNS Zone pública
     replicas: 2
-    scope: External
+    scope: External                 # Azure Public Load Balancer ("publish external")
     routeSelector:
-      key: router
+      key: ingress-type
       value: public
     namespaceSelector: {}
     nodePlacement: {}
     certificate:
       enabled: true
-      issuer: letsencrypt-prod      # internal-ca | letsencrypt-prod
+      issuer: letsencrypt-prod      # wildcard *.cgibs.gov.br
       secretName: public-ingress-tls
-
 
 # =============================================================================
 #  5. EXTERNAL DNS -- uma instância por zona / por IngressController
@@ -251,26 +272,29 @@ externalDNS:
     # acima e pede o client secret interativamente.
     aadClientSecret: ""
 
-  # ---- Azure PRIVATE DNS Zone <- rotas do IngressController privado ----
+  # ---- Azure PRIVATE DNS Zone <- rotas com ingress-type=private ----
   private:
     enabled: true
     name: private
     routerName: private             # DEVE casar com ingress.private.name
-    domain: "<PREENCHER>"           # DEVE casar com ingress.private.domain
+    domain: "pri.cgibs.gov.br"      # DEVE casar com ingress.private.domain
     resourceGroup: "<PREENCHER>"    # RG da Private DNS Zone
-    # Resource ID completo da zona privada:
-    #   /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Network/privateDnsZones/<zona>
-    zoneId: "<PREENCHER>"
+    # az network private-dns zone show -n pri.cgibs.gov.br -g <rg> --query id -o tsv
+    zoneId: "<PREENCHER>"           # .../providers/Microsoft.Network/privateDnsZones/pri.cgibs.gov.br
+    excludeDomains: []
     configSecretName: azure-config-file-private
 
-  # ---- Azure PUBLIC DNS Zone <- rotas do IngressController público ----
+  # ---- Azure PUBLIC DNS Zone <- rotas com ingress-type=public ----
   public:
     enabled: true
     name: public
     routerName: public              # DEVE casar com ingress.public.name
-    domain: "<PREENCHER>"           # DEVE casar com ingress.public.domain
+    domain: "cgibs.gov.br"          # DEVE casar com ingress.public.domain
     resourceGroup: "<PREENCHER>"    # RG da Azure DNS Zone pública
-    # Resource ID completo da zona pública:
-    #   /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Network/dnszones/<zona>
-    zoneId: "<PREENCHER>"
+    # az network dns zone show -n cgibs.gov.br -g <rg> --query id -o tsv
+    zoneId: "<PREENCHER>"           # .../providers/Microsoft.Network/dnszones/cgibs.gov.br
+    # pri.cgibs.gov.br é SUBDOMÍNIO de cgibs.gov.br: sem esta exclusão o filtro
+    # da instância pública também casaria com os hosts privados.
+    excludeDomains:
+      - "pri.cgibs.gov.br"
     configSecretName: azure-config-file-public

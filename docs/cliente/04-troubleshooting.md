@@ -72,6 +72,17 @@ oc logs -n cert-manager deploy/cert-manager -f
 
 - **Challenge parado em `pending`** — o Service Principal não tem
   `DNS Zone Contributor` na zona pública, ou `azuredns-config` está errado.
+- **Wildcard privado (`*.pri.cgibs.gov.br`) falhando** — confirme que o
+  subdomínio não está delegado publicamente:
+
+  ```bash
+  dig +short NS pri.cgibs.gov.br     # não deve retornar nada
+  dig +short TXT _acme-challenge.pri.cgibs.gov.br
+  ```
+
+  O TXT precisa ser gravado na zona **pública** `cgibs.gov.br`. Se
+  `pri.cgibs.gov.br` estiver delegado a outro servidor, o Let's Encrypt procura o
+  TXT lá e não encontra.
 - **`propagation check failed`** — em cluster privado, o cert-manager pode não
   alcançar os NS autoritativos. Configure nameservers recursivos no operator:
 
@@ -97,15 +108,39 @@ oc get svc -n openshift-ingress
 - **LB sem IP** — na Azure, o Internal LB precisa de subnet com espaço livre;
   confira também as quotas de Public IP para o LB externo.
 
-## Uma Route não é admitida por nenhum router
+## Uma Route foi para o router errado
 
 ```bash
 oc get route <rota> -n <ns> -o jsonpath='{.status.ingress[*].routerName}'; echo
 oc get route <rota> -n <ns> --show-labels
 ```
 
-Sem a label `router: private|public` e com `isolateByLabel: true`, a rota é
-recusada pelos três IngressControllers. Adicione a label.
+| `routerName` observado | Causa |
+|---|---|
+| `default` (esperava `private`) | label `ingress-type` ausente ou com valor errado |
+| `default` **e** `private` | `ingress.default.isolateByLabel` está `false` |
+| nenhum | o `domain` do IngressController não bate com o host da rota |
+
+Lembre que `NotIn` casa também com Routes **sem** a label — por isso o que não
+tiver `ingress-type: public|private` vai parar no `default`. É o comportamento
+desejado, mas explica rotas "sumindo" para o default.
+
+## Uma Route criada a partir de um Ingress não muda de router
+
+A Route gerada recebe as labels do Ingress **na criação**. Alterações posteriores
+só são reconciliadas com a anotação:
+
+```yaml
+annotations:
+  route.openshift.io/reconcile-labels: "true"
+```
+
+Sem ela, trocar `ingress-type` no Ingress não move a Route. Verifique a Route
+gerada, não o Ingress:
+
+```bash
+oc get route -n <ns> --show-labels
+```
 
 ## O registro DNS não aparece na Azure
 

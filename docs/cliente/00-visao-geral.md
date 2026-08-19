@@ -12,8 +12,8 @@ faz o resto. Nada de `oc apply` manual depois do bootstrap inicial.
 |---|---|---|
 | Provisionamento | `ClusterDeployment` (Hive) + `install-config` + `MachinePool` + `ManagedCluster` | Hub |
 | Operators | cert-manager Operator, ExternalDNS Operator | Cluster novo |
-| Certificados | `ClusterIssuer` ACME/Azure DNS e CA interna, `Certificate` dos ingress e das apps | Cluster novo |
-| Ingress | IngressController **privado** (LB interno) e **público** (LB externo) | Cluster novo |
+| Certificados | `ClusterIssuer` ACME/Azure DNS, wildcards `*.cgibs.gov.br` e `*.pri.cgibs.gov.br` | Cluster novo |
+| Ingress | IngressController **privado** (LB interno) e **público** (LB externo), separados pela label `ingress-type` | Cluster novo |
 | DNS | ExternalDNS → **Azure Private DNS Zone** e → **Azure DNS Zone** pública | Cluster novo |
 
 ## Como o fluxo se encadeia
@@ -57,16 +57,57 @@ garantem a ordem correta em qualquer um dos casos.
 
 ## Como as rotas são separadas
 
-A separação entre ingress privado, público e default é feita por **label na Route**:
+A separação entre os três IngressControllers é feita por **uma label na Route**:
+`ingress-type`.
 
-| Label na Route | IngressController | Load Balancer | Zona DNS | Certificado |
-|---|---|---|---|---|
-| `router: private` | `private` | Azure Internal LB | Private DNS Zone | `internal-ca` (configurável) |
-| `router: public` | `public` | Azure Public LB | Azure DNS Zone | `letsencrypt-prod` (configurável) |
-| _(sem label)_ | `default` | conforme `publish` | — | do cluster |
+| Label na Route | IngressController | Load Balancer | Domínio | Zona DNS | Certificado |
+|---|---|---|---|---|---|
+| `ingress-type: private` | `private` | Azure Internal LB | `pri.cgibs.gov.br` | Azure **Private** DNS Zone | `*.pri.cgibs.gov.br` |
+| `ingress-type: public` | `public` | Azure Public LB | `cgibs.gov.br` | Azure DNS Zone (pública) | `*.cgibs.gov.br` |
+| qualquer outro valor | `default` | conforme `publish` | `apps.<cluster>.cgibs.gov.br` | — | do cluster |
+| _(sem a label)_ | `default` | conforme `publish` | `apps.<cluster>.cgibs.gov.br` | — | do cluster |
 
-A chave da label (`router`) e os valores (`private` / `public`) são parâmetros
-em `ingress.private.routeSelector` e `ingress.public.routeSelector`.
+O **`default` fica reservado às aplicações internas do OpenShift**. Ele recebe o
+seletor:
+
+```yaml
+routeSelector:
+  matchExpressions:
+    - key: ingress-type
+      operator: NotIn
+      values: [public, private]
+```
+
+`NotIn` no seletor de labels do Kubernetes também casa com objetos que **não têm**
+a label — por isso o console, o OAuth e as demais rotas de plataforma continuam
+no `default` sem qualquer alteração.
+
+A chave da label e os valores reservados são parâmetros
+(`ingress.default.labelKey`, `ingress.default.reservedValues`,
+`ingress.<private|public>.routeSelector`).
+
+## Certificados: os dois wildcards saem do Let's Encrypt
+
+Não há CA interna nesta arquitetura. O `ClusterIssuer` **`letsencrypt-prod`**
+emite os dois wildcards por desafio **DNS01 na Azure DNS Zone pública**:
+
+- `*.cgibs.gov.br` → certificado padrão do IngressController público
+- `*.pri.cgibs.gov.br` → certificado padrão do IngressController privado
+
+O wildcard privado também sai daí: o desafio grava o TXT
+`_acme-challenge.pri.cgibs.gov.br` na zona **pública** `cgibs.gov.br`, e é só esse
+registro que o Let's Encrypt consulta. O nome final continua resolvendo apenas na
+Private DNS Zone, dentro da VNet.
+
+> **Requisito:** `pri.cgibs.gov.br` não pode estar delegado publicamente para
+> outro servidor de nomes. Confirme com `dig +short NS pri.cgibs.gov.br` — não
+> deve retornar nada.
+
+Como os dois wildcards já cobrem qualquer host de um nível sob os dois domínios,
+**a maioria das aplicações não precisa pedir certificado nenhum**: basta a label
+correta na Route. Certificado próprio só é necessário para host fora do wildcard,
+chave separada ou exigência de auditoria — ver
+[3.6](03-day2-ingress-dns-certs.md#36-publicar-uma-aplicação).
 
 ## Documentos
 
@@ -74,3 +115,4 @@ em `ingress.private.routeSelector` e `ingress.public.routeSelector`.
 2. [Provisionar o cluster](02-provisionar-cluster.md)
 3. [Day-2: ingress, DNS e certificados](03-day2-ingress-dns-certs.md)
 4. [Troubleshooting](04-troubleshooting.md)
+5. [Estender: novos operadores, manifestos e camadas](05-estender.md)
