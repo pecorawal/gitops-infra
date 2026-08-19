@@ -128,6 +128,7 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 │   └── cliente
 │       ├── scripts
 │       │   ├── criar-secrets-day2.sh
+│       │   ├── diagnosticar.sh
 │       │   └── verificar-rbac-acm.sh
 │       ├── 00-visao-geral.md
 │       ├── 01-pre-requisitos.md
@@ -148,6 +149,6 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 ├── README.md
 └── gitops-workflow.md
 
-28 directories, 84 files
+28 directories, 85 files
 ```
 <!-- readme-tree end -->
