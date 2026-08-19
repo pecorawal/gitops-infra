@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# =============================================================================
+#  Percorre a cadeia inteira e diz ONDE ela parou.
+#
+#    ApplicationSet -> bundle-<cluster> -> provision-<cluster> -> Namespace
+#      -> ExternalSecrets -> ClusterDeployment -> ManagedCluster -> ArgoCD
+#
+#  Uso (no HUB, a partir da raiz do repositorio):
+#    ./docs/cliente/scripts/diagnosticar.sh <nome-do-cluster>
+# =============================================================================
+set -uo pipefail
+
+CLUSTER="${1:?uso: $0 <nome-do-cluster>}"
+NS_ARGO="${NS_ARGO:-openshift-gitops}"
+VALUES="clusters/${CLUSTER}/values.yaml"
+
+ok()   { printf "  \033[32mOK\033[0m    %s\n" "$1"; }
+bad()  { printf "  \033[31mFALHA\033[0m %s\n" "$1"; }
+warn() { printf "  \033[33mAVISO\033[0m %s\n" "$1"; }
+hdr()  { printf "\n\033[1m== %s\033[0m\n" "$1"; }
+
+# ---------------------------------------------------------------- 1. o arquivo
+hdr "1. Arquivo do cluster"
+if [[ ! -f "$VALUES" ]]; then
+  bad "$VALUES nao existe."
+  echo "        O diretorio precisa se chamar exatamente como clusterName."
+  ls -d clusters/*/ 2>/dev/null | sed 's/^/          existe: /'
+  exit 1
+fi
+ok "$VALUES encontrado"
+
+NOME=$(python3 -c "import yaml;print(yaml.safe_load(open('$VALUES'))['clusterName'])" 2>/dev/null)
+if [[ "$NOME" != "$CLUSTER" ]]; then
+  bad "clusterName='$NOME' difere do nome do diretorio '$CLUSTER'."
+  echo "        O ApplicationSet nomeia a Application pelo DIRETORIO, mas os charts"
+  echo "        usam clusterName. Os dois precisam ser iguais."
+else
+  ok "clusterName confere com o diretorio"
+fi
+
+ENABLED=$(python3 -c "import yaml;print(yaml.safe_load(open('$VALUES'))['provision']['enabled'])" 2>/dev/null)
+if [[ "$ENABLED" != "True" ]]; then
+  bad "provision.enabled = $ENABLED"
+  echo
+  echo "        ESTA E A CAUSA MAIS COMUM DE 'nao cria nem o namespace'."
+  echo "        Com o interruptor em false o chart nao emite NENHUM objeto -- nem"
+  echo "        Application filha, nem Namespace. O bundle fica verde, sem recursos."
+  echo
+  echo "        Corrija em $VALUES:"
+  echo "            provision:"
+  echo "              enabled: true"
+  exit 1
+fi
+ok "provision.enabled = true"
+
+# ------------------------------------------------------- 2. render local (Helm)
+hdr "2. Renderizacao local dos charts"
+if ! OUT=$(helm template "$CLUSTER" charts/azure-ipi-cluster -f "$VALUES" 2>&1); then
+  bad "charts/azure-ipi-cluster nao renderiza:"
+  echo "$OUT" | sed 's/^/        /'
+  echo
+  echo "        Enquanto isto falhar, a Application provision-$CLUSTER fica em"
+  echo "        ComparisonError e nada e aplicado -- inclusive o Namespace."
+  exit 1
+fi
+ok "charts/azure-ipi-cluster renderiza ($(grep -c '^kind:' <<<"$OUT") objetos)"
+grep '^kind:' <<<"$OUT" | sort | uniq -c | sed 's/^/        /'
+
+if ! helm template "$CLUSTER" charts/cluster-bundle -f "$VALUES" \
+      --set "global.valuesPath=${VALUES}" >/dev/null 2>&1; then
+  bad "charts/cluster-bundle nao renderiza"
+  exit 1
+fi
+ok "charts/cluster-bundle renderiza"
+
+# ------------------------------------------------------------- 3. lado cluster
+if ! oc whoami >/dev/null 2>&1; then
+  warn "sem sessao oc -- parando aqui. Faca login no HUB para as checagens seguintes."
+  exit 0
+fi
+
+hdr "3. ApplicationSet"
+if oc get applicationset cliente-clusters -n "$NS_ARGO" >/dev/null 2>&1; then
+  ok "applicationset/cliente-clusters existe"
+  REV=$(oc get applicationset cliente-clusters -n "$NS_ARGO" -o jsonpath='{.spec.generators[0].git.revision}')
+  echo "        revision do generator: $REV   (a branch precisa ter o commit)"
+  oc get applicationset cliente-clusters -n "$NS_ARGO" \
+    -o jsonpath='{range .status.conditions[*]}        {.type}={.status} {.message}{"\n"}{end}' 2>/dev/null
+else
+  bad "applicationset/cliente-clusters NAO existe"
+  echo "        Aplique o root:  oc apply -f argocd/root-cliente.yaml"
+  echo "        E confira:       oc get application cliente-bootstrap -n $NS_ARGO"
+  exit 1
+fi
+
+hdr "4. Applications geradas"
+for app in "bundle-$CLUSTER" "provision-$CLUSTER"; do
+  if oc get application "$app" -n "$NS_ARGO" >/dev/null 2>&1; then
+    read -r SYNC HEALTH < <(oc get application "$app" -n "$NS_ARGO" \
+      -o jsonpath='{.status.sync.status} {.status.health.status}')
+    ok "$app  sync=$SYNC  health=$HEALTH"
+    oc get application "$app" -n "$NS_ARGO" \
+      -o jsonpath='{range .status.conditions[*]}        [{.type}] {.message}{"\n"}{end}' 2>/dev/null
+  else
+    bad "$app nao existe"
+    [[ "$app" == "bundle-$CLUSTER" ]] && \
+      echo "        O generator nao casou clusters/*/values.yaml, ou a branch do
+        generator ($REV) nao tem o seu commit."
+  fi
+done
+
+hdr "5. Objetos no hub"
+oc get namespace "$CLUSTER" >/dev/null 2>&1 \
+  && ok "namespace/$CLUSTER existe" \
+  || bad "namespace/$CLUSTER NAO existe  <-- e o que voce esta vendo"
+
+for kind in externalsecret secret clusterdeployment machinepool; do
+  n=$(oc get "$kind" -n "$CLUSTER" --no-headers 2>/dev/null | wc -l)
+  printf "        %-18s %s\n" "$kind" "$n"
+done
+oc get externalsecret -n "$CLUSTER" --no-headers 2>/dev/null \
+  | awk '{printf "        externalsecret %-32s %s\n", $1, $3}'
+
+hdr "6. RBAC (namespaces)"
+SA="system:serviceaccount:${NS_ARGO}:openshift-gitops-argocd-application-controller"
+if [[ "$(oc auth can-i create namespaces --as="$SA" 2>/dev/null)" == "yes" ]]; then
+  ok "o ArgoCD pode criar namespaces"
+else
+  bad "o ArgoCD NAO pode criar namespaces"
+  echo "        oc apply -f argocd/00-rbac-acm.yaml"
+  echo "        ./docs/cliente/scripts/verificar-rbac-acm.sh"
+fi
+
+echo
+echo "Se tudo acima esta OK e o namespace continua ausente, veja a mensagem em"
+echo "  oc get application provision-$CLUSTER -n $NS_ARGO -o jsonpath='{.status.conditions}' | python3 -m json.tool"

@@ -131,6 +131,13 @@ ACM neste namespace, já nos formatos que o Hive exige — ver
 > Se você deixar algum `<PREENCHER>` para trás, o `helm template` falha listando
 > exatamente quais campos faltam, antes de qualquer coisa ser aplicada.
 
+Vale rodar **antes** de commitar — pega os dois erros mais comuns sem envolver o
+cluster:
+
+```bash
+./docs/cliente/scripts/diagnosticar.sh <nome-do-cluster>
+```
+
 ## 2.5 O que acontece
 
 1. O `ApplicationSet` detecta o novo `values.yaml` e cria `bundle-azr-cliente-prod-01`.

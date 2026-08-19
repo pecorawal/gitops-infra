@@ -1,5 +1,101 @@
 # 4. Troubleshooting
 
+## Comecei por aqui: o cluster não sai do lugar
+
+```bash
+./docs/cliente/scripts/diagnosticar.sh <nome-do-cluster>
+```
+
+Percorre a cadeia inteira e diz onde ela parou:
+
+```
+ApplicationSet -> bundle-<cluster> -> provision-<cluster> -> Namespace
+  -> ExternalSecrets -> ClusterDeployment -> ManagedCluster -> registro no ArgoCD
+```
+
+As duas causas que respondem pela maioria dos "não cria nem o namespace":
+
+### 1. `provision.enabled` continua `false`
+
+De longe a mais comum. Com o interruptor em `false` o chart **não emite objeto
+nenhum** — nem a Application filha, nem o Namespace. E não há erro: o
+`bundle-<cluster>` fica verde, com zero recursos, o que parece sucesso.
+
+```bash
+grep -A1 '^provision:' clusters/<cluster>/values.yaml
+```
+
+```yaml
+provision:
+  enabled: true      # <-- sem isto, nada acontece
+```
+
+Confirme sem sair da sua máquina — saída vazia significa que nada seria aplicado:
+
+```bash
+helm template x charts/cluster-bundle -f clusters/<cluster>/values.yaml
+```
+
+### 2. Sobrou algum `<PREENCHER>`
+
+Aí a renderização **falha de propósito**, e o Namespace faz parte do mesmo chart
+— por isso nem ele é criado:
+
+```
+Cluster "meu-cluster-01": 6 valor(es) ainda por preencher em clusters/meu-cluster-01/values.yaml:
+  - provision.azure.baseDomainResourceGroupName
+  - provision.azure.computeSubnet
+  - provision.azure.controlPlaneSubnet
+  - provision.azure.networkResourceGroupName
+  - provision.credentials.sourceSecret
+  - provision.networking.machineNetwork
+```
+
+Na interface do ArgoCD isso aparece como `ComparisonError` em
+`provision-<cluster>`, e a mensagem fica escondida em `.status.conditions`:
+
+```bash
+oc get application provision-<cluster> -n openshift-gitops \
+  -o jsonpath='{.status.conditions}' | python3 -m json.tool
+```
+
+Mais rápido é reproduzir localmente:
+
+```bash
+helm template x charts/azure-ipi-cluster -f clusters/<cluster>/values.yaml
+```
+
+### 3. O nome do diretório não bate com `clusterName`
+
+O ApplicationSet nomeia a Application pelo **diretório** (`bundle-{{path.basename}}`),
+mas os charts usam `clusterName` para namespace e objetos. Se divergirem, você
+procura um namespace com um nome e ele é criado com outro.
+
+```bash
+basename $(dirname clusters/<cluster>/values.yaml)
+grep '^clusterName:' clusters/<cluster>/values.yaml
+```
+
+### 4. O commit não está na branch que o generator lê
+
+```bash
+oc get applicationset cliente-clusters -n openshift-gitops \
+  -o jsonpath='{.spec.generators[0].git.revision}{"\n"}'
+git log --oneline -1 origin/cliente
+```
+
+O generator lê `clusters/*/values.yaml` da branch `cliente`. Um commit em `main`
+não é enxergado.
+
+### 5. RBAC
+
+```bash
+oc auth can-i create namespaces \
+  --as=system:serviceaccount:openshift-gitops:openshift-gitops-argocd-application-controller
+```
+
+Se der `no`, é a seção abaixo.
+
 ## "one or more synchronization tasks completed unsuccessfully" — `is forbidden`
 
 O sintoma mais comum logo depois de aplicar `root-cliente.yaml`:
