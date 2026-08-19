@@ -1,19 +1,28 @@
 {{- if and .Values.ingress.enabled .Values.ingress.default.isolateByLabel }}
 # ---------------------------------------------------------------------------
-#  ISOLAMENTO DO IngressController "default"
+#  IngressController "default" -- reservado as aplicacoes internas do OpenShift
 # ---------------------------------------------------------------------------
-#  Uma Route e admitida por TODO IngressController cujo routeSelector casa com
+#  Uma Route e admitida por TODO IngressController cujo routeSelector case com
 #  ela. O "default" nasce com routeSelector vazio, ou seja, admite tudo -- e
-#  isso inclui as rotas que voce marcou com router=private, que passariam a
-#  ser servidas tambem pelo ingress default.
+#  isso inclui as rotas marcadas como public/private, que passariam a ser
+#  servidas tambem pelo ingress default.
 #
-#  O patch abaixo faz o default recusar qualquer Route que tenha a label
-#  "{{ .Values.ingress.default.labelKey }}", seja qual for o valor. Rotas do
-#  console, OAuth e demais rotas de plataforma nao tem essa label e continuam
-#  funcionando normalmente.
+#  O patch abaixo faz o default admitir apenas o que NAO for public nem private:
 #
-#  ServerSideApply: o ArgoCD altera apenas o campo routeSelector, sem assumir
-#  a posse do objeto inteiro (que pertence ao ingress-operator).
+#    routeSelector:
+#      matchExpressions:
+#        - key: {{ .Values.ingress.default.labelKey }}
+#          operator: NotIn
+#          values: [{{ join ", " .Values.ingress.default.reservedValues }}]
+#
+#  Semantica do seletor de labels do Kubernetes: NotIn tambem casa com objetos
+#  que NAO tem a label. Logo o default continua servindo:
+#    - as rotas de plataforma (console, oauth, ...), que nao tem a label;
+#    - qualquer rota com {{ .Values.ingress.default.labelKey }} de valor
+#      diferente de {{ join " e " .Values.ingress.default.reservedValues }}.
+#
+#  ServerSideApply: o ArgoCD altera apenas o campo routeSelector, sem assumir a
+#  posse do objeto inteiro, que pertence ao ingress-operator.
 #
 #  Para reverter:
 #    oc patch ingresscontroller default -n openshift-ingress-operator \
@@ -31,5 +40,7 @@ spec:
   routeSelector:
     matchExpressions:
       - key: {{ .Values.ingress.default.labelKey }}
-        operator: DoesNotExist
+        operator: NotIn
+        values:
+          {{- toYaml .Values.ingress.default.reservedValues | nindent 10 }}
 {{- end }}

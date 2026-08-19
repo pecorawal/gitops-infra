@@ -15,6 +15,8 @@ certManager:
       clientSecretRef:
         name: azuredns-config
         key: client-secret
+  # Opcional. Desligada por padrao: os dois ingress usam certificados ACME
+  # emitidos pelo letsencrypt-prod via desafio DNS01 na zona publica.
   internalCA:
     enabled: false
     selfSigned: true
@@ -28,7 +30,7 @@ ingress:
     domain: ""
     certificate:
       enabled: false
-      issuer: internal-ca
+      issuer: letsencrypt-prod
       secretName: private-ingress-tls
   public:
     enabled: false
