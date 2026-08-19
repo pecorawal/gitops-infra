@@ -6,7 +6,7 @@ Neste repositório está a definição de um OpenShift GitOps para importação 
 
 Esta branch entrega o fluxo completo, dirigido por **um único `values.yaml` por cluster**:
 
-1. **Provisionamento** — cluster OpenShift IPI na Azure (BYO VNet, privado) via Hive/ACM
+1. **Provisionamento** — cluster OpenShift IPI na Azure (BYO VNet, privado) via Hive/ACM, com uma **única Credential do ACM** copiada automaticamente para o namespace de cada cluster pelo External Secrets Operator
 2. **IngressControllers** — privado (LB interno, `pri.cgibs.gov.br`) e público (LB externo, `cgibs.gov.br`), separados pela label `ingress-type`; o `default` fica reservado às aplicações internas do OpenShift
 3. **ExternalDNS** — uma instância para a Azure Private DNS Zone e outra para a Azure DNS Zone pública
 4. **cert-manager** — `ClusterIssuer` ACME/DNS01 emitindo os wildcards `*.cgibs.gov.br` e `*.pri.cgibs.gov.br`
@@ -49,6 +49,7 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 │   ├── 02-appset-cliente.yaml
 │   ├── 03-cluster-set-bindings.yaml
 │   ├── 04-placements-por-clusterset.yaml
+│   ├── 05-acm-credentials-store.yaml
 │   ├── app-set-import.yaml
 │   ├── channel.yaml
 │   ├── cluster-set-binding.yaml
@@ -58,13 +59,16 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 │   ├── azure-ipi-cluster
 │   │   ├── templates
 │   │   │   ├── 00-namespace.yaml
-│   │   │   ├── 01-install-config-secret.yaml
-│   │   │   ├── 02-clusterdeployment.yaml
-│   │   │   ├── 03-machinepool-worker.yaml
-│   │   │   ├── 04-managedcluster.yaml
-│   │   │   ├── 05-klusterletaddonconfig.yaml
+│   │   │   ├── 01-externalsecret-credentials.yaml
+│   │   │   ├── 02-install-config-secret.yaml
+│   │   │   ├── 03-clusterdeployment.yaml
+│   │   │   ├── 04-machinepool-worker.yaml
+│   │   │   ├── 05-managedcluster.yaml
+│   │   │   ├── 06-klusterletaddonconfig.yaml
 │   │   │   ├── _clusterset.tpl
-│   │   │   └── _installconfig.tpl
+│   │   │   ├── _credentials.tpl
+│   │   │   ├── _installconfig.tpl
+│   │   │   └── _validate.tpl
 │   │   ├── Chart.yaml
 │   │   └── values.yaml
 │   ├── cert-manager-config
@@ -144,6 +148,6 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 ├── README.md
 └── gitops-workflow.md
 
-28 directories, 80 files
+28 directories, 84 files
 ```
 <!-- readme-tree end -->

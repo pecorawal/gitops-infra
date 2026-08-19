@@ -1,4 +1,5 @@
 {{- if .Values.provision.enabled }}
+{{- include "azure-ipi-cluster.validate" . }}
 # Namespace do cluster no hub. Abriga a Credential do ACM, o ClusterDeployment
 # e todos os objetos do Hive.
 # Prune=false: apagar a Application NAO pode apagar este namespace junto com a

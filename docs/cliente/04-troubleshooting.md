@@ -208,6 +208,46 @@ helm template x charts/cluster-bundle -f clusters/<cluster>/values.yaml
 
 Saída vazia = nenhuma camada habilitada.
 
+## As credenciais não aparecem no namespace do cluster
+
+```bash
+oc get externalsecret -n <cluster>
+oc describe externalsecret <cluster>-azure-creds -n <cluster>
+oc get clustersecretstore acm-credentials-hub -o yaml | grep -A5 conditions
+oc logs -n <ns-do-eso> deploy/external-secrets -f
+```
+
+| `STATUS` do ExternalSecret | Causa |
+|---|---|
+| `SecretSyncedError` + `key not found` | `sourceSecret` não existe, ou está noutro namespace |
+| `SecretSyncedError` + `forbidden` | o `Role` do passo 1.4 não cobre o namespace certo |
+| `InvalidProviderConfig` no store | `remoteNamespace` / `caProvider.namespace` divergem do namespace real |
+| nada acontece, sem evento | ESO não instalado: `oc get crd externalsecrets.external-secrets.io` |
+
+Os quatro pontos `# <<< NAMESPACE` de `bootstrap/05-acm-credentials-store.yaml`
+precisam apontar todos para o **mesmo** namespace, e ele precisa ser igual a
+`provision.credentials.sourceNamespace` do values do cluster.
+
+Confirme as chaves da Credential de origem — os nomes têm que bater com o que o
+template espera (`osServicePrincipal.json`, `pullSecret`, `ssh-privatekey`):
+
+```bash
+oc get secret <credential> -n <ns> -o jsonpath='{.data}' | python3 -m json.tool | grep '":'
+```
+
+Se a Credential não tiver `ssh-privatekey`, use `copySshKey: false`.
+
+## O ClusterDeployment reclama de secret ausente logo no início
+
+Normal e transitório. O ArgoCD aplica o `ExternalSecret` (wave -3) e o
+`ClusterDeployment` (wave 0) em sequência, mas quem materializa o Secret é o ESO,
+de forma assíncrona. O Hive reconcilia sozinho assim que o Secret aparece —
+questão de segundos. Só investigue se persistir:
+
+```bash
+oc get secret -n <cluster> | grep -E 'azure-creds|pull-secret'
+```
+
 ## O provisionamento falha
 
 ```bash

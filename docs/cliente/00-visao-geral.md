@@ -4,13 +4,16 @@ Este repositório provisiona e configura clusters **OpenShift IPI na Azure** usa
 **Red Hat Advanced Cluster Management (ACM/Hive)** e **OpenShift GitOps (ArgoCD)**.
 
 Você edita **um único arquivo** — `clusters/<seu-cluster>/values.yaml` — e o ArgoCD
-faz o resto. Nada de `oc apply` manual depois do bootstrap inicial.
+faz o resto. Nada de `oc apply` manual depois do bootstrap inicial: nem criar
+namespace, nem copiar credencial, nem derivar pull secret. Uma **única**
+Credential do ACM atende todos os provisionamentos, e o External Secrets Operator
+a materializa no namespace de cada cluster novo.
 
 ## O que é entregue
 
 | Camada | O que é criado | Onde roda |
 |---|---|---|
-| Provisionamento | `ClusterDeployment` (Hive) + `install-config` + `MachinePool` + `ManagedCluster` | Hub |
+| Provisionamento | `ExternalSecret` das credenciais + `ClusterDeployment` (Hive) + `install-config` + `MachinePool` + `ManagedCluster` | Hub |
 | Operators | cert-manager Operator, ExternalDNS Operator | Cluster novo |
 | Certificados | `ClusterIssuer` ACME/Azure DNS, wildcards `*.cgibs.gov.br` e `*.pri.cgibs.gov.br` | Cluster novo |
 | Ingress | IngressController **privado** (LB interno) e **público** (LB externo), separados pela label `ingress-type` | Cluster novo |

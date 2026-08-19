@@ -15,7 +15,7 @@ Todo campo `<PREENCHER>` precisa de valor. Os que costumam dar trabalho:
 
 | Campo | Onde achar |
 |---|---|
-| `provision.credentialsSecret` | `oc get secret -n <cluster> -l cluster.open-cluster-management.io/type=azr` |
+| `provision.credentials.sourceSecret` | `oc get secret -A -l cluster.open-cluster-management.io/type=azr` |
 | `provision.imageSetRef` | `oc get clusterimageset` |
 | `provision.azure.baseDomainResourceGroupName` | RG da Azure DNS Zone pública |
 | `provision.azure.networkResourceGroupName` | `az network vnet show -n <vnet> -g <rg> --query resourceGroup -o tsv` |
@@ -116,12 +116,21 @@ git commit -m "novo cluster azr-cliente-prod-01"
 git push origin cliente
 ```
 
+**Não é preciso criar o namespace nem copiar credencial.** O chart cria o
+namespace e dois `ExternalSecret` que materializam a Credential compartilhada do
+ACM neste namespace, já nos formatos que o Hive exige — ver
+[1.4](01-pre-requisitos.md#14-liberar-a-cópia-automática-da-credential).
+
+> Se você deixar algum `<PREENCHER>` para trás, o `helm template` falha listando
+> exatamente quais campos faltam, antes de qualquer coisa ser aplicada.
+
 ## 2.5 O que acontece
 
 1. O `ApplicationSet` detecta o novo `values.yaml` e cria `bundle-azr-cliente-prod-01`.
 2. O bundle emite `provision-azr-cliente-prod-01`.
 3. Essa Application aplica no hub, em ordem de wave:
    - o Namespace do cluster (`-5`);
+   - os dois `ExternalSecret` que copiam a Credential do ACM (`-3`);
    - o Secret `<cluster>-install-config` (`-1`) — o manifesto do `openshift-install`;
    - o `ClusterDeployment` (`0`) — dispara o Hive;
    - o `MachinePool` de workers (`1`);
@@ -136,6 +145,9 @@ git push origin cliente
 
 ```bash
 export CLUSTER=azr-cliente-prod-01
+
+# as credenciais foram materializadas?
+oc get externalsecret,secret -n "$CLUSTER"
 
 # estado geral
 oc get clusterdeployment -n "$CLUSTER" -w
