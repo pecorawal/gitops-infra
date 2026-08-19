@@ -79,17 +79,34 @@ provision:
   #   oc get clusterimageset
   imageSetRef: "img4.18.20-multi-appsub"
 
-  # Nome do Secret da Credential do ACM (Credentials > Add > Microsoft Azure).
-  # A Credential DEVE ter sido criada no namespace <clusterName>.
-  # Contém osServicePrincipal.json e ssh-privatekey.
-  credentialsSecret: "<PREENCHER>"
+  # -------------------------------------------------------------------------
+  #  CREDENCIAIS
+  #  O Hive só lê Secrets do namespace do ClusterDeployment, mas a Credential do
+  #  ACM é UMA SÓ para todos os provisionamentos. No modo externalSecret o ESO
+  #  a copia automaticamente para o namespace deste cluster, já convertendo o
+  #  pull secret para o formato .dockerconfigjson que o Hive exige.
+  #  Nenhum "oc create secret" manual, nenhum segredo no Git.
+  # -------------------------------------------------------------------------
+  credentials:
+    # externalSecret = cópia automática da Credential compartilhada (recomendado)
+    # existing       = a Credential já foi criada no namespace deste cluster
+    mode: externalSecret
 
-  # Pull secret no formato que o Hive exige (.dockerconfigjson).
-  # Criado uma única vez -- ver docs/cliente/01-pre-requisitos.md passo 3.
-  pullSecretRef: "azr-cliente-dev-01-pull-secret"
+    # ---- modo externalSecret ----
+    # Onde vive a Credential compartilhada. Descubra com:
+    #   oc get secret -A -l cluster.open-cluster-management.io/type=azr \
+    #     -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name
+    # O namespace precisa bater com bootstrap/05-acm-credentials-store.yaml.
+    sourceNamespace: acm-credentials
+    sourceSecret: "<PREENCHER>"          # nome da Credential do ACM
+    clusterSecretStore: acm-credentials-hub
+    refreshInterval: "1h"
+    copySshKey: true                     # false se a Credential não tem ssh-privatekey
 
-  # Chave SSH para acesso aos nós. Vazio = usa a ssh-privatekey da Credential do ACM.
-  sshPrivateKeySecretRef: ""
+    # ---- modo existing (ignorado quando mode=externalSecret) ----
+    existingCredentialsSecret: ""
+    existingPullSecret: ""
+    existingSshPrivateKeySecret: ""
 
   # Internal = API e ingress default só acessíveis pela VNet (cluster privado).
   # External = API e ingress default publicados na internet.

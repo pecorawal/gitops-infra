@@ -13,6 +13,7 @@ Antes de escolher, use esta tabela:
 | Uma capacidade nova e independente (logging, storage, backup, service mesh) | **novo chart** + nova Application | Sim |
 | Um recurso no **hub** e não no cluster gerenciado | `charts/azure-ipi-cluster/` ou novo chart com destino hub | Depende |
 | Uma aplicação de negócio | outro repositório (`workloads/`, `gitops-workloads-helm`) | Não |
+| Um Secret que vem de fora do Git | `ExternalSecret` no chart + `ClusterSecretStore` no `bootstrap/` | Não |
 
 Regra prática: **um chart por capacidade**. Se o recurso novo tem ciclo de vida
 próprio (pode ser ligado/desligado sem afetar os outros), ele merece chart e

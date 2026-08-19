@@ -19,9 +19,16 @@ addons:
 provision:
   enabled: false
   imageSetRef: ""
-  credentialsSecret: ""
-  pullSecretRef: ""
-  sshPrivateKeySecretRef: ""
+  credentials:
+    mode: externalSecret          # externalSecret | existing
+    sourceNamespace: acm-credentials
+    sourceSecret: ""
+    clusterSecretStore: acm-credentials-hub
+    refreshInterval: "1h"
+    copySshKey: true
+    existingCredentialsSecret: ""
+    existingPullSecret: ""
+    existingSshPrivateKeySecret: ""
   publish: Internal
   fips: false
   azure:

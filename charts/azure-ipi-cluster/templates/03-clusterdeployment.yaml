@@ -19,9 +19,10 @@ spec:
   installed: false
   platform:
     azure:
-      # Secret da Credential do ACM (chave osServicePrincipal.json).
+      # Secret com a chave osServicePrincipal.json. No modo externalSecret e o
+      # <cluster>-azure-creds materializado em 01-externalsecret-credentials.
       credentialsSecretRef:
-        name: {{ .Values.provision.credentialsSecret }}
+        name: {{ include "azure-ipi-cluster.azureCredsSecret" . }}
       region: {{ .Values.provision.azure.region }}
       baseDomainResourceGroupName: {{ .Values.provision.azure.baseDomainResourceGroupName }}
       cloudName: {{ .Values.provision.azure.cloudName }}
@@ -31,9 +32,9 @@ spec:
     imageSetRef:
       name: {{ .Values.provision.imageSetRef }}
     sshPrivateKeySecretRef:
-      # Vazio no values = reusa a propria Credential do ACM, que ja traz a
-      # chave sob o nome ssh-privatekey.
-      name: {{ .Values.provision.sshPrivateKeySecretRef | default .Values.provision.credentialsSecret }}
+      # Mesmo Secret do osServicePrincipal.json: o Hive le chaves diferentes de
+      # refs diferentes, e nada impede que apontem para o mesmo objeto.
+      name: {{ include "azure-ipi-cluster.sshSecret" . }}
   pullSecretRef:
-    name: {{ .Values.provision.pullSecretRef }}
+    name: {{ include "azure-ipi-cluster.pullSecret" . }}
 {{- end }}

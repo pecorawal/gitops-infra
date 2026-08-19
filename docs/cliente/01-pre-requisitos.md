@@ -23,44 +23,112 @@ Tudo aqui é feito **uma única vez**, no **hub** (o cluster onde rodam ACM e Op
 Se `outboundType: UserDefinedRouting`, a subnet precisa de rota de saída
 (firewall/NAT) **antes** da instalação — o instalador não a cria.
 
-## 1.3 Credential do ACM
+## 1.3 Credential do ACM — uma só, para todos os clusters
 
-A Credential **precisa ser criada no namespace com o mesmo nome do cluster**, porque
-o Hive só lê Secrets do namespace do `ClusterDeployment`.
+Crie **uma única** Credential Azure no ACM, num namespace dedicado. Ela serve
+todos os provisionamentos: não é preciso criar uma por cluster, nem criar o
+namespace do cluster à mão.
 
 ```bash
-export CLUSTER=azr-cliente-dev-01
-oc new-project "$CLUSTER"
+oc new-project acm-credentials
 ```
 
 No console do ACM: **Credentials → Add credential → Microsoft Azure**
 
-- *Credential name*: `azr-cliente-dev-01-azure`
-- *Namespace*: **`azr-cliente-dev-01`** (o namespace criado acima)
+- *Credential name*: `azure-cliente`
+- *Namespace*: **`acm-credentials`**
 - Base DNS domain, Service Principal (clientId/clientSecret/tenantId/subscriptionId),
   Base domain resource group name, pull secret e chave SSH.
 
-Confirme:
+Anote **namespace** e **nome** — vão nos dois lugares do passo 1.4:
 
 ```bash
-oc get secret -n "$CLUSTER" -l cluster.open-cluster-management.io/type=azr
+oc get secret -A -l cluster.open-cluster-management.io/type=azr \
+  -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name
 ```
 
-## 1.4 Derivar o pull secret
+## 1.4 Liberar a cópia automática da Credential
 
-A Credential do ACM guarda o pull secret na chave `pullSecret`, mas o Hive exige um
-Secret do tipo `kubernetes.io/dockerconfigjson`. Um comando, uma vez por cluster:
+O Hive só lê Secrets do **namespace do ClusterDeployment**, e esse namespace é
+diferente para cada cluster. Em vez de copiar a Credential à mão toda vez, o
+External Secrets Operator faz isso sob demanda.
+
+Edite `bootstrap/05-acm-credentials-store.yaml` e troque `acm-credentials` pelo
+seu namespace nos **quatro** pontos marcados `# <<< NAMESPACE`:
+
+```yaml
+# ServiceAccount, Role, RoleBinding e ClusterSecretStore
+namespace: acm-credentials          # <<< NAMESPACE
+...
+spec:
+  provider:
+    kubernetes:
+      remoteNamespace: acm-credentials   # <<< NAMESPACE
+```
+
+Isso cria:
+
+| Objeto | Papel |
+|---|---|
+| `ServiceAccount eso-acm-credentials-reader` | identidade que o ESO usa para ler |
+| `Role` + `RoleBinding` | leitura de Secrets **apenas** nesse namespace |
+| `ClusterSecretStore acm-credentials-hub` | origem tipo `kubernetes`, apontando para o próprio hub |
+
+Depois, no `values.yaml` de cada cluster, basta apontar a origem:
+
+```yaml
+provision:
+  credentials:
+    mode: externalSecret
+    sourceNamespace: acm-credentials
+    sourceSecret: azure-cliente
+```
+
+O chart gera dois `ExternalSecret` no namespace do cluster, já nos formatos
+exatos que o Hive exige:
+
+| Secret gerado | Tipo | Chaves | Lido por |
+|---|---|---|---|
+| `<cluster>-azure-creds` | `Opaque` | `osServicePrincipal.json`, `ssh-privatekey` | `platform.azure.credentialsSecretRef`, `provisioning.sshPrivateKeySecretRef` |
+| `<cluster>-pull-secret` | `kubernetes.io/dockerconfigjson` | `.dockerconfigjson` | `pullSecretRef` |
+
+> **A conversão do pull secret acontece aqui.** A Credential do ACM guarda o pull
+> secret em texto, na chave `pullSecret`; o Hive exige o tipo
+> `kubernetes.io/dockerconfigjson` com a chave `.dockerconfigjson`. O
+> `ExternalSecret` faz a tradução — era exatamente o `oc create secret
+> docker-registry` que antes tinha que ser repetido a cada cluster.
+
+Nada de segredo passa pelo Git: o que está versionado é o **nome** da Credential.
+
+Requer o External Secrets Operator no hub — já é o caso, `charts/import-cluster`
+depende dele. Confirme:
 
 ```bash
-export CLUSTER=azr-cliente-dev-01
-export ACM_CRED=azr-cliente-dev-01-azure
+oc get crd externalsecrets.external-secrets.io clustersecretstores.external-secrets.io
+```
 
+### Se preferir manter uma Credential por cluster
+
+O modo antigo continua disponível:
+
+```yaml
+provision:
+  credentials:
+    mode: existing
+    existingCredentialsSecret: azr-cliente-dev-01-azure
+    existingPullSecret: azr-cliente-dev-01-pull-secret
+```
+
+Nesse caso, por cluster: criar o namespace, criar a Credential nele e derivar o
+pull secret à mão:
+
+```bash
+export CLUSTER=azr-cliente-dev-01 ACM_CRED=azr-cliente-dev-01-azure
+oc new-project "$CLUSTER"
 oc get secret "$ACM_CRED" -n "$CLUSTER" -o jsonpath='{.data.pullSecret}' \
   | base64 -d > /tmp/ps.json
-
 oc create secret docker-registry "${CLUSTER}-pull-secret" -n "$CLUSTER" \
   --from-file=.dockerconfigjson=/tmp/ps.json
-
 rm -f /tmp/ps.json
 ```
 
