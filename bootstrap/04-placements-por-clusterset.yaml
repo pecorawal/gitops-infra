@@ -1,0 +1,46 @@
+# ---------------------------------------------------------------------------
+#  PLACEMENTS POR ManagedClusterSet
+# ---------------------------------------------------------------------------
+#  A Placement "all-managed-clusters" (main-placement.yaml) cobre TODOS os
+#  clusters e e a que o GitOpsCluster consome para registrar os destinos no
+#  ArgoCD -- nao mexa nela.
+#
+#  As duas abaixo servem para segmentar por ambiente: ACM Policies que so devem
+#  valer em producao, janelas de manutencao distintas, ou ApplicationSets de
+#  workload que precisem separar prod de non-prod.
+#
+#  Exemplo de uso num ApplicationSet:
+#    generators:
+#      - clusterDecisionResource:
+#          configMapRef: acm-placement
+#          labelSelector:
+#            matchLabels:
+#              cluster.open-cluster-management.io/placement: prod-clusters
+# ---------------------------------------------------------------------------
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: prod-clusters
+  namespace: openshift-gitops
+spec:
+  clusterSets:
+    - prod
+  predicates:
+    - requiredClusterSelector:
+        labelSelector:
+          matchLabels:
+            apps.open-cluster-management.io/replicate-to-argocd: "true"
+---
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: non-prod-clusters
+  namespace: openshift-gitops
+spec:
+  clusterSets:
+    - non-prod
+  predicates:
+    - requiredClusterSelector:
+        labelSelector:
+          matchLabels:
+            apps.open-cluster-management.io/replicate-to-argocd: "true"

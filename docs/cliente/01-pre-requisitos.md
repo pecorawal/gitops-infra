@@ -110,16 +110,36 @@ ServiceAccounts `openshift-gitops-argocd-application-controller` (escrita) e
 Confirme antes de seguir:
 
 ```bash
-SA=system:serviceaccount:openshift-gitops:openshift-gitops-argocd-application-controller
-
-oc auth can-i patch  managedclustersets.cluster.open-cluster-management.io       --as="$SA"
-oc auth can-i create managedclustersets.cluster.open-cluster-management.io/bind  --as="$SA"
-oc auth can-i create channels.apps.open-cluster-management.io -n cluster-gitops-repo --as="$SA"
-oc auth can-i create clusterdeployments.hive.openshift.io -n default             --as="$SA"
-oc auth can-i update managedclusters.register.open-cluster-management.io/accept  --as="$SA"
+./docs/cliente/scripts/verificar-rbac-acm.sh
 ```
 
-Os cinco precisam responder `yes`.
+Todas as linhas precisam sair `OK`.
+
+> **Não use `oc auth can-i` para os subrecursos.** Três das permissões são
+> subrecursos virtuais (`managedclusters/accept`, `managedclustersets/bind`,
+> `managedclustersets/join`) que só existem dentro da `SubjectAccessReview` que
+> os webhooks do ACM montam — não estão na API de discovery.
+>
+> ```bash
+> # ISTO NÃO FUNCIONA e vai responder "no" mesmo com a permissão concedida:
+> oc auth can-i update managedclusters.register.open-cluster-management.io/accept --as="$SA"
+> ```
+>
+> O `kubectl` interpreta o que vem depois da barra como **nome** do objeto, não
+> como subrecurso. E com `--subresource=accept` o restmapper resolve
+> `managedclusters` para o grupo real `cluster.open-cluster-management.io`, nunca
+> para `register.open-cluster-management.io`, que é sintético. O script acima
+> monta a `SubjectAccessReview` exatamente como o webhook.
+
+Para os recursos normais, o `oc auth can-i` funciona:
+
+```bash
+SA=system:serviceaccount:openshift-gitops:openshift-gitops-argocd-application-controller
+
+oc auth can-i patch  managedclustersets.cluster.open-cluster-management.io          --as="$SA"
+oc auth can-i create channels.apps.open-cluster-management.io -n cluster-gitops-repo --as="$SA"
+oc auth can-i create clusterdeployments.hive.openshift.io -n default                --as="$SA"
+```
 
 ### Se preferir o caminho curto
 

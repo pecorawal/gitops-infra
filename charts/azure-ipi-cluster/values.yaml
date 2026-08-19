@@ -2,7 +2,12 @@
 clusterName: ""
 environment: dev
 baseDomain: ""
-clusterSet: global-clusters
+# Vazio = resolvido a partir de labels.env por clusterSets.byEnv (_clusterset.tpl).
+# Preencher aqui e o escape hatch para forcar um set especifico.
+clusterSet: ""
+clusterSets:
+  default: ""
+  byEnv: {}
 cloudProvider: Azure
 labels: {}
 addons:
