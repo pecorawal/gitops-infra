@@ -332,7 +332,7 @@ git push -u origin feature/oadp
 Depois do merge em `cliente`, o ArgoCD sincroniza sozinho. Para forçar:
 
 ```bash
-oc annotate application bundle-<cluster> -n openshift-gitops \
+oc annotate applications.argoproj.io bundle-<cluster> -n openshift-gitops \
   argocd.argoproj.io/refresh=hard --overwrite
 ```
 

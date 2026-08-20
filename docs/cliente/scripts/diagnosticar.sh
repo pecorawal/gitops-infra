@@ -117,26 +117,26 @@ else
 fi
 
 hdr "4. ApplicationSet"
-if oc get applicationset cliente-clusters -n "$NS_ARGO" >/dev/null 2>&1; then
+if oc get applicationsets.argoproj.io cliente-clusters -n "$NS_ARGO" >/dev/null 2>&1; then
   ok "applicationset/cliente-clusters existe"
-  REV=$(oc get applicationset cliente-clusters -n "$NS_ARGO" -o jsonpath='{.spec.generators[0].git.revision}')
+  REV=$(oc get applicationsets.argoproj.io cliente-clusters -n "$NS_ARGO" -o jsonpath='{.spec.generators[0].git.revision}')
   echo "        revision do generator: $REV   (a branch precisa ter o commit)"
-  oc get applicationset cliente-clusters -n "$NS_ARGO" \
+  oc get applicationsets.argoproj.io cliente-clusters -n "$NS_ARGO" \
     -o jsonpath='{range .status.conditions[*]}        {.type}={.status} {.message}{"\n"}{end}' 2>/dev/null
 else
   bad "applicationset/cliente-clusters NAO existe"
   echo "        Aplique o root:  oc apply -f argocd/root-cliente.yaml"
-  echo "        E confira:       oc get application cliente-bootstrap -n $NS_ARGO"
+  echo "        E confira:       oc get applications.argoproj.io cliente-bootstrap -n $NS_ARGO"
   exit 1
 fi
 
 hdr "5. Applications geradas"
 for app in "bundle-$CLUSTER" "provision-$CLUSTER"; do
-  if oc get application "$app" -n "$NS_ARGO" >/dev/null 2>&1; then
-    read -r SYNC HEALTH < <(oc get application "$app" -n "$NS_ARGO" \
+  if oc get applications.argoproj.io "$app" -n "$NS_ARGO" >/dev/null 2>&1; then
+    read -r SYNC HEALTH < <(oc get applications.argoproj.io "$app" -n "$NS_ARGO" \
       -o jsonpath='{.status.sync.status} {.status.health.status}')
     ok "$app  sync=$SYNC  health=$HEALTH"
-    oc get application "$app" -n "$NS_ARGO" \
+    oc get applications.argoproj.io "$app" -n "$NS_ARGO" \
       -o jsonpath='{range .status.conditions[*]}        [{.type}] {.message}{"\n"}{end}' 2>/dev/null
   else
     bad "$app nao existe"
@@ -165,7 +165,7 @@ else
   echo "        Se os passos 1 a 4 acima estao OK, ele nunca foi criado: veja o erro"
   echo "        de sincronizacao em provision-$CLUSTER, no passo 5."
   echo "        Se ja existiu, confira o historico:"
-  echo "          oc get application provision-$CLUSTER -n $NS_ARGO -o jsonpath='{.status.operationState.message}'"
+  echo "          oc get applications.argoproj.io provision-$CLUSTER -n $NS_ARGO -o jsonpath='{.status.operationState.message}'"
 fi
 
 for kind in externalsecret secret clusterdeployment machinepool; do
@@ -176,7 +176,7 @@ oc get externalsecret -n "$CLUSTER" --no-headers 2>/dev/null \
   | awk '{printf "        externalsecret %-32s %s\n", $1, $3}'
 
 hdr "7. Protecoes contra delecao acidental"
-FIN=$(oc get application "provision-$CLUSTER" -n "$NS_ARGO" -o jsonpath='{.metadata.finalizers}' 2>/dev/null)
+FIN=$(oc get applications.argoproj.io "provision-$CLUSTER" -n "$NS_ARGO" -o jsonpath='{.metadata.finalizers}' 2>/dev/null)
 if [[ -n "$FIN" && "$FIN" == *"resources-finalizer"* ]]; then
   bad "provision-$CLUSTER ainda tem resources-finalizer: $FIN"
   echo "        Versao antiga do chart. Se o bundle prunar esta Application, ela"
@@ -213,4 +213,4 @@ fi
 
 echo
 echo "Se tudo acima esta OK e o namespace continua ausente, veja a mensagem em"
-echo "  oc get application provision-$CLUSTER -n $NS_ARGO -o jsonpath='{.status.conditions}' | python3 -m json.tool"
+echo "  oc get applications.argoproj.io provision-$CLUSTER -n $NS_ARGO -o jsonpath='{.status.conditions}' | python3 -m json.tool"
