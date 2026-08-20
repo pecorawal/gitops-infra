@@ -1,5 +1,67 @@
 # 4. Troubleshooting
 
+## Isolar o provisionamento do bundle (diagnóstico)
+
+Quando não se consegue determinar quem está mexendo no namespace, vale eliminar
+camadas. `argocd/provision-standalone.yaml` substitui a cadeia
+
+```
+ApplicationSet cliente-clusters -> bundle-<cluster> -> provision-<cluster>
+```
+
+por **uma** Application aplicada à mão, que por construção **não consegue apagar
+nada**: sem `syncPolicy.automated`, sem `prune`, sem `selfHeal` e sem
+`resources-finalizer`.
+
+```bash
+# 1. desligue a esteira normal, para as duas não brigarem pelos mesmos objetos
+oc get applications.argoproj.io -n openshift-gitops \
+  -o custom-columns=NOME:.metadata.name,FINALIZERS:.metadata.finalizers
+#    se alguma provision-* tiver resources-finalizer, remova ANTES de apagar,
+#    senão a deleção cascateia e o Hive destrói o cluster na Azure
+oc delete applicationsets.argoproj.io cliente-clusters -n openshift-gitops --ignore-not-found
+oc delete applications.argoproj.io bundle-<cluster> provision-<cluster> \
+  -n openshift-gitops --ignore-not-found
+
+# 2. recrie as credenciais (o passo 1 pode ter levado o namespace junto)
+./docs/cliente/scripts/preparar-credenciais.sh <cluster>
+
+# 3. aplique a Application avulsa
+sed 's/<CLUSTER>/<cluster>/g' argocd/provision-standalone.yaml | oc apply -f -
+
+# 4. sincronize MANUALMENTE (pela console, ou:)
+oc patch applications.argoproj.io provision-standalone-<cluster> -n openshift-gitops \
+  --type=merge -p '{"operation":{"sync":{"revision":"cliente"}}}'
+
+# 5. acompanhe
+oc get applications.argoproj.io provision-standalone-<cluster> -n openshift-gitops \
+  -o jsonpath='{range .status.conditions[*]}{.type}: {.message}{"\n"}{end}'
+oc get namespace <cluster> -w
+```
+
+### Como ler o resultado
+
+| O que acontece | Conclusão |
+|---|---|
+| Namespace criado e **permanece** | O culpado estava na cadeia acima. O suspeito é o `prune` do bundle quando o chart renderiza vazio — ou seja, `provision.enabled: false` no values. |
+| Namespace **continua sumindo** | Não é o bundle nem o ApplicationSet. Procure fora do ArgoCD: outro operador, ou uma `Policy` do ACM com `remediationAction: enforce` e `complianceType: mustnothave`. |
+| Nada é aplicado, sem erro | O chart renderizou vazio: `provision.enabled` continua `false`. Confirme com `helm template x charts/azure-ipi-cluster -f clusters/<cluster>/values.yaml` |
+| Erro de comparação | A mensagem do passo 5 diz qual. `no matches for kind ExternalSecret` = `mode: externalSecret` sem o ESO. |
+
+Se o namespace continuar sumindo, veja quem o apagou:
+
+```bash
+oc get events -A --field-selector involvedObject.name=<cluster> --sort-by=.lastTimestamp
+oc get policies.policy.open-cluster-management.io -A
+```
+
+### Voltar ao normal
+
+```bash
+oc delete applications.argoproj.io provision-standalone-<cluster> -n openshift-gitops
+oc apply -f argocd/root-cliente.yaml
+```
+
 ## `oc get application` diz NotFound, mas a console mostra o objeto
 
 O nome curto `application` é **ambíguo** neste cluster. O ACM instala o CRD
