@@ -179,6 +179,21 @@ provision:
   # para quem nao quer nem a possibilidade de perder um cluster por engano.
   preserveOnDelete: false
 
+  # Separa os objetos do ACM (ManagedCluster, KlusterletAddonConfig) dos objetos
+  # do Hive (Namespace, install-config, ClusterDeployment, MachinePool).
+  #
+  # Deixe false para BISSECAR o problema "o namespace some durante o sync":
+  # no ACM, o namespace de mesmo nome pertence ao ciclo de vida do
+  # ManagedCluster, e o managedcluster-import-controller o APAGA se o
+  # ManagedCluster for rejeitado ou entrar em detach. Com acmImport desligado,
+  # o sync aplica so o Hive e o namespace fica fora do alcance desse controlador.
+  #
+  # Depois que o provisionamento andar, volte para true -- sem o ManagedCluster
+  # o cluster nao e importado no ACM nem registrado no ArgoCD, e nenhuma
+  # Application de day-2 encontra destino.
+  acmImport:
+    enabled: true
+
 
 # =============================================================================
 #  2. OPERATORS -- instalados no cluster provisionado (spoke)

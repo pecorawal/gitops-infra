@@ -1,5 +1,77 @@
 # 4. Troubleshooting
 
+## O namespace é destruído exatamente quando eu sincronizo
+
+Sintoma preciso: o namespace fica de pé por horas, com as credenciais dentro; no
+instante em que a Application sincroniza, ele começa a ser destruído e o
+provisionamento não anda.
+
+**Não é o ArgoCD.** Um sync manual só executa `apply`; ele não emite `delete`
+para um objeto que está no estado desejado. Quem apaga é um **controlador
+reagindo** a algo que o sync criou.
+
+### O suspeito: o `ManagedCluster`
+
+No ACM, o namespace de mesmo nome do cluster **pertence ao ciclo de vida do
+`ManagedCluster`**. O `managedcluster-import-controller` é dono dele e o apaga
+quando o `ManagedCluster` é rejeitado, perde `hubAcceptsClient`, ou entra em
+detach. O chart cria o `ManagedCluster` na wave 2 — depois do Namespace (`-5`) e
+do `ClusterDeployment` (`0`). Daí a sequência observada.
+
+A causa mais comum de rejeição neste repo é RBAC: sem `update` em
+`managedclusters/accept` (grupo sintético `register.open-cluster-management.io`),
+o webhook recusa `hubAcceptsClient: true`.
+
+```bash
+./docs/cliente/scripts/verificar-rbac-acm.sh
+```
+
+### Bissecar em um sync
+
+`provision.acmImport.enabled: false` faz o chart emitir **só os objetos do
+Hive**, deixando o namespace fora do alcance do controlador do ACM:
+
+```yaml
+provision:
+  acmImport:
+    enabled: false
+```
+
+| Emitido | `acmImport: true` | `acmImport: false` |
+|---|---|---|
+| `Namespace`, `Secret`, `ClusterDeployment`, `MachinePool` | sim | sim |
+| `ManagedCluster`, `KlusterletAddonConfig` | sim | **não** |
+
+Commite, sincronize e observe:
+
+```bash
+oc get namespace <cluster> -w
+```
+
+| Resultado | Conclusão |
+|---|---|
+| Namespace **sobrevive** e o Hive começa a provisionar | Confirmado: era o ACM reagindo ao `ManagedCluster`. Corrija o RBAC e volte `acmImport` para `true`. |
+| Namespace **ainda é destruído** | Não é o ACM. Veja quem emitiu o delete, abaixo. |
+
+> Lembre de voltar `acmImport` para `true` depois. Sem o `ManagedCluster` o
+> cluster não é importado no ACM nem registrado no ArgoCD, e nenhuma Application
+> de day-2 encontra destino.
+
+### Ver quem emitiu o delete
+
+```bash
+# eventos do namespace e do ManagedCluster, em ordem
+oc get events -A --sort-by=.lastTimestamp \
+  | grep -Ei '<cluster>|managedcluster' | tail -30
+
+# o que o ACM diz do ManagedCluster
+oc get managedcluster <cluster> -o yaml | grep -A30 'conditions:'
+
+# logs do controlador que é dono do namespace
+oc logs -n multicluster-engine -l app=managedcluster-import-controller-v2 --tail=100 \
+  | grep -i '<cluster>'
+```
+
 ## Isolar o provisionamento do bundle (diagnóstico)
 
 Quando não se consegue determinar quem está mexendo no namespace, vale eliminar

@@ -1,4 +1,4 @@
-{{- if .Values.provision.enabled }}
+{{- if and .Values.provision.enabled .Values.provision.acmImport.enabled }}
 # Registra o cluster no ACM. Clusters provisionados pelo Hive sao importados
 # automaticamente -- nao existe auto-import-secret / kubeconfig aqui, ao
 # contrario de charts/import-cluster.
