@@ -1,4 +1,4 @@
-{{- if .Values.provision.enabled }}
+{{- if and .Values.provision.enabled .Values.provision.acmImport.enabled }}
 # Addons do ACM instalados no cluster assim que ele e importado.
 apiVersion: agent.open-cluster-management.io/v1
 kind: KlusterletAddonConfig

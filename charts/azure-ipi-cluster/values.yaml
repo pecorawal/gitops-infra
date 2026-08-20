@@ -32,6 +32,11 @@ provision:
   publish: Internal
   fips: false
   preserveOnDelete: false
+  # Separa os objetos do ACM (ManagedCluster, KlusterletAddonConfig) dos objetos
+  # do Hive (Namespace, install-config, ClusterDeployment, MachinePool).
+  # Util para bissecar: com false, o sync aplica so o Hive.
+  acmImport:
+    enabled: true
   azure:
     region: ""
     cloudName: AzurePublicCloud
