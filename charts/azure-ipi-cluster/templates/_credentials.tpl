@@ -11,28 +11,31 @@
        <cluster>-azure-creds   Opaque       osServicePrincipal.json + ssh-privatekey
        <cluster>-pull-secret   dockerconfigjson  .dockerconfigjson
 
-   modo "existing": voce criou a Credential do ACM dentro do namespace do
-     cluster e informou os nomes em credentials.existing*.
+   modo "existing" (padrao): os Secrets ja existem no namespace do cluster,
+     criados por docs/cliente/scripts/preparar-credenciais.sh a partir da
+     Credential compartilhada do ACM. Os nomes seguem a MESMA convencao
+     (<cluster>-azure-creds e <cluster>-pull-secret), entao nao e preciso
+     informar nada -- os campos existing* sao apenas para nomes fora do padrao.
   ===========================================================================
 */}}
 
 {{/* Secret com osServicePrincipal.json (platform.azure.credentialsSecretRef) */}}
 {{- define "azure-ipi-cluster.azureCredsSecret" -}}
 {{- $c := .Values.provision.credentials -}}
-{{- if eq $c.mode "externalSecret" -}}
-{{- printf "%s-azure-creds" .Values.clusterName -}}
+{{- if and (eq $c.mode "existing") $c.existingCredentialsSecret -}}
+{{- $c.existingCredentialsSecret -}}
 {{- else -}}
-{{- required "provision.credentials.existingCredentialsSecret e obrigatorio quando credentials.mode=existing" $c.existingCredentialsSecret -}}
+{{- printf "%s-azure-creds" .Values.clusterName -}}
 {{- end -}}
 {{- end -}}
 
 {{/* Secret dockerconfigjson (pullSecretRef) */}}
 {{- define "azure-ipi-cluster.pullSecret" -}}
 {{- $c := .Values.provision.credentials -}}
-{{- if eq $c.mode "externalSecret" -}}
-{{- printf "%s-pull-secret" .Values.clusterName -}}
+{{- if and (eq $c.mode "existing") $c.existingPullSecret -}}
+{{- $c.existingPullSecret -}}
 {{- else -}}
-{{- required "provision.credentials.existingPullSecret e obrigatorio quando credentials.mode=existing" $c.existingPullSecret -}}
+{{- printf "%s-pull-secret" .Values.clusterName -}}
 {{- end -}}
 {{- end -}}
 

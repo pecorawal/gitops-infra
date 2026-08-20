@@ -88,28 +88,38 @@ provision:
   # -------------------------------------------------------------------------
   #  CREDENCIAIS
   #  O Hive só lê Secrets do namespace do ClusterDeployment, mas a Credential do
-  #  ACM é UMA SÓ para todos os provisionamentos. No modo externalSecret o ESO
-  #  a copia automaticamente para o namespace deste cluster, já convertendo o
-  #  pull secret para o formato .dockerconfigjson que o Hive exige.
-  #  Nenhum "oc create secret" manual, nenhum segredo no Git.
+  #  ACM é UMA SÓ para todos os provisionamentos. Há dois caminhos para levá-la
+  #  até o namespace de cada cluster:
+  #
+  #  mode: existing  (PADRÃO, não exige operador nenhum)
+  #      Rode UMA vez por cluster, antes de commitar:
+  #          ./docs/cliente/scripts/preparar-credenciais.sh <cluster>
+  #      Ele cria o namespace e os dois Secrets a partir da Credential do ACM,
+  #      já nos formatos que o Hive exige. Os nomes seguem a convenção
+  #      <cluster>-azure-creds e <cluster>-pull-secret, que é o que o chart
+  #      procura -- nada mais precisa ser preenchido aqui.
+  #
+  #  mode: externalSecret  (exige o External Secrets Operator no hub)
+  #      O ESO copia a Credential sozinho, a cada sincronização. Sem passo
+  #      manual algum, mas o CRD ExternalSecret precisa existir.
+  #      ATENÇÃO: sem o ESO instalado, este modo faz a Application inteira ir a
+  #      ComparisonError ("no matches for kind ExternalSecret") e NADA é
+  #      aplicado -- nem o Namespace.
   # -------------------------------------------------------------------------
   credentials:
-    # externalSecret = cópia automática da Credential compartilhada (recomendado)
-    # existing       = a Credential já foi criada no namespace deste cluster
-    mode: externalSecret
+    mode: existing
 
-    # ---- modo externalSecret ----
-    # Onde vive a Credential compartilhada. Descubra com:
-    #   oc get secret -A -l cluster.open-cluster-management.io/type=azr \
-    #     -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name
-    # O namespace precisa bater com bootstrap/05-acm-credentials-store.yaml.
+    # ---- modo externalSecret (ignorado quando mode=existing) ----
     sourceNamespace: acm-credentials
-    sourceSecret: "<PREENCHER>"          # nome da Credential do ACM
+    sourceSecret: ""
     clusterSecretStore: acm-credentials-hub
     refreshInterval: "1h"
-    copySshKey: true                     # false se a Credential não tem ssh-privatekey
+    copySshKey: true
 
-    # ---- modo existing (ignorado quando mode=externalSecret) ----
+    # ---- modo existing ----
+    # Vazios = usa a convenção <cluster>-azure-creds / <cluster>-pull-secret,
+    # exatamente os nomes que preparar-credenciais.sh gera.
+    # Preencha só se os seus Secrets tiverem outros nomes.
     existingCredentialsSecret: ""
     existingPullSecret: ""
     existingSshPrivateKeySecret: ""

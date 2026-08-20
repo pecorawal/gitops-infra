@@ -20,7 +20,7 @@ provision:
   enabled: false
   imageSetRef: ""
   credentials:
-    mode: externalSecret          # externalSecret | existing
+    mode: existing                # existing | externalSecret (este exige o ESO)
     sourceNamespace: acm-credentials
     sourceSecret: ""
     clusterSecretStore: acm-credentials-hub

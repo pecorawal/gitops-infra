@@ -47,26 +47,70 @@ oc get secret -A -l cluster.open-cluster-management.io/type=azr \
   -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name
 ```
 
-## 1.4 Liberar a cópia automática da Credential
+## 1.4 Levar a Credential até o namespace de cada cluster
 
-O Hive só lê Secrets do **namespace do ClusterDeployment**, e esse namespace é
-diferente para cada cluster. Em vez de copiar a Credential à mão toda vez, o
-External Secrets Operator faz isso sob demanda.
+O Hive só lê Secrets do **namespace do `ClusterDeployment`**, e esse namespace é
+diferente para cada cluster. Como a Credential é uma só, ela precisa ser
+materializada em cada namespace. Há dois caminhos.
 
-Edite `bootstrap/05-acm-credentials-store.yaml` e troque `acm-credentials` pelo
-seu namespace nos **quatro** pontos marcados `# <<< NAMESPACE`:
+### Caminho A — `mode: existing` (padrão, não exige operador nenhum)
 
-```yaml
-# ServiceAccount, Role, RoleBinding e ClusterSecretStore
-namespace: acm-credentials          # <<< NAMESPACE
-...
-spec:
-  provider:
-    kubernetes:
-      remoteNamespace: acm-credentials   # <<< NAMESPACE
+Um comando por cluster, antes de commitar:
+
+```bash
+./docs/cliente/scripts/preparar-credenciais.sh azr-cliente-dev-01
 ```
 
-Isso cria:
+O script localiza sozinho a Credential do ACM (pela label
+`cluster.open-cluster-management.io/type=azr`) e cria, de forma idempotente:
+
+| Objeto | Tipo | Chaves | Lido por |
+|---|---|---|---|
+| `namespace/<cluster>` | — | — | tudo do Hive |
+| `<cluster>-azure-creds` | `Opaque` | `osServicePrincipal.json`, `ssh-privatekey` | `credentialsSecretRef`, `sshPrivateKeySecretRef` |
+| `<cluster>-pull-secret` | `kubernetes.io/dockerconfigjson` | `.dockerconfigjson` | `pullSecretRef` |
+
+> **A conversão do pull secret está aqui.** A Credential do ACM guarda o pull
+> secret em texto, na chave `pullSecret`; o Hive exige o tipo
+> `kubernetes.io/dockerconfigjson` com a chave `.dockerconfigjson`. O script faz
+> a tradução e valida que o conteúdo é JSON antes de aplicar.
+
+Se houver mais de uma Credential Azure, ele lista e pede que você escolha:
+
+```bash
+./docs/cliente/scripts/preparar-credenciais.sh azr-cliente-dev-01 acm-credentials/azure-cliente
+```
+
+Os nomes gerados são exatamente os que o chart procura, então no `values.yaml`
+basta:
+
+```yaml
+provision:
+  credentials:
+    mode: existing
+```
+
+Nada mais a preencher. Repetir o script para o mesmo cluster é seguro — ele
+atualiza os Secrets a partir da Credential atual, útil quando o Service Principal
+é rotacionado.
+
+### Caminho B — `mode: externalSecret` (exige o External Secrets Operator)
+
+Se o hub tiver o ESO, a cópia acontece sozinha a cada sincronização e não há
+passo manual algum. Verifique:
+
+```bash
+oc get crd externalsecrets.external-secrets.io
+```
+
+> **Se o CRD não existir, não use este modo.** O ArgoCD não consegue nem comparar
+> o estado desejado (`no matches for kind "ExternalSecret"`), a Application vai a
+> `ComparisonError` e **nada** é aplicado — nem o `Namespace`, que está no mesmo
+> chart. O sintoma é "o provisionamento fica parado e não cria nem o namespace".
+
+Com o ESO presente, edite `bootstrap/05-acm-credentials-store.yaml` e troque
+`acm-credentials` pelo seu namespace nos **quatro** pontos marcados
+`# <<< NAMESPACE`. Isso cria:
 
 | Objeto | Papel |
 |---|---|
@@ -74,7 +118,7 @@ Isso cria:
 | `Role` + `RoleBinding` | leitura de Secrets **apenas** nesse namespace |
 | `ClusterSecretStore acm-credentials-hub` | origem tipo `kubernetes`, apontando para o próprio hub |
 
-Depois, no `values.yaml` de cada cluster, basta apontar a origem:
+E no values do cluster:
 
 ```yaml
 provision:
@@ -84,53 +128,26 @@ provision:
     sourceSecret: azure-cliente
 ```
 
-O chart gera dois `ExternalSecret` no namespace do cluster, já nos formatos
-exatos que o Hive exige:
+Os dois `ExternalSecret` gerados produzem exatamente os mesmos Secrets do
+caminho A, com os mesmos nomes.
 
-| Secret gerado | Tipo | Chaves | Lido por |
-|---|---|---|---|
-| `<cluster>-azure-creds` | `Opaque` | `osServicePrincipal.json`, `ssh-privatekey` | `platform.azure.credentialsSecretRef`, `provisioning.sshPrivateKeySecretRef` |
-| `<cluster>-pull-secret` | `kubernetes.io/dockerconfigjson` | `.dockerconfigjson` | `pullSecretRef` |
+### Qual escolher
 
-> **A conversão do pull secret acontece aqui.** A Credential do ACM guarda o pull
-> secret em texto, na chave `pullSecret`; o Hive exige o tipo
-> `kubernetes.io/dockerconfigjson` com a chave `.dockerconfigjson`. O
-> `ExternalSecret` faz a tradução — era exatamente o `oc create secret
-> docker-registry` que antes tinha que ser repetido a cada cluster.
+| | A — `existing` | B — `externalSecret` |
+|---|---|---|
+| Operador extra | nenhum | External Secrets Operator |
+| Passo por cluster | um comando, uma vez | nenhum |
+| Rotação do SP | rodar o script de novo | automática (`refreshInterval`) |
+| Falha se o operador não existir | — | **quebra tudo, inclusive o Namespace** |
 
-Nada de segredo passa pelo Git: o que está versionado é o **nome** da Credential.
+Nos dois casos nenhum segredo passa pelo Git.
 
-Requer o External Secrets Operator no hub — já é o caso, `charts/import-cluster`
-depende dele. Confirme:
-
-```bash
-oc get crd externalsecrets.external-secrets.io clustersecretstores.external-secrets.io
-```
-
-### Se preferir manter uma Credential por cluster
-
-O modo antigo continua disponível:
-
-```yaml
-provision:
-  credentials:
-    mode: existing
-    existingCredentialsSecret: azr-cliente-dev-01-azure
-    existingPullSecret: azr-cliente-dev-01-pull-secret
-```
-
-Nesse caso, por cluster: criar o namespace, criar a Credential nele e derivar o
-pull secret à mão:
-
-```bash
-export CLUSTER=azr-cliente-dev-01 ACM_CRED=azr-cliente-dev-01-azure
-oc new-project "$CLUSTER"
-oc get secret "$ACM_CRED" -n "$CLUSTER" -o jsonpath='{.data.pullSecret}' \
-  | base64 -d > /tmp/ps.json
-oc create secret docker-registry "${CLUSTER}-pull-secret" -n "$CLUSTER" \
-  --from-file=.dockerconfigjson=/tmp/ps.json
-rm -f /tmp/ps.json
-```
+> Existe ainda um terceiro caminho, não implementado aqui: uma `Policy` do ACM
+> com *hub templates* (`{{hub fromSecret ... hub}}`) materializando os Secrets
+> no `local-cluster`. Dispensa o ESO e mantém tudo em GitOps, mas depende da
+> versão do ACM (desde a 2.9 os hub templates só enxergam objetos do mesmo
+> namespace da Policy) e guarda o valor resolvido na Policy replicada. Se
+> preferir esse caminho, peça que eu monte.
 
 ## 1.5 Escolher a versão do OpenShift
 

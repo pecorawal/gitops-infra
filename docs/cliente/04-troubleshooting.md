@@ -13,9 +13,41 @@ ApplicationSet -> bundle-<cluster> -> provision-<cluster> -> Namespace
   -> ExternalSecrets -> ClusterDeployment -> ManagedCluster -> registro no ArgoCD
 ```
 
-As duas causas que respondem pela maioria dos "não cria nem o namespace":
+As causas que respondem pela maioria dos "não cria nem o namespace", em ordem
+de frequência:
 
-### 1. `provision.enabled` continua `false`
+### 1. `mode: externalSecret` sem o External Secrets Operator
+
+```bash
+oc get crd externalsecrets.external-secrets.io
+```
+
+Se não existir e o values estiver com `mode: externalSecret`, **é esta a causa**.
+O ArgoCD não consegue nem comparar o estado desejado:
+
+```
+Failed to compare desired state to live state: ...
+  no matches for kind "ExternalSecret" in version "external-secrets.io/v1"
+```
+
+A Application inteira vai a `ComparisonError` e **nada** é aplicado — nem o
+`Namespace`, que está no mesmo chart. Daí o "fica parado e não cria nem o
+namespace".
+
+Correção:
+
+```yaml
+provision:
+  credentials:
+    mode: existing
+```
+
+```bash
+./docs/cliente/scripts/preparar-credenciais.sh <cluster>
+git commit -am "credenciais em modo existing" && git push origin cliente
+```
+
+### 2. `provision.enabled` continua `false`
 
 De longe a mais comum. Com o interruptor em `false` o chart **não emite objeto
 nenhum** — nem a Application filha, nem o Namespace. E não há erro: o
@@ -36,7 +68,7 @@ Confirme sem sair da sua máquina — saída vazia significa que nada seria apli
 helm template x charts/cluster-bundle -f clusters/<cluster>/values.yaml
 ```
 
-### 2. Sobrou algum `<PREENCHER>`
+### 3. Sobrou algum `<PREENCHER>`
 
 Aí a renderização **falha de propósito**, e o Namespace faz parte do mesmo chart
 — por isso nem ele é criado:
@@ -65,7 +97,7 @@ Mais rápido é reproduzir localmente:
 helm template x charts/azure-ipi-cluster -f clusters/<cluster>/values.yaml
 ```
 
-### 3. O nome do diretório não bate com `clusterName`
+### 4. O nome do diretório não bate com `clusterName`
 
 O ApplicationSet nomeia a Application pelo **diretório** (`bundle-{{path.basename}}`),
 mas os charts usam `clusterName` para namespace e objetos. Se divergirem, você
@@ -76,7 +108,7 @@ basename $(dirname clusters/<cluster>/values.yaml)
 grep '^clusterName:' clusters/<cluster>/values.yaml
 ```
 
-### 4. O commit não está na branch que o generator lê
+### 5. O commit não está na branch que o generator lê
 
 ```bash
 oc get applicationset cliente-clusters -n openshift-gitops \
@@ -87,7 +119,7 @@ git log --oneline -1 origin/cliente
 O generator lê `clusters/*/values.yaml` da branch `cliente`. Um commit em `main`
 não é enxergado.
 
-### 5. RBAC
+### 6. RBAC
 
 ```bash
 oc auth can-i create namespaces \
@@ -304,7 +336,26 @@ helm template x charts/cluster-bundle -f clusters/<cluster>/values.yaml
 
 Saída vazia = nenhuma camada habilitada.
 
-## As credenciais não aparecem no namespace do cluster
+## O ClusterDeployment não acha as credenciais (`mode: existing`)
+
+```bash
+oc get secret -n <cluster> | grep -E 'azure-creds|pull-secret'
+oc get clusterdeployment <cluster> -n <cluster> -o yaml | grep -A20 conditions
+```
+
+Se os Secrets não estiverem lá, rode o preparo — é idempotente:
+
+```bash
+./docs/cliente/scripts/preparar-credenciais.sh <cluster>
+```
+
+O Hive só lê Secrets do namespace do `ClusterDeployment`; um Secret na
+namespace da Credential compartilhada não serve.
+
+Rodar de novo também é como se propaga a **rotação do Service Principal**: o
+script sobrescreve os Secrets a partir da Credential atual do ACM.
+
+## As credenciais não aparecem no namespace do cluster (`mode: externalSecret`)
 
 ```bash
 oc get externalsecret -n <cluster>
