@@ -82,6 +82,36 @@ done
 [[ $falta -eq 0 ]] || exit 1
 
 # --------------------------------------------------------------- 1. o namespace
+# Um namespace em Terminating aceita 'oc apply' sem erro (e no-op), mas recusa
+# qualquer objeto novo. Sem esta trava o script seguiria e falharia so na criacao
+# do Secret, com uma mensagem que nao explica a causa.
+FASE=$(oc get namespace "$CLUSTER" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+if [[ "$FASE" == "Terminating" ]]; then
+  DESDE=$(oc get namespace "$CLUSTER" -o jsonpath='{.metadata.deletionTimestamp}' 2>/dev/null)
+  cat >&2 <<FIM
+ERRO: o namespace $CLUSTER esta em Terminating desde $DESDE.
+      Ele nao aceita objetos novos, entao nao adianta recriar as credenciais
+      agora. Alguem o apagou e a delecao esta travada.
+
+      Descubra o que esta segurando:
+
+        # o que sobrou dentro dele
+        oc api-resources --verbs=list --namespaced -o name \\
+          | xargs -n1 oc get -n $CLUSTER --show-kind --ignore-not-found 2>/dev/null
+
+        # suspeito 1: ClusterDeployment com finalizer do Hive (job de deprovision)
+        oc get clusterdeployment -n $CLUSTER \\
+          -o jsonpath='{range .items[*]}{.metadata.name}: {.metadata.finalizers}{"\\n"}{end}'
+        oc logs -n $CLUSTER -l hive.openshift.io/job-type=deprovision --tail=50
+
+        # suspeito 2: APIService indisponivel trava a delecao de QUALQUER namespace
+        oc get apiservice | grep -v ' True '
+
+      ATENCAO: se houver um ClusterDeployment, esperar e o certo -- o Hive esta
+      destruindo o cluster na Azure e forcar o finalizer deixaria recursos orfaos.
+FIM
+  exit 1
+fi
 oc create namespace "$CLUSTER" --dry-run=client -o yaml | oc apply -f - >/dev/null
 oc label namespace "$CLUSTER" \
   "cluster.open-cluster-management.io/managedCluster=$CLUSTER" --overwrite >/dev/null
