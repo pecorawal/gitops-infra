@@ -6,7 +6,7 @@ Neste repositório está a definição de um OpenShift GitOps para importação 
 
 Esta branch entrega o fluxo completo, dirigido por **um único `values.yaml` por cluster**:
 
-1. **Provisionamento** — cluster OpenShift IPI na Azure (BYO VNet, privado) via Hive/ACM, com uma **única Credential do ACM** copiada automaticamente para o namespace de cada cluster pelo External Secrets Operator
+1. **Provisionamento** — cluster OpenShift IPI na Azure (BYO VNet, privado) via Hive/ACM, a partir de uma **única Credential do ACM** compartilhada por todos os clusters
 2. **IngressControllers** — privado (LB interno, `pri.cgibs.gov.br`) e público (LB externo, `cgibs.gov.br`), separados pela label `ingress-type`; o `default` fica reservado às aplicações internas do OpenShift
 3. **ExternalDNS** — uma instância para a Azure Private DNS Zone e outra para a Azure DNS Zone pública
 4. **cert-manager** — `ClusterIssuer` ACME/DNS01 emitindo os wildcards `*.cgibs.gov.br` e `*.pri.cgibs.gov.br`
@@ -14,8 +14,12 @@ Esta branch entrega o fluxo completo, dirigido por **um único `values.yaml` por
 ```bash
 oc apply -f argocd/00-rbac-acm.yaml       # RBAC do ArgoCD sobre ACM/Hive (cluster-admin)
 oc apply -f argocd/root-cliente.yaml      # uma única vez
+
 cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
+./docs/cliente/scripts/preparar-credenciais.sh <seu-cluster>   # namespace + credenciais
 # preencher os <PREENCHER>, virar os enabled: true, commitar
+
+./docs/cliente/scripts/diagnosticar.sh <seu-cluster>           # se algo não andar
 ```
 
 📖 **Guia completo: [`docs/cliente/`](docs/cliente/00-visao-geral.md)** — inclui
@@ -129,6 +133,7 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 │       ├── scripts
 │       │   ├── criar-secrets-day2.sh
 │       │   ├── diagnosticar.sh
+│       │   ├── preparar-credenciais.sh
 │       │   └── verificar-rbac-acm.sh
 │       ├── 00-visao-geral.md
 │       ├── 01-pre-requisitos.md
@@ -149,6 +154,6 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 ├── README.md
 └── gitops-workflow.md
 
-28 directories, 85 files
+28 directories, 86 files
 ```
 <!-- readme-tree end -->

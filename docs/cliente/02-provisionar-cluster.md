@@ -123,10 +123,17 @@ git commit -m "novo cluster azr-cliente-prod-01"
 git push origin cliente
 ```
 
-**Não é preciso criar o namespace nem copiar credencial.** O chart cria o
-namespace e dois `ExternalSecret` que materializam a Credential compartilhada do
-ACM neste namespace, já nos formatos que o Hive exige — ver
-[1.4](01-pre-requisitos.md#14-liberar-a-cópia-automática-da-credential).
+Antes de commitar, prepare as credenciais do cluster (um comando, uma vez):
+
+```bash
+./docs/cliente/scripts/preparar-credenciais.sh azr-cliente-prod-01
+```
+
+Ele cria o namespace e os dois Secrets a partir da Credential compartilhada do
+ACM, já nos formatos que o Hive exige — ver
+[1.4](01-pre-requisitos.md#14-levar-a-credential-até-o-namespace-de-cada-cluster).
+Com o External Secrets Operator no hub, esse passo desaparece
+(`mode: externalSecret`).
 
 > Se você deixar algum `<PREENCHER>` para trás, o `helm template` falha listando
 > exatamente quais campos faltam, antes de qualquer coisa ser aplicada.
@@ -144,7 +151,7 @@ cluster:
 2. O bundle emite `provision-azr-cliente-prod-01`.
 3. Essa Application aplica no hub, em ordem de wave:
    - o Namespace do cluster (`-5`);
-   - os dois `ExternalSecret` que copiam a Credential do ACM (`-3`);
+   - no modo `externalSecret`, os dois `ExternalSecret` que copiam a Credential (`-3`);
    - o Secret `<cluster>-install-config` (`-1`) — o manifesto do `openshift-install`;
    - o `ClusterDeployment` (`0`) — dispara o Hive;
    - o `MachinePool` de workers (`1`);

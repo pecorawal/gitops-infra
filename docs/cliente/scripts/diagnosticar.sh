@@ -53,6 +53,9 @@ if [[ "$ENABLED" != "True" ]]; then
 fi
 ok "provision.enabled = true"
 
+MODE=$(python3 -c "import yaml;print(yaml.safe_load(open('$VALUES'))['provision']['credentials']['mode'])" 2>/dev/null)
+ok "provision.credentials.mode = $MODE"
+
 # ------------------------------------------------------- 2. render local (Helm)
 hdr "2. Renderizacao local dos charts"
 if ! OUT=$(helm template "$CLUSTER" charts/azure-ipi-cluster -f "$VALUES" 2>&1); then
@@ -79,7 +82,41 @@ if ! oc whoami >/dev/null 2>&1; then
   exit 0
 fi
 
-hdr "3. ApplicationSet"
+hdr "3. Credenciais (mode=$MODE)"
+if [[ "$MODE" == "externalSecret" ]]; then
+  if oc get crd externalsecrets.external-secrets.io >/dev/null 2>&1; then
+    ok "CRD ExternalSecret presente (External Secrets Operator instalado)"
+    oc get clustersecretstore "$(python3 -c "import yaml;print(yaml.safe_load(open('$VALUES'))['provision']['credentials']['clusterSecretStore'])")" \
+      >/dev/null 2>&1 && ok "ClusterSecretStore existe" || bad "ClusterSecretStore nao existe (bootstrap/05-acm-credentials-store.yaml)"
+  else
+    bad "mode=externalSecret mas o External Secrets Operator NAO esta instalado"
+    echo
+    echo "        ESTA E A CAUSA. Sem o CRD, o ArgoCD nao consegue nem comparar o"
+    echo "        estado desejado (\"no matches for kind ExternalSecret\"), a"
+    echo "        Application inteira vai a ComparisonError e NADA e aplicado --"
+    echo "        inclusive o Namespace, que esta no mesmo chart."
+    echo
+    echo "        Corrija em $VALUES:"
+    echo "            provision:"
+    echo "              credentials:"
+    echo "                mode: existing"
+    echo "        e rode uma vez:"
+    echo "            ./docs/cliente/scripts/preparar-credenciais.sh $CLUSTER"
+    exit 1
+  fi
+else
+  for sec in "${CLUSTER}-azure-creds" "${CLUSTER}-pull-secret"; do
+    if oc get secret "$sec" -n "$CLUSTER" >/dev/null 2>&1; then
+      ok "secret/$sec existe"
+    else
+      bad "secret/$sec NAO existe em $CLUSTER"
+      echo "        Rode:  ./docs/cliente/scripts/preparar-credenciais.sh $CLUSTER"
+      echo "        (o Hive so le Secrets do namespace do ClusterDeployment)"
+    fi
+  done
+fi
+
+hdr "4. ApplicationSet"
 if oc get applicationset cliente-clusters -n "$NS_ARGO" >/dev/null 2>&1; then
   ok "applicationset/cliente-clusters existe"
   REV=$(oc get applicationset cliente-clusters -n "$NS_ARGO" -o jsonpath='{.spec.generators[0].git.revision}')
@@ -93,7 +130,7 @@ else
   exit 1
 fi
 
-hdr "4. Applications geradas"
+hdr "5. Applications geradas"
 for app in "bundle-$CLUSTER" "provision-$CLUSTER"; do
   if oc get application "$app" -n "$NS_ARGO" >/dev/null 2>&1; then
     read -r SYNC HEALTH < <(oc get application "$app" -n "$NS_ARGO" \
@@ -109,7 +146,7 @@ for app in "bundle-$CLUSTER" "provision-$CLUSTER"; do
   fi
 done
 
-hdr "5. Objetos no hub"
+hdr "6. Objetos no hub"
 oc get namespace "$CLUSTER" >/dev/null 2>&1 \
   && ok "namespace/$CLUSTER existe" \
   || bad "namespace/$CLUSTER NAO existe  <-- e o que voce esta vendo"
@@ -121,7 +158,7 @@ done
 oc get externalsecret -n "$CLUSTER" --no-headers 2>/dev/null \
   | awk '{printf "        externalsecret %-32s %s\n", $1, $3}'
 
-hdr "6. RBAC (namespaces)"
+hdr "7. RBAC (namespaces)"
 SA="system:serviceaccount:${NS_ARGO}:openshift-gitops-argocd-application-controller"
 if [[ "$(oc auth can-i create namespaces --as="$SA" 2>/dev/null)" == "yes" ]]; then
   ok "o ArgoCD pode criar namespaces"
