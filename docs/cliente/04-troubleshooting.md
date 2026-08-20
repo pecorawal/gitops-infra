@@ -1,5 +1,33 @@
 # 4. Troubleshooting
 
+## `oc get application` diz NotFound, mas a console mostra o objeto
+
+O nome curto `application` é **ambíguo** neste cluster. O ACM instala o CRD
+`applications.app.k8s.io` (SIG Apps), e o OpenShift GitOps instala
+`applications.argoproj.io`. Quando há empate, o `oc` resolve pela ordem do
+discovery — e costuma cair no `app.k8s.io`:
+
+```
+Error from server (NotFound): applications.app.k8s.io "provision-x" not found
+```
+
+O objeto existe; você consultou o recurso errado. Use sempre o nome qualificado:
+
+```bash
+oc get applications.argoproj.io -A
+oc get applicationsets.argoproj.io -A
+oc delete applications.argoproj.io <nome> -n openshift-gitops
+```
+
+Conferir a ambiguidade:
+
+```bash
+oc api-resources | grep -i '^application'
+```
+
+Todos os comandos e scripts deste repositório usam o nome qualificado por causa
+disso.
+
 ## Apaguei a Application raiz e nada foi embora
 
 Comportamento esperado, não defeito. O ArgoCD só faz **deleção em cascata**
@@ -54,14 +82,14 @@ Quase sempre é finalizer de uma versão anterior do chart. **Confira antes de
 forçar:**
 
 ```bash
-oc get application <nome> -n openshift-gitops -o jsonpath='{.metadata.finalizers}{"\n"}'
+oc get applications.argoproj.io <nome> -n openshift-gitops -o jsonpath='{.metadata.finalizers}{"\n"}'
 ```
 
 Se aparecer `resources-finalizer.argocd.argoproj.io`, remover o finalizer faz o
 objeto sumir **sem** disparar cascata — que é justamente o que você quer aqui:
 
 ```bash
-oc patch application <nome> -n openshift-gitops \
+oc patch applications.argoproj.io <nome> -n openshift-gitops \
   --type=merge -p '{"metadata":{"finalizers":null}}'
 ```
 
@@ -82,7 +110,7 @@ oc get namespace <cluster> -o jsonpath='{.status.phase} {.metadata.deletionTimes
 oc get events -A --field-selector reason=Killing,involvedObject.name=<cluster> 2>/dev/null
 
 # o ArgoCD registrou prune/delete no histórico?
-oc get application provision-<cluster> -n openshift-gitops \
+oc get applications.argoproj.io provision-<cluster> -n openshift-gitops \
   -o jsonpath='{.status.operationState.message}{"\n"}'
 ```
 
@@ -134,7 +162,7 @@ Se o namespace já foi destruído, recrie as credenciais e deixe o ArgoCD refaze
 
 ```bash
 ./docs/cliente/scripts/preparar-credenciais.sh <cluster>
-oc annotate application provision-<cluster> -n openshift-gitops \
+oc annotate applications.argoproj.io provision-<cluster> -n openshift-gitops \
   argocd.argoproj.io/refresh=hard --overwrite
 ```
 
@@ -243,7 +271,7 @@ Na interface do ArgoCD isso aparece como `ComparisonError` em
 `provision-<cluster>`, e a mensagem fica escondida em `.status.conditions`:
 
 ```bash
-oc get application provision-<cluster> -n openshift-gitops \
+oc get applications.argoproj.io provision-<cluster> -n openshift-gitops \
   -o jsonpath='{.status.conditions}' | python3 -m json.tool
 ```
 
@@ -267,7 +295,7 @@ grep '^clusterName:' clusters/<cluster>/values.yaml
 ### 5. O commit não está na branch que o generator lê
 
 ```bash
-oc get applicationset cliente-clusters -n openshift-gitops \
+oc get applicationsets.argoproj.io cliente-clusters -n openshift-gitops \
   -o jsonpath='{.spec.generators[0].git.revision}{"\n"}'
 git log --oneline -1 origin/cliente
 ```
@@ -313,7 +341,7 @@ Depois force a re-sincronização (o ArgoCD já está tentando de novo com backo
 mas isso acelera):
 
 ```bash
-oc annotate application cliente-bootstrap -n openshift-gitops \
+oc annotate applications.argoproj.io cliente-bootstrap -n openshift-gitops \
   argocd.argoproj.io/refresh=hard --overwrite
 ```
 
@@ -475,7 +503,7 @@ clusterSet: "non-pro"      # 3. force o set, ignorando o mapa
 ## O ApplicationSet não gerou nada
 
 ```bash
-oc get applicationset cliente-clusters -n openshift-gitops -o yaml | grep -A20 status
+oc get applicationsets.argoproj.io cliente-clusters -n openshift-gitops -o yaml | grep -A20 status
 oc logs -n openshift-gitops deploy/openshift-gitops-applicationset-controller
 ```
 
@@ -675,7 +703,7 @@ oc logs -n external-dns-operator deploy/external-dns-<nome> -f
 
 ```bash
 # Hub
-oc get applications -n openshift-gitops | grep -E 'bundle-|provision-|operators-|certs-|ingress-|dns-'
+oc get applications.argoproj.io -n openshift-gitops | grep -E 'bundle-|provision-|operators-|certs-|ingress-|dns-'
 oc get clusterdeployment -A
 oc get managedcluster
 

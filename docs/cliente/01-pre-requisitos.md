@@ -267,8 +267,8 @@ Isso instala, a partir de `bootstrap/`:
 Verifique:
 
 ```bash
-oc get application  cliente-bootstrap  -n openshift-gitops
-oc get applicationset cliente-clusters  -n openshift-gitops
+oc get applications.argoproj.io  cliente-bootstrap  -n openshift-gitops
+oc get applicationsets.argoproj.io cliente-clusters  -n openshift-gitops
 oc get gitopscluster -n openshift-gitops
 ```
 

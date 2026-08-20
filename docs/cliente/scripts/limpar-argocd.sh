@@ -54,11 +54,11 @@ echo "Hub: $(oc whoami --show-server)"
 # ------------------------------------------------- 1. o gerador, antes de tudo
 hdr "1. ApplicationSet"
 act "applicationset/cliente-clusters" \
-  oc delete applicationset cliente-clusters -n "$NS" --ignore-not-found
+  oc delete applicationsets.argoproj.io cliente-clusters -n "$NS" --ignore-not-found
 
 # ------------------------------------------------------- 2 e 3. as Applications
 hdr "2. Applications da esteira"
-APPS=$(oc get application -n "$NS" -o name 2>/dev/null \
+APPS=$(oc get applications.argoproj.io -n "$NS" -o name 2>/dev/null \
   | sed 's|application.argoproj.io/||' \
   | grep -E '^(bundle|provision|operators|certs|ingress|dns)-' || true)
 if [[ -z "$APPS" ]]; then
@@ -66,13 +66,13 @@ if [[ -z "$APPS" ]]; then
 else
   # filhas primeiro, bundles depois
   for app in $(grep -v '^bundle-' <<<"$APPS") $(grep '^bundle-' <<<"$APPS"); do
-    act "application/$app" oc delete application "$app" -n "$NS" --ignore-not-found --wait=false
+    act "application/$app" oc delete applications.argoproj.io "$app" -n "$NS" --ignore-not-found --wait=false
   done
 fi
 
 hdr "3. Application raiz"
 act "application/cliente-bootstrap" \
-  oc delete application cliente-bootstrap -n "$NS" --ignore-not-found
+  oc delete applications.argoproj.io cliente-bootstrap -n "$NS" --ignore-not-found
 
 # --------------------------------------------------- 4. objetos do bootstrap/
 hdr "4. Objetos do bootstrap/"
@@ -83,7 +83,7 @@ done
 for p in all-managed-clusters pro-clusters non-pro-clusters gitops; do
   act "placement/$p"                              oc delete placement "$p" -n "$NS" --ignore-not-found
 done
-act "applicationset/import-external-clusters"     oc delete applicationset import-external-clusters -n "$NS" --ignore-not-found
+act "applicationset/import-external-clusters"     oc delete applicationsets.argoproj.io import-external-clusters -n "$NS" --ignore-not-found
 act "channel/cluster-gitops-channel"              oc delete channel cluster-gitops-channel -n cluster-gitops-repo --ignore-not-found
 act "namespace/cluster-gitops-repo"               oc delete namespace cluster-gitops-repo --ignore-not-found --wait=false
 act "clustersecretstore/acm-credentials-hub"      oc delete clustersecretstore acm-credentials-hub --ignore-not-found
@@ -96,7 +96,7 @@ echo "ManagedCluster, MachinePool e os namespaces dos clusters."
 if [[ $GO -eq 1 ]]; then
   hdr "5. Sobrou algo?"
   sleep 3
-  REST=$(oc get application,applicationset -n "$NS" -o name 2>/dev/null \
+  REST=$(oc get applications.argoproj.io,applicationsets.argoproj.io -n "$NS" -o name 2>/dev/null \
     | grep -E '(bundle|provision|operators|certs|ingress|dns|cliente)-' || true)
   if [[ -z "$REST" ]]; then
     echo "  nada. Estado do ArgoCD limpo."
@@ -105,9 +105,9 @@ if [[ $GO -eq 1 ]]; then
     echo
     echo "  Se estiver preso, quase sempre e finalizer de uma versao antiga."
     echo "  Confira antes de forcar:"
-    echo "    oc get application <nome> -n $NS -o jsonpath='{.metadata.finalizers}'"
+    echo "    oc get applications.argoproj.io <nome> -n $NS -o jsonpath='{.metadata.finalizers}'"
     echo "  E so entao:"
-    echo "    oc patch application <nome> -n $NS --type=merge -p '{\"metadata\":{\"finalizers\":null}}'"
+    echo "    oc patch applications.argoproj.io <nome> -n $NS --type=merge -p '{\"metadata\":{\"finalizers\":null}}'"
     echo
     echo "  ATENCAO: remover o finalizer NAO dispara cascata -- o objeto some e os"
     echo "  recursos ficam. E o que voce quer aqui."
