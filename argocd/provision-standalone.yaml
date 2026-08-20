@@ -1,0 +1,78 @@
+# ---------------------------------------------------------------------------
+#  APPLICATION DE PROVISIONAMENTO AVULSA -- PARA DIAGNOSTICO
+# ---------------------------------------------------------------------------
+#  Substitui, so para este cluster, a cadeia
+#      ApplicationSet cliente-clusters -> bundle-<cluster> -> provision-<cluster>
+#  por UMA Application aplicada a mao. Serve para responder a pergunta
+#  "quem esta apagando o namespace?" eliminando duas camadas.
+#
+#  Por construcao ela NAO consegue apagar nada:
+#    - sem syncPolicy.automated  -> nada acontece sem voce mandar sincronizar
+#    - sem prune                 -> nunca remove objeto que saiu do estado desejado
+#    - sem resources-finalizer   -> apagar esta Application nao cascateia
+#
+#  Se o namespace SUMIR mesmo assim, o culpado nao e o bundle nem o ApplicationSet.
+#  Se ele PARAR de sumir, o culpado esta na cadeia acima -- e o suspeito e o
+#  prune do bundle quando o chart renderiza vazio (provision.enabled: false).
+#
+#  COMO USAR
+#  ---------
+#  1. Desligue a esteira normal para este cluster, para as duas nao brigarem:
+#         oc delete applicationsets.argoproj.io cliente-clusters -n openshift-gitops
+#         oc delete applications.argoproj.io bundle-<CLUSTER> provision-<CLUSTER> \
+#            -n openshift-gitops
+#     (confira antes se alguma tem resources-finalizer -- se tiver, remova primeiro,
+#      senao a delecao cascateia e o Hive destroi o cluster na Azure)
+#
+#  2. Gere o arquivo para o seu cluster e aplique:
+#         sed 's/<CLUSTER>/kildes9002/g' argocd/provision-standalone.yaml | oc apply -f -
+#
+#  3. Sincronize MANUALMENTE, pela console ou por:
+#         oc patch applications.argoproj.io provision-standalone-<CLUSTER> \
+#           -n openshift-gitops --type=merge \
+#           -p '{"operation":{"sync":{"revision":"cliente"}}}'
+#
+#  4. Acompanhe:
+#         oc get applications.argoproj.io provision-standalone-<CLUSTER> -n openshift-gitops \
+#           -o jsonpath='{range .status.conditions[*]}{.type}: {.message}{"\n"}{end}'
+#         oc get namespace <CLUSTER> -w
+#
+#  Quando terminar o diagnostico, apague esta Application e volte ao root:
+#         oc delete applications.argoproj.io provision-standalone-<CLUSTER> -n openshift-gitops
+#         oc apply -f argocd/root-cliente.yaml
+# ---------------------------------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: provision-standalone-<CLUSTER>
+  namespace: openshift-gitops
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/pecorawal/gitops-infra.git'
+    targetRevision: cliente
+    path: charts/azure-ipi-cluster
+    helm:
+      releaseName: <CLUSTER>
+      # ../../ leva de charts/azure-ipi-cluster ate a raiz do repositorio.
+      valueFiles:
+        - ../../clusters/<CLUSTER>/values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: <CLUSTER>
+  ignoreDifferences:
+    - group: hive.openshift.io
+      kind: ClusterDeployment
+      jsonPointers:
+        - /spec/installed
+        - /spec/clusterMetadata
+        - /spec/provisioning/installerImageOverride
+    - group: hive.openshift.io
+      kind: MachinePool
+      jsonPointers:
+        - /spec/replicas
+  # SEM automated: sync so acontece quando voce mandar.
+  # SEM prune: esta Application nunca apaga nada.
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
