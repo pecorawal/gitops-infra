@@ -195,7 +195,33 @@ oc get secret -n "$CLUSTER" "${CLUSTER}-admin-kubeconfig" \
   -o jsonpath='{.data.kubeconfig}' | base64 -d > ~/.kube/"$CLUSTER"
 ```
 
-## 2.8 Escalar depois
+## 2.8 Descomissionar um cluster
+
+Isto é **deliberado**, nunca um efeito colateral. As Applications não carregam
+`resources-finalizer`, e os objetos críticos levam `Prune=false,Delete=false` —
+apagar uma Application, editar o values ou desligar `provision.enabled` **não**
+destrói o cluster; no máximo o deixa órfão do GitOps.
+
+Para destruir de verdade, apague o `ClusterDeployment`. O Hive roda um job de
+deprovision e remove a infraestrutura na Azure:
+
+```bash
+# 1. tire o cluster do Git, para o ArgoCD não recriá-lo
+git rm -r clusters/<cluster> && git commit -m "descomissiona <cluster>" && git push origin cliente
+
+# 2. destrua a infraestrutura
+oc delete clusterdeployment <cluster> -n <cluster>
+oc logs -n <cluster> -l hive.openshift.io/job-type=deprovision -f
+
+# 3. limpe o resto
+oc delete managedcluster <cluster>
+oc delete namespace <cluster>
+```
+
+Com `provision.preserveOnDelete: true`, o passo 2 **não** destrói nada na Azure —
+apenas desvincula. Os recursos ficam para limpeza manual.
+
+## 2.9 Escalar depois
 
 Mude `provision.compute.replicas` e commite — o Hive reconcilia o `MachinePool`.
 

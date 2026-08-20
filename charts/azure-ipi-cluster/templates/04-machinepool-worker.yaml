@@ -8,6 +8,7 @@ metadata:
   namespace: {{ .Values.clusterName }}
   annotations:
     argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
 spec:
   clusterDeploymentRef:
     name: {{ .Values.clusterName }}

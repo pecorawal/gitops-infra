@@ -170,6 +170,15 @@ provision:
 
   fips: false
 
+  # Rede de seguranca contra descomissionamento acidental.
+  # true  = se o ClusterDeployment for apagado, o Hive NAO destroi a
+  #         infraestrutura na Azure; sobram recursos orfaos para limpar a mao.
+  # false = comportamento padrao do Hive: apagar o ClusterDeployment dispara o
+  #         job de deprovision e o cluster e destruido.
+  # Os objetos criticos ja levam Prune=false,Delete=false; isto e a camada extra
+  # para quem nao quer nem a possibilidade de perder um cluster por engano.
+  preserveOnDelete: false
+
 
 # =============================================================================
 #  2. OPERATORS -- instalados no cluster provisionado (spoke)
