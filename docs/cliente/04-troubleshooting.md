@@ -1,5 +1,93 @@
 # 4. Troubleshooting
 
+## "Resource /Namespace/&lt;cluster&gt; is missing, it might have been deleted"
+
+Essa mensagem do ArgoCD significa **"declarado no Git, ausente no cluster"**. Ela
+não diz se o objeto foi apagado ou se nunca chegou a ser criado — e os dois casos
+têm causas bem diferentes. Descubra qual é:
+
+```bash
+# existe? está terminando?
+oc get namespace <cluster> -o jsonpath='{.status.phase} {.metadata.deletionTimestamp}{"\n"}' 2>&1
+
+# alguém apagou? (o evento fica ~1h)
+oc get events -A --field-selector reason=Killing,involvedObject.name=<cluster> 2>/dev/null
+
+# o ArgoCD registrou prune/delete no histórico?
+oc get application provision-<cluster> -n openshift-gitops \
+  -o jsonpath='{.status.operationState.message}{"\n"}'
+```
+
+### Se nunca foi criado
+
+A sincronização está falhando antes de chegar na wave `-5`. Rode o diagnóstico —
+as causas mais comuns são `mode: externalSecret` sem o ESO, `provision.enabled:
+false` e `<PREENCHER>` restante:
+
+```bash
+./docs/cliente/scripts/diagnosticar.sh <cluster>
+```
+
+### Se foi apagado — era este defeito, corrigido agora
+
+Até o commit anterior, a Application `provision-<cluster>` carregava
+`resources-finalizer.argocd.argoproj.io`. A cadeia era:
+
+1. `bundle-<cluster>` sincroniza com `prune: true`;
+2. se o bundle deixasse de emitir `provision-<cluster>` — `provision.enabled`
+   voltando a `false`, uma edição no values, um erro de renderização — o ArgoCD
+   **prunava** essa Application;
+3. apagar uma Application **com** `resources-finalizer` dispara **deleção em
+   cascata** de tudo que ela gerencia: Namespace, ClusterDeployment, MachinePool,
+   ManagedCluster;
+4. o Hive, ao ver o `ClusterDeployment` sumir, roda um job de **deprovision** que
+   destrói o cluster na Azure.
+
+O `Prune=false` que o Namespace já tinha **não protege disso**. São duas opções
+diferentes, e essa é a distinção que faltava:
+
+| Sync option | Protege de |
+|---|---|
+| `Prune=false` | remoção quando o objeto sai do estado desejado, **durante um sync** |
+| `Delete=false` | remoção na **deleção em cascata** da Application |
+
+**Correção aplicada:**
+
+- `resources-finalizer` removido de `provision-<cluster>`. O pior caso agora é
+  orfandade — a Application some, o cluster continua de pé — o que se recupera
+  reaplicando o values. Antes, o pior caso era perder o cluster.
+- `Prune=false,Delete=false` em Namespace, ClusterDeployment, MachinePool,
+  ManagedCluster e KlusterletAddonConfig.
+- Novo `provision.preserveOnDelete`, que passa `spec.preserveOnDelete: true` ao
+  `ClusterDeployment`: mesmo apagado, o Hive não destrói a infraestrutura na
+  Azure. Camada extra, opcional.
+
+Se o namespace já foi destruído, recrie as credenciais e deixe o ArgoCD refazer:
+
+```bash
+./docs/cliente/scripts/preparar-credenciais.sh <cluster>
+oc annotate application provision-<cluster> -n openshift-gitops \
+  argocd.argoproj.io/refresh=hard --overwrite
+```
+
+Se o cluster chegou a existir na Azure e foi deprovisionado, não há o que
+recuperar — o provisionamento recomeça do zero.
+
+### Se o namespace está preso em `Terminating`
+
+```bash
+oc get namespace <cluster> -o jsonpath='{.spec.finalizers}{"\n"}'
+oc api-resources --verbs=list --namespaced -o name \
+  | xargs -n1 oc get -n <cluster> --no-headers --ignore-not-found 2>/dev/null | head
+```
+
+Quase sempre é um `ClusterDeployment` com o finalizer do Hive esperando o job de
+deprovision terminar. Acompanhe antes de forçar:
+
+```bash
+oc logs -n <cluster> -l hive.openshift.io/job-type=deprovision -f
+```
+
 ## Comecei por aqui: o cluster não sai do lugar
 
 ```bash

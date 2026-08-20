@@ -2,8 +2,11 @@
 {{- include "azure-ipi-cluster.validate" . }}
 # Namespace do cluster no hub. Abriga a Credential do ACM, o ClusterDeployment
 # e todos os objetos do Hive.
-# Prune=false: apagar a Application NAO pode apagar este namespace junto com a
-# Credential do ACM que voce criou dentro dele.
+# Duas protecoes DIFERENTES, ambas necessarias:
+#   Prune=false   nao remove quando o objeto sai do estado desejado (sync)
+#   Delete=false  nao remove quando a Application e apagada (delecao em cascata)
+# Prune=false sozinho NAO protege de cascata -- foi assim que este namespace,
+# junto com a Credential e o ClusterDeployment dentro dele, podia desaparecer.
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -12,5 +15,5 @@ metadata:
     cluster.open-cluster-management.io/managedCluster: {{ .Values.clusterName }}
   annotations:
     argocd.argoproj.io/sync-wave: "-5"
-    argocd.argoproj.io/sync-options: Prune=false
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
 {{- end }}

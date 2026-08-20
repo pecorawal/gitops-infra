@@ -18,6 +18,7 @@ metadata:
   name: {{ .Values.clusterName }}
   annotations:
     argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
   labels:
     cloud: {{ .Values.cloudProvider | default "Azure" }}
     vendor: OpenShift

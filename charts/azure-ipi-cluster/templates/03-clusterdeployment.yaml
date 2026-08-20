@@ -9,6 +9,11 @@ metadata:
   annotations:
     gitops.io/managed-by: "acm-gitops"
     argocd.argoproj.io/sync-wave: "0"
+    # O objeto mais perigoso do repositorio: apagar um ClusterDeployment faz o
+    # Hive rodar um job de deprovision que DESTROI o cluster na Azure.
+    # Prune=false  -> nao remove se sair do estado desejado
+    # Delete=false -> nao remove na delecao em cascata da Application
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
   labels:
     cloud: Azure
     vendor: OpenShift
@@ -17,6 +22,13 @@ spec:
   baseDomain: {{ .Values.baseDomain }}
   clusterName: {{ .Values.clusterName }}
   installed: false
+  {{- if .Values.provision.preserveOnDelete }}
+  # Ultima linha de defesa: mesmo que o ClusterDeployment seja apagado, o Hive
+  # NAO destroi a infraestrutura na Azure -- apenas para de gerenciar o cluster.
+  # Voce fica com recursos orfaos para limpar a mao, o que e preferivel a perder
+  # um cluster por engano. Deixe false para permitir o deprovision automatico.
+  preserveOnDelete: true
+  {{- end }}
   platform:
     azure:
       # Secret com a chave osServicePrincipal.json. No modo externalSecret e o

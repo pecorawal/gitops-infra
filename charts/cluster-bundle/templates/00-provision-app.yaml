@@ -8,9 +8,21 @@ metadata:
   namespace: {{ .Values.global.argoNamespace }}
   annotations:
     argocd.argoproj.io/sync-wave: "0"
-  finalizers:
-    # Sem este finalizer, apagar a Application deixaria o cluster orfao na Azure.
-    - resources-finalizer.argocd.argoproj.io
+# ATENCAO: esta Application NAO leva resources-finalizer, e isso e deliberado.
+#
+# O bundle que a gera sincroniza com prune: true. Se o bundle deixar de emitir
+# esta Application -- porque provision.enabled voltou a false, porque alguem
+# editou o values, ou por qualquer erro de renderizacao -- o ArgoCD a PRUNA.
+# Com o finalizer, apagar a Application dispara delecao em cascata de tudo que
+# ela gerencia: Namespace, ClusterDeployment, MachinePool, ManagedCluster. E o
+# Hive, ao ver o ClusterDeployment sumir, roda um job de DEPROVISION que destroi
+# o cluster na Azure.
+#
+# Ou seja: uma edicao no values.yaml poderia derrubar um cluster de producao.
+# Sem o finalizer o pior caso vira apenas orfandade -- a Application some, o
+# cluster continua de pe -- o que e recuperavel reaplicando o values.
+#
+# Para descomissionar de verdade, veja docs/cliente/02-provisionar-cluster.md.
 spec:
   project: {{ .Values.global.project }}
   source:

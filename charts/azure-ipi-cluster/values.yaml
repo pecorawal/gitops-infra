@@ -31,6 +31,7 @@ provision:
     existingSshPrivateKeySecret: ""
   publish: Internal
   fips: false
+  preserveOnDelete: false
   azure:
     region: ""
     cloudName: AzurePublicCloud

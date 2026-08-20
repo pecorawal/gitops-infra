@@ -147,9 +147,26 @@ for app in "bundle-$CLUSTER" "provision-$CLUSTER"; do
 done
 
 hdr "6. Objetos no hub"
-oc get namespace "$CLUSTER" >/dev/null 2>&1 \
-  && ok "namespace/$CLUSTER existe" \
-  || bad "namespace/$CLUSTER NAO existe  <-- e o que voce esta vendo"
+if NSJSON=$(oc get namespace "$CLUSTER" -o json 2>/dev/null); then
+  TERM=$(python3 -c "import json,sys;d=json.load(sys.stdin);print(d['metadata'].get('deletionTimestamp') or '')" <<<"$NSJSON")
+  if [[ -n "$TERM" ]]; then
+    bad "namespace/$CLUSTER esta em Terminating desde $TERM"
+    echo "        Quase sempre e o ClusterDeployment segurando, com o finalizer do"
+    echo "        Hive, ate o job de deprovision terminar:"
+    echo "          oc logs -n $CLUSTER -l hive.openshift.io/job-type=deprovision -f"
+  else
+    ok "namespace/$CLUSTER existe"
+  fi
+else
+  bad "namespace/$CLUSTER NAO existe"
+  echo "        A mensagem do ArgoCD \"is missing, it might have been deleted\" so"
+  echo "        diz que esta declarado no Git e ausente no cluster -- nao diz se"
+  echo "        foi apagado ou se nunca chegou a ser criado."
+  echo "        Se os passos 1 a 4 acima estao OK, ele nunca foi criado: veja o erro"
+  echo "        de sincronizacao em provision-$CLUSTER, no passo 5."
+  echo "        Se ja existiu, confira o historico:"
+  echo "          oc get application provision-$CLUSTER -n $NS_ARGO -o jsonpath='{.status.operationState.message}'"
+fi
 
 for kind in externalsecret secret clusterdeployment machinepool; do
   n=$(oc get "$kind" -n "$CLUSTER" --no-headers 2>/dev/null | wc -l)
@@ -158,7 +175,33 @@ done
 oc get externalsecret -n "$CLUSTER" --no-headers 2>/dev/null \
   | awk '{printf "        externalsecret %-32s %s\n", $1, $3}'
 
-hdr "7. RBAC (namespaces)"
+hdr "7. Protecoes contra delecao acidental"
+FIN=$(oc get application "provision-$CLUSTER" -n "$NS_ARGO" -o jsonpath='{.metadata.finalizers}' 2>/dev/null)
+if [[ -n "$FIN" && "$FIN" == *"resources-finalizer"* ]]; then
+  bad "provision-$CLUSTER ainda tem resources-finalizer: $FIN"
+  echo "        Versao antiga do chart. Se o bundle prunar esta Application, ela"
+  echo "        apaga em cascata o Namespace e o ClusterDeployment -- e o Hive"
+  echo "        destroi o cluster na Azure. Atualize a branch e sincronize."
+else
+  ok "provision-$CLUSTER sem resources-finalizer (sem delecao em cascata)"
+fi
+JP='{.metadata.annotations.argocd\.argoproj\.io/sync-options}'
+check_protecao() { # <kind> [-n <ns>]
+  local kind="$1"; shift
+  local so; so=$(oc get "$kind" "$CLUSTER" "$@" -o jsonpath="$JP" 2>/dev/null)
+  if [[ -z "$so" ]]; then
+    warn "$kind/$CLUSTER: sem anotacao sync-options (objeto ausente ou chart antigo)"
+  elif [[ "$so" == *"Delete=false"* ]]; then
+    ok "$kind/$CLUSTER protegido: $so"
+  else
+    bad "$kind/$CLUSTER sem Delete=false (atual: $so)"
+    echo "        Prune=false sozinho NAO impede delecao em cascata."
+  fi
+}
+check_protecao namespace
+check_protecao clusterdeployment -n "$CLUSTER"
+
+hdr "8. RBAC (namespaces)"
 SA="system:serviceaccount:${NS_ARGO}:openshift-gitops-argocd-application-controller"
 if [[ "$(oc auth can-i create namespaces --as="$SA" 2>/dev/null)" == "yes" ]]; then
   ok "o ArgoCD pode criar namespaces"
