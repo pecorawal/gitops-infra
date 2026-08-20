@@ -1,5 +1,73 @@
 # 4. Troubleshooting
 
+## Apaguei a Application raiz e nada foi embora
+
+Comportamento esperado, não defeito. O ArgoCD só faz **deleção em cascata**
+quando a Application tem o finalizer `resources-finalizer.argocd.argoproj.io`.
+Nenhuma Application desta esteira tem — de propósito: a cascata da
+`provision-<cluster>` destruiria o `ClusterDeployment`, e o Hive deprovisionaria
+o cluster na Azure.
+
+Sem o finalizer, apagar uma Application é uma deleção **não-cascata**: some o
+objeto `Application`, ficam todos os recursos que ela gerenciava.
+
+E há um agravante: o **`ApplicationSet cliente-clusters` continua vivo**. Ele é
+quem gera os `bundle-<cluster>`, então recria tudo em segundos. Por isso a ordem
+importa — o gerador tem que morrer primeiro.
+
+### Limpeza ordenada
+
+```bash
+./docs/cliente/scripts/limpar-argocd.sh              # só lista (dry-run)
+./docs/cliente/scripts/limpar-argocd.sh --confirmar  # executa
+```
+
+A ordem que ele segue:
+
+| # | O quê | Por que nessa ordem |
+|---|---|---|
+| 1 | `ApplicationSet cliente-clusters` | senão ele recria os `bundle-*` |
+| 2 | `provision-*`, `operators-*`, `certs-*`, `ingress-*`, `dns-*` | filhas antes dos pais |
+| 3 | `bundle-*` | |
+| 4 | `Application cliente-bootstrap` | a raiz |
+| 5 | `GitOpsCluster`, bindings, placements, `Channel`, `ClusterSecretStore` | o que vinha de `bootstrap/` |
+
+**O que o script deliberadamente não toca:** `ClusterDeployment`,
+`ManagedCluster`, `MachinePool`, `ManagedClusterSet` e os namespaces dos
+clusters. Apagar um `ClusterDeployment` faz o Hive **destruir o cluster na
+Azure**, e isso nunca deve ser efeito colateral de "resetar o ArgoCD". Os
+clusters continuam de pé e são readotados quando você reaplica o root.
+
+Para descomissionar de verdade, é o procedimento explícito de
+[2.8](02-provisionar-cluster.md#28-descomissionar-um-cluster).
+
+### Recomeçar
+
+```bash
+oc apply -f argocd/00-rbac-acm.yaml
+oc apply -f argocd/root-cliente.yaml
+```
+
+### Se uma Application ficar presa
+
+Quase sempre é finalizer de uma versão anterior do chart. **Confira antes de
+forçar:**
+
+```bash
+oc get application <nome> -n openshift-gitops -o jsonpath='{.metadata.finalizers}{"\n"}'
+```
+
+Se aparecer `resources-finalizer.argocd.argoproj.io`, remover o finalizer faz o
+objeto sumir **sem** disparar cascata — que é justamente o que você quer aqui:
+
+```bash
+oc patch application <nome> -n openshift-gitops \
+  --type=merge -p '{"metadata":{"finalizers":null}}'
+```
+
+> Não faça isso em uma Application que você pretende manter: sem o finalizer o
+> ArgoCD perde o vínculo de limpeza dela.
+
 ## "Resource /Namespace/&lt;cluster&gt; is missing, it might have been deleted"
 
 Essa mensagem do ArgoCD significa **"declarado no Git, ausente no cluster"**. Ela

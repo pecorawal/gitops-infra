@@ -20,6 +20,7 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 # preencher os <PREENCHER>, virar os enabled: true, commitar
 
 ./docs/cliente/scripts/diagnosticar.sh <seu-cluster>           # se algo não andar
+./docs/cliente/scripts/limpar-argocd.sh                        # zerar o ArgoCD (dry-run)
 ```
 
 📖 **Guia completo: [`docs/cliente/`](docs/cliente/00-visao-geral.md)** — inclui
@@ -133,6 +134,7 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 │       ├── scripts
 │       │   ├── criar-secrets-day2.sh
 │       │   ├── diagnosticar.sh
+│       │   ├── limpar-argocd.sh
 │       │   ├── preparar-credenciais.sh
 │       │   └── verificar-rbac-acm.sh
 │       ├── 00-visao-geral.md
@@ -154,6 +156,6 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 ├── README.md
 └── gitops-workflow.md
 
-28 directories, 86 files
+28 directories, 87 files
 ```
 <!-- readme-tree end -->

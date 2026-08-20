@@ -355,6 +355,7 @@ Opcionalmente, mais uma `Placement` em
 
 | Sintoma | Causa |
 |---|---|
+| Apaguei a Application e os recursos ficaram | esperado: sem `resources-finalizer` não há cascata. Veja [limpar-argocd.sh](04-troubleshooting.md#apaguei-a-application-raiz-e-nada-foi-embora) |
 | `helm template` falha com "ManagedClusterSet indefinido" | `labels.env` não está em `clusterSets.byEnv` e `clusterSets.default` está vazio |
 | Cluster provisionado mas invisível no ArgoCD | falta o `ManagedClusterSetBinding` do set em `openshift-gitops` |
 | Application nova não aparece | faltou o interruptor em `charts/cluster-bundle/values.yaml`, ou o `if` no template |
