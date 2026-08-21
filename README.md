@@ -38,15 +38,18 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 | `charts/ingress-controllers/` | IngressController privado e público |
 | `charts/external-dns-config/` | instâncias do ExternalDNS por zona |
 | `charts/nsg-rule/` | CronJob que sincroniza a inbound rule do NSG com o IP do LB do ingress |
+| `charts/cluster-autoscaling/` | ClusterAutoscaler + MachineAutoscaler (autoscaling do pool worker) |
 
 <!-- readme-tree start -->
 ```
-.
 ├── .github
 │   └── workflows
 │       └── readme-tree.yaml
+├── .gitignore
+├── README.md
 ├── argocd
 │   ├── 00-rbac-acm.yaml
+│   ├── provision-standalone.yaml
 │   ├── root-apps.yaml
 │   ├── root-cliente.yaml
 │   └── root-clusters.yaml
@@ -64,6 +67,7 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 │   └── main-placement.yaml
 ├── charts
 │   ├── azure-ipi-cluster
+│   │   ├── Chart.yaml
 │   │   ├── templates
 │   │   │   ├── 00-namespace.yaml
 │   │   │   ├── 01-externalsecret-credentials.yaml
@@ -76,9 +80,9 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 │   │   │   ├── _credentials.tpl
 │   │   │   ├── _installconfig.tpl
 │   │   │   └── _validate.tpl
-│   │   ├── Chart.yaml
 │   │   └── values.yaml
 │   ├── cert-manager-config
+│   │   ├── Chart.yaml
 │   │   ├── templates
 │   │   │   ├── 10-clusterissuer-selfsigned.yaml
 │   │   │   ├── 11-clusterissuer-internal-ca.yaml
@@ -86,78 +90,92 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 │   │   │   ├── 20-certificate-ingress-private.yaml
 │   │   │   ├── 21-certificate-ingress-public.yaml
 │   │   │   └── 30-certificates-apps.yaml
+│   │   └── values.yaml
+│   ├── cluster-autoscaling
 │   │   ├── Chart.yaml
+│   │   ├── templates
+│   │   │   ├── 10-clusterautoscaler.yaml
+│   │   │   └── 20-machineautoscaler.yaml
 │   │   └── values.yaml
 │   ├── cluster-bundle
+│   │   ├── Chart.yaml
 │   │   ├── templates
 │   │   │   ├── 00-provision-app.yaml
 │   │   │   ├── 10-operators-app.yaml
 │   │   │   ├── 20-cert-manager-app.yaml
 │   │   │   ├── 30-ingress-app.yaml
 │   │   │   ├── 40-external-dns-app.yaml
+│   │   │   ├── 50-nsg-app.yaml
+│   │   │   ├── 60-autoscaling-app.yaml
 │   │   │   └── _helpers.tpl
-│   │   ├── Chart.yaml
 │   │   └── values.yaml
 │   ├── cluster-operators
+│   │   ├── Chart.yaml
 │   │   ├── templates
 │   │   │   ├── 00-namespaces.yaml
 │   │   │   ├── 10-cert-manager-operator.yaml
 │   │   │   └── 20-external-dns-operator.yaml
-│   │   ├── Chart.yaml
 │   │   └── values.yaml
 │   ├── external-dns-config
+│   │   ├── Chart.yaml
 │   │   ├── templates
 │   │   │   ├── 00-azure-config-secret.yaml
 │   │   │   ├── 10-externaldns-private.yaml
 │   │   │   ├── 20-externaldns-public.yaml
 │   │   │   └── _externaldns.tpl
-│   │   ├── Chart.yaml
 │   │   └── values.yaml
 │   ├── import-cluster
+│   │   ├── Chart.yaml
+│   │   └── templates
+│   │       ├── 00-namespace.yaml
+│   │       ├── 01-external-secret-kubeconfig.yaml
+│   │       ├── 02-managed-cluster.yaml
+│   │       └── placement.yaml
+│   ├── ingress-controllers
+│   │   ├── Chart.yaml
 │   │   ├── templates
-│   │   │   ├── 00-namespace.yaml
-│   │   │   ├── 01-external-secret-kubeconfig.yaml
-│   │   │   ├── 02-managed-cluster.yaml
-│   │   │   └── placement.yaml
-│   │   └── Chart.yaml
-│   └── ingress-controllers
-│       ├── templates
-│       │   ├── 00-default-route-selector.yaml
-│       │   ├── 10-ingresscontroller-private.yaml
-│       │   ├── 20-ingresscontroller-public.yaml
-│       │   └── _ingresscontroller.tpl
+│   │   │   ├── 00-default-route-selector.yaml
+│   │   │   ├── 10-ingresscontroller-private.yaml
+│   │   │   ├── 20-ingresscontroller-public.yaml
+│   │   │   └── _ingresscontroller.tpl
+│   │   └── values.yaml
+│   └── nsg-rule
 │       ├── Chart.yaml
+│       ├── templates
+│       │   ├── 00-namespace.yaml
+│       │   ├── 10-serviceaccount.yaml
+│       │   ├── 11-role.yaml
+│       │   ├── 12-rolebinding.yaml
+│       │   ├── 20-configmap-script.yaml
+│       │   ├── 30-cronjob.yaml
+│       │   └── _validate.tpl
 │       └── values.yaml
 ├── clusters
 │   └── azr-cliente-dev-01
 │       └── values.yaml
 ├── docs
 │   └── cliente
-│       ├── scripts
-│       │   ├── criar-secrets-day2.sh
-│       │   ├── diagnosticar.sh
-│       │   ├── limpar-argocd.sh
-│       │   ├── preparar-credenciais.sh
-│       │   └── verificar-rbac-acm.sh
 │       ├── 00-visao-geral.md
 │       ├── 01-pre-requisitos.md
 │       ├── 02-provisionar-cluster.md
 │       ├── 03-day2-ingress-dns-certs.md
 │       ├── 04-troubleshooting.md
-│       └── 05-estender.md
+│       ├── 05-estender.md
+│       └── scripts
+│           ├── criar-secrets-day2.sh
+│           ├── diagnosticar.sh
+│           ├── limpar-argocd.sh
+│           ├── preparar-credenciais.sh
+│           └── verificar-rbac-acm.sh
+├── gitops-workflow.md
 ├── imports
 │   └── rosaqa
 │       └── values.yaml
 ├── policies
 │   ├── enforce-gitops-labels.yaml
 │   └── pci-compliance-policy.yaml
-├── workloads
-│   ├── checkout-frontend-api-appset.yaml
-│   └── pagamentos-api-appset.yaml
-├── .gitignore
-├── README.md
-└── gitops-workflow.md
-
-28 directories, 87 files
+└── workloads
+    ├── checkout-frontend-api-appset.yaml
+    └── pagamentos-api-appset.yaml
 ```
 <!-- readme-tree end -->

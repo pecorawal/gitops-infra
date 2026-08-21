@@ -1,0 +1,21 @@
+# Valores injetados pelo ApplicationSet (bootstrap/02-appset-cliente.yaml).
+# Nao edite aqui -- o arquivo do cliente e clusters/<cluster>/values.yaml.
+autoscaling:
+  enabled: false
+
+  # Configuracao GLOBAL do cluster-autoscaler (CR "default", unico aceito).
+  clusterAutoscaler:
+    maxNodesTotal: 20
+    scaleDown:
+      enabled: true
+      unneededTime: 10m
+      delayAfterAdd: 10m
+      delayAfterDelete: 10m
+      delayAfterFailure: 10m
+
+  # Um MachineAutoscaler por MachineSet do pool worker.
+  # Descubra os nomes reais com: oc get machineset -n openshift-machine-api
+  machineSets: []
+  #  - name: <cluster>-worker-<region>-<zone>   # ex: azr-cliente-dev-01-worker-brazilsouth1
+  #    minReplicas: 2
+  #    maxReplicas: 6

@@ -254,7 +254,8 @@ backup:
 | 20 | cert-manager (issuers e certificados) |
 | 30 | ingress controllers |
 | 40 | external-dns |
-| **50+** | **camadas novas** |
+| 50 | nsg-rule (NSG inbound do LB do ingress) |
+| **60** | **autoscaling (ClusterAutoscaler + MachineAutoscaler)** |
 
 Se a camada nova depender de um operador, o operador entra em
 `charts/cluster-operators` (wave 10) e os CRs dele na wave nova. Sempre múltiplos

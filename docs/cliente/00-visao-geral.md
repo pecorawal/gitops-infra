@@ -18,6 +18,7 @@ Operator.
 | Certificados | `ClusterIssuer` ACME/Azure DNS, wildcards `*.cgibs.gov.br` e `*.pri.cgibs.gov.br` | Cluster novo |
 | Ingress | IngressController **privado** (LB interno) e **público** (LB externo), separados pela label `ingress-type` | Cluster novo |
 | DNS | ExternalDNS → **Azure Private DNS Zone** e → **Azure DNS Zone** pública | Cluster novo |
+| Autoscaling | `ClusterAutoscaler` global + `MachineAutoscaler` por MachineSet (pool worker, min..max) | Cluster novo |
 
 ## Como o fluxo se encadeia
 
@@ -36,10 +37,12 @@ argocd/root-cliente.yaml            (aplicado UMA vez, na mão)
                           ├─ wave 10  operators-<cluster>  → charts/cluster-operators   [SPOKE]
                           ├─ wave 20  certs-<cluster>      → charts/cert-manager-config [SPOKE]
                           ├─ wave 30  ingress-<cluster>    → charts/ingress-controllers [SPOKE]
-                          └─ wave 40  dns-<cluster>        → charts/external-dns-config [SPOKE]
+                          ├─ wave 40  dns-<cluster>        → charts/external-dns-config [SPOKE]
+                          ├─ wave 50  nsg-<cluster>        → charts/nsg-rule            [SPOKE]
+                          └─ wave 60  autoscale-<cluster>  → charts/cluster-autoscaling [SPOKE]
 ```
 
-As cinco Applications filhas leem **o mesmo** `clusters/<cluster>/values.yaml`.
+As sete Applications filhas leem **o mesmo** `clusters/<cluster>/values.yaml`.
 
 ## Agrupamento por ambiente
 
@@ -72,6 +75,8 @@ operators.enabled    →  instala cert-manager e ExternalDNS
 certManager.enabled  →  cria ClusterIssuers e Certificates
 ingress.enabled      →  cria os IngressControllers
 externalDNS.enabled  →  publica os registros de DNS
+nsgRule.enabled      →  sincroniza a inbound rule do NSG com o IP do LB do ingress
+autoscaling.enabled  →  liga o autoscaling do pool worker (min..max por MachineSet)
 ```
 
 Você pode virar todos de uma vez ou avançar camada por camada — as sync-waves
