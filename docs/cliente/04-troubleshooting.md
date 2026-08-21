@@ -1,5 +1,62 @@
 # 4. Troubleshooting
 
+## "could not unmarshal InstallConfig: error converting YAML to JSON"
+
+O `install-config.yaml` gerado saiu com YAML inválido. Veja exatamente o que o
+chart produziu, com numeração de linha para casar com a mensagem de erro:
+
+```bash
+helm template x charts/azure-ipi-cluster -f clusters/<cluster>/values.yaml \
+  | python3 -c '
+import sys, yaml
+for d in yaml.safe_load_all(sys.stdin):
+    if d and d.get("kind") == "Secret" and "install-config.yaml" in d.get("stringData", {}):
+        ic = d["stringData"]["install-config.yaml"]
+        for i, l in enumerate(ic.split("\n"), 1):
+            print("%3d| %s" % (i, l))
+        yaml.safe_load(ic)
+        print(">>> install-config e YAML valido")
+'
+```
+
+### Causa mais comum: lista onde o chart espera escalar
+
+`did not find expected ',' or ']'` é o parser topando com um `[`. Acontecia
+quando `clusterNetwork`, `machineNetwork` ou `serviceNetwork` eram preenchidos no
+formato nativo do install-config (lista) em vez de escalar — o Go interpolava a
+estrutura como texto e produzia `- cidr: [map[cidr:10.0.0.0/16]]`.
+
+**Os dois formatos passaram a funcionar**, então isto não deve mais ocorrer:
+
+```yaml
+# forma curta
+networking:
+  clusterNetwork: "10.128.0.0/14"
+  hostPrefix: 23
+  machineNetwork: "10.0.0.0/16"
+  serviceNetwork: "172.30.0.0/16"
+
+# forma do install-config -- equivalente
+networking:
+  clusterNetwork:
+    - cidr: 10.128.0.0/14
+      hostPrefix: 23
+  machineNetwork:
+    - cidr: 10.0.0.0/16
+  serviceNetwork:
+    - 172.30.0.0/16
+```
+
+Se ainda falhar, o comando acima aponta a linha. Suspeitos: valor com `:` ou `#`
+sem aspas, ou uma tabulação no lugar de espaços no `values.yaml`.
+
+### Depois de corrigir
+
+O Hive não relê o Secret de install-config sozinho num provisionamento que já
+falhou. Siga o roteiro de recriação em
+[2.8](02-provisionar-cluster.md#28-descomissionar-um-cluster): pausar o ArgoCD,
+apagar o `ClusterDeployment`, esperar o deprovision, e só então recriar.
+
 ## `clusterdeploymentvalidators` — "Required value: must specify secrets for Azure access"
 
 ```
