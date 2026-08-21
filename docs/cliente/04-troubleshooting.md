@@ -1,5 +1,90 @@
 # 4. Troubleshooting
 
+## `clusterdeploymentvalidators` — "Required value: must specify secrets for Azure access"
+
+```
+admission webhook "clusterdeploymentvalidators.admission.hive.openshift.io" denied the request:
+ClusterDeployment "kildes9002" is invalid:
+  spec.platform.azure.credentialsSecretRef.name: Required value: must specify secrets for Azure access
+  spec.provisioning.sshPrivateKeySecretRef.name: Required value: must specify a name for the ssh private key secret
+```
+
+**Não é sobre o conteúdo do Secret.** É sobre o manifesto: o chart renderizou os
+dois `name:` **vazios**, e o Hive recusa `...SecretRef` presente sem nome.
+
+```yaml
+credentialsSecretRef:
+  name: ""          # <- é disto que o webhook reclama
+```
+
+Verifique o que o chart produz:
+
+```bash
+helm template x charts/azure-ipi-cluster -f clusters/<cluster>/values.yaml \
+  | grep -A2 -E 'credentialsSecretRef|sshPrivateKeySecretRef|pullSecretRef'
+```
+
+Deve sair `<cluster>-azure-creds` e `<cluster>-pull-secret`. Se sair vazio:
+
+| Causa | Como confirmar |
+|---|---|
+| `clusterName` vazio ou ausente no values | `grep '^clusterName:' clusters/<cluster>/values.yaml` |
+| Bloco `provision.credentials` ausente (values de uma versão anterior) | `grep -A3 '  credentials:' clusters/<cluster>/values.yaml` |
+| **O ArgoCD está renderizando um chart mais antigo que o values** | veja abaixo |
+
+O terceiro é o mais traiçoeiro: se o `helm template` local acerta e o ArgoCD
+erra, os dois estão em revisões diferentes. Charts anteriores liam
+`provision.credentialsSecret`, chave que não existe mais — e uma chave inexistente
+renderiza como string vazia, sem erro.
+
+```bash
+oc get applications.argoproj.io <app> -n openshift-gitops \
+  -o jsonpath='revision desejada: {.spec.source.targetRevision}{"\n"}revision sincronizada: {.status.sync.revision}{"\n"}'
+git log --oneline -1 origin/cliente
+```
+
+Se a revisão sincronizada for antiga, force o refresh:
+
+```bash
+oc annotate applications.argoproj.io <app> -n openshift-gitops \
+  argocd.argoproj.io/refresh=hard --overwrite
+```
+
+O chart agora **falha na renderização** com mensagem explícita nesse caso, em vez
+de emitir vazio e deixar o webhook do Hive reclamar de longe.
+
+### E se a Credential não tiver chave SSH
+
+O webhook também recusa `sshPrivateKeySecretRef` presente com nome vazio. Se você
+não tem (ou não quer) acesso SSH aos nós, omita o bloco inteiro:
+
+```yaml
+provision:
+  credentials:
+    sshPrivateKey: false
+```
+
+### `copySshKey` × `sshPrivateKey`
+
+Confusão comum, porque os nomes se parecem:
+
+| Valor | Vale para | O que faz |
+|---|---|---|
+| `copySshKey` | **só** `mode: externalSecret` | inclui `ssh-privatekey` no `ExternalSecret` gerado. **Ignorado** em `mode: existing` |
+| `sshPrivateKey` | os **dois** modos | emite ou omite o bloco `sshPrivateKeySecretRef` no `ClusterDeployment` |
+
+Em `mode: existing`, quem copia a chave é o `preparar-credenciais.sh`. Confirme
+que ela chegou:
+
+```bash
+oc get secret <cluster>-azure-creds -n <cluster> \
+  -o go-template='{{range $k,$v := .data}}{{$k}}{{"\n"}}{{end}}'
+```
+
+Devem aparecer `osServicePrincipal.json` e `ssh-privatekey`. Se a segunda não
+estiver lá, a Credential do ACM não tem chave SSH — use `sshPrivateKey: false`
+ou adicione a chave à Credential no console do ACM.
+
 ## O namespace é destruído exatamente quando eu sincronizo
 
 Sintoma preciso: o namespace fica de pé por horas, com as credenciais dentro; no

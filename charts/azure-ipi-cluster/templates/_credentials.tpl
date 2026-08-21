@@ -22,21 +22,31 @@
 {{/* Secret com osServicePrincipal.json (platform.azure.credentialsSecretRef) */}}
 {{- define "azure-ipi-cluster.azureCredsSecret" -}}
 {{- $c := .Values.provision.credentials -}}
+{{- $nome := "" -}}
 {{- if and (eq $c.mode "existing") $c.existingCredentialsSecret -}}
-{{- $c.existingCredentialsSecret -}}
-{{- else -}}
-{{- printf "%s-azure-creds" .Values.clusterName -}}
+{{- $nome = $c.existingCredentialsSecret -}}
+{{- else if .Values.clusterName -}}
+{{- $nome = printf "%s-azure-creds" .Values.clusterName -}}
 {{- end -}}
+{{- if not $nome -}}
+{{- fail "\n\ncredentialsSecretRef ficaria VAZIO.\nclusterName esta vazio e provision.credentials.existingCredentialsSecret tambem.\nSem isso o webhook do Hive recusa o ClusterDeployment com\n  spec.platform.azure.credentialsSecretRef.name: Required value\n" -}}
+{{- end -}}
+{{- $nome -}}
 {{- end -}}
 
 {{/* Secret dockerconfigjson (pullSecretRef) */}}
 {{- define "azure-ipi-cluster.pullSecret" -}}
 {{- $c := .Values.provision.credentials -}}
+{{- $nome := "" -}}
 {{- if and (eq $c.mode "existing") $c.existingPullSecret -}}
-{{- $c.existingPullSecret -}}
-{{- else -}}
-{{- printf "%s-pull-secret" .Values.clusterName -}}
+{{- $nome = $c.existingPullSecret -}}
+{{- else if .Values.clusterName -}}
+{{- $nome = printf "%s-pull-secret" .Values.clusterName -}}
 {{- end -}}
+{{- if not $nome -}}
+{{- fail "\n\npullSecretRef ficaria VAZIO. Verifique clusterName no values.yaml.\n" -}}
+{{- end -}}
+{{- $nome -}}
 {{- end -}}
 
 {{/*
