@@ -70,6 +70,15 @@ spec:
 As sync-waves internas de `cluster-operators` são sempre as mesmas:
 `Namespace: -2` → `OperatorGroup: -1` → `Subscription: 0`.
 
+> **Confira os install modes antes de escolher o escopo.** `OperatorGroup` sem
+> `targetNamespaces` = AllNamespaces, e operadores que só suportam `OwnNamespace`
+> são recusados com `AllNamespaces InstallModeType not supported`:
+>
+> ```bash
+> oc get packagemanifest <pacote> -n openshift-marketplace \
+>   -o jsonpath='{range .status.channels[*].currentCSVDesc.installModes[*]}{.type}={.supported}{"\n"}{end}'
+> ```
+
 ### Passo 2 — declarar os defaults
 
 Em `charts/cluster-operators/values.yaml`:
