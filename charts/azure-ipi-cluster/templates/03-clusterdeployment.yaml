@@ -43,10 +43,14 @@ spec:
       name: {{ .Values.clusterName }}-install-config
     imageSetRef:
       name: {{ .Values.provision.imageSetRef }}
+    {{- if .Values.provision.credentials.sshPrivateKey }}
+    # Mesmo Secret do osServicePrincipal.json: o Hive le chaves diferentes de
+    # refs diferentes, e nada impede que apontem para o mesmo objeto.
+    # O bloco inteiro e OMITIDO quando credentials.sshPrivateKey e false --
+    # o webhook do Hive recusa sshPrivateKeySecretRef presente com name vazio.
     sshPrivateKeySecretRef:
-      # Mesmo Secret do osServicePrincipal.json: o Hive le chaves diferentes de
-      # refs diferentes, e nada impede que apontem para o mesmo objeto.
       name: {{ include "azure-ipi-cluster.sshSecret" . }}
+    {{- end }}
   pullSecretRef:
     name: {{ include "azure-ipi-cluster.pullSecret" . }}
 {{- end }}

@@ -116,6 +116,12 @@ provision:
     refreshInterval: "1h"
     copySshKey: true
 
+    # Vale para os DOIS modos. Com false, o ClusterDeployment sai SEM o bloco
+    # sshPrivateKeySecretRef (cluster sem acesso SSH aos nós). Use false quando
+    # a Credential do ACM não tem ssh-privatekey -- o webhook do Hive recusa o
+    # bloco presente com name vazio.
+    sshPrivateKey: true
+
     # ---- modo existing ----
     # Vazios = usa a convenção <cluster>-azure-creds / <cluster>-pull-secret,
     # exatamente os nomes que preparar-credenciais.sh gera.

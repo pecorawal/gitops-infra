@@ -25,7 +25,12 @@ provision:
     sourceSecret: ""
     clusterSecretStore: acm-credentials-hub
     refreshInterval: "1h"
+    # SO no modo externalSecret: inclui ssh-privatekey no ExternalSecret gerado.
+    # Ignorado quando mode=existing.
     copySshKey: true
+    # Vale para os DOIS modos: se false, o ClusterDeployment sai sem o bloco
+    # sshPrivateKeySecretRef (cluster sem acesso SSH aos nos).
+    sshPrivateKey: true
     existingCredentialsSecret: ""
     existingPullSecret: ""
     existingSshPrivateKeySecret: ""
