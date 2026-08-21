@@ -1,0 +1,13 @@
+{{- if .Values.nsgRule.enabled }}
+# Role no namespace do Service (openshift-ingress): o pod so le Services,
+# nada mais.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: nsg-rule-svc-reader
+  namespace: {{ .Values.nsgRule.serviceNamespace }}
+rules:
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch"]
+{{- end }}

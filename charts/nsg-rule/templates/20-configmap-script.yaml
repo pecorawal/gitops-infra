@@ -1,0 +1,57 @@
+{{- if .Values.nsgRule.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nsg-rule-script
+  namespace: {{ .Values.nsgRule.namespace }}
+data:
+  nsg-rule.sh: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    echo "[$(date -u)] Iniciando sincronizacao NSG: regra=${RULE_NAME} nsg=${NSG_NAME} (rg=${NSG_RG})"
+
+    # 1. Espera o Service do IngressController ter IP publico (ate ~25 min)
+    IP=""
+    DEADLINE=$((SECONDS + 1500))
+    while [[ $SECONDS -lt $DEADLINE ]]; do
+      IP=$(kubectl get svc "$SVC_NAME" -n "$SVC_NAMESPACE" \
+           -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
+      if [[ -n "$IP" && "$IP" != "<pending>" ]]; then
+        echo "[$(date -u)] IP do LB ${SVC_NAME}: ${IP}"
+        break
+      fi
+      echo "[$(date -u)] Aguardando IP do LB (${DEADLINE} seg restantes)..."
+      sleep 15
+    done
+    if [[ -z "$IP" || "$IP" == "<pending>" ]]; then
+      echo "ERRO: Service ${SVC_NAME} sem IP de LB apos o timeout" >&2
+      exit 1
+    fi
+
+    # 2. Autentica na Azure com o Service Principal (Secret azure-spn, fora do Git)
+    az login --service-principal -u "$AZURE_CLIENT_ID" -p "$AZURE_CLIENT_SECRET" \
+      --tenant "$AZURE_TENANT_ID" --output none
+    az account set --subscription "$SUBSCRIPTION"
+
+    # 3. Regra idempotente: cria ou atualiza quando o IP muda (upsert do az)
+    EXISTING=$(az network nsg rule show -g "$NSG_RG" --nsg-name "$NSG_NAME" -n "$RULE_NAME" \
+               --query destinationAddressPrefix -o tsv 2>/dev/null || true)
+    if [[ "$EXISTING" == "$IP" ]]; then
+      echo "[$(date -u)] OK: regra ${RULE_NAME} ja aponta para ${IP} - nada a fazer"
+      exit 0
+    fi
+
+    echo "[$(date -u)] Criando/atualizando regra ${RULE_NAME} -> ${IP} (TCP 80/443 do Internet)"
+    az network nsg rule create -g "$NSG_RG" --nsg-name "$NSG_NAME" -n "$RULE_NAME" \
+      --priority "$PRIORITY" \
+      --access Allow \
+      --direction Inbound \
+      --protocol Tcp \
+      --source-address-prefixes Internet \
+      --source-port-ranges '*' \
+      --destination-address-prefixes "$IP" \
+      --destination-port-ranges 80 443 \
+      --output none
+    echo "[$(date -u)] OK: regra ${RULE_NAME} sincronizada com ${IP}"
+{{- end }}

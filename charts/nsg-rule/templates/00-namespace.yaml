@@ -1,0 +1,8 @@
+{{- if .Values.nsgRule.enabled }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.nsgRule.namespace }}
+  labels:
+    app: nsg-rule
+{{- end }}

@@ -19,3 +19,5 @@ ingress:
   enabled: false
 externalDNS:
   enabled: false
+nsgRule:
+  enabled: false

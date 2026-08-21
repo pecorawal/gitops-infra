@@ -1,0 +1,5 @@
+apiVersion: v2
+name: nsg-rule
+description: Sincroniza a regra inbound do NSG da Azure com o IP do Load Balancer do IngressController (80/443 do Internet)
+type: application
+version: 0.1.0

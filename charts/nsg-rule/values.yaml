@@ -1,0 +1,26 @@
+# Defaults. Os valores reais vem de clusters/<cluster>/values.yaml, sob a
+# chave nsgRule: (mesma convencao de provision/ingress/externalDNS).
+nsgRule:
+  enabled: false
+  # Namespace onde roda o CronJob (e a ServiceAccount).
+  namespace: nsg-rule
+
+  # Service do IngressController cujo IP publico vai para a regra do NSG.
+  serviceName: router-public
+  serviceNamespace: openshift-ingress
+
+  # NSG alvo na Azure.
+  nsgName: ""
+  nsgResourceGroup: ""
+  subscriptionId: ""
+  ruleName: Allow_HTTP_HTTPS_Ingress
+  priority: 1000
+  schedule: "*/10 * * * *"
+  timeoutSeconds: 1800
+
+  # Imagem com az CLI + kubectl (mcr.microsoft.com/azure-cli inclui ambos).
+  image: mcr.microsoft.com/azure-cli
+  imageTag: latest
+
+  # Secret (fora do Git) com clientId/clientSecret/tenantId do Service Principal.
+  secretName: azure-spn
