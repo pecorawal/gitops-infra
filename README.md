@@ -10,6 +10,7 @@ Esta branch entrega o fluxo completo, dirigido por **um único `values.yaml` por
 2. **IngressControllers** — privado (LB interno, `pri.cgibs.gov.br`) e público (LB externo, `cgibs.gov.br`), separados pela label `ingress-type`; o `default` fica reservado às aplicações internas do OpenShift
 3. **ExternalDNS** — uma instância para a Azure Private DNS Zone e outra para a Azure DNS Zone pública
 4. **cert-manager** — `ClusterIssuer` ACME/DNS01 emitindo os wildcards `*.cgibs.gov.br` e `*.pri.cgibs.gov.br`
+5. **NSG rule** — CronJob idempotente que sincroniza a inbound rule do NSG da Azure com o IP público do Load Balancer do IngressController (TCP 80/443 do Internet)
 
 ```bash
 oc apply -f argocd/00-rbac-acm.yaml       # RBAC do ArgoCD sobre ACM/Hive (cluster-admin)
@@ -36,6 +37,7 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 | `charts/cert-manager-config/` | ClusterIssuers e Certificates |
 | `charts/ingress-controllers/` | IngressController privado e público |
 | `charts/external-dns-config/` | instâncias do ExternalDNS por zona |
+| `charts/nsg-rule/` | CronJob que sincroniza a inbound rule do NSG com o IP do LB do ingress |
 
 <!-- readme-tree start -->
 ```

@@ -1,0 +1,64 @@
+{{- if .Values.nsgRule.enabled }}
+{{- include "nsg-rule.validate" . }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: nsg-rule
+  namespace: {{ .Values.nsgRule.namespace }}
+spec:
+  schedule: {{ .Values.nsgRule.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: {{ .Values.nsgRule.timeoutSeconds }}
+      template:
+        spec:
+          serviceAccountName: nsg-rule-sa
+          restartPolicy: Never
+          containers:
+            - name: nsg-rule
+              image: "{{ .Values.nsgRule.image }}:{{ .Values.nsgRule.imageTag }}"
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/bash", "/scripts/nsg-rule.sh"]
+              env:
+                - name: SVC_NAME
+                  value: {{ .Values.nsgRule.serviceName | quote }}
+                - name: SVC_NAMESPACE
+                  value: {{ .Values.nsgRule.serviceNamespace | quote }}
+                - name: NSG_NAME
+                  value: {{ .Values.nsgRule.nsgName | quote }}
+                - name: NSG_RG
+                  value: {{ .Values.nsgRule.nsgResourceGroup | quote }}
+                - name: SUBSCRIPTION
+                  value: {{ .Values.nsgRule.subscriptionId | quote }}
+                - name: RULE_NAME
+                  value: {{ .Values.nsgRule.ruleName | quote }}
+                - name: PRIORITY
+                  value: {{ .Values.nsgRule.priority | quote }}
+                - name: AZURE_CLIENT_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.nsgRule.secretName }}
+                      key: clientId
+                - name: AZURE_CLIENT_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.nsgRule.secretName }}
+                      key: clientSecret
+                - name: AZURE_TENANT_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.nsgRule.secretName }}
+                      key: tenantId
+              volumeMounts:
+                - name: script
+                  mountPath: /scripts
+          volumes:
+            - name: script
+              configMap:
+                name: nsg-rule-script
+                defaultMode: 0555
+{{- end }}

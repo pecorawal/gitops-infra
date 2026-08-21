@@ -22,6 +22,17 @@ for k in '$1'.split('.'):
 print(d)
 "; }
 
+get2() { python3 -c "
+import sys,yaml
+d=yaml.safe_load(open('$VALUES'))
+for k in '$1'.split('.'):
+    if isinstance(d, dict) and k in d:
+        d=d[k]
+    else:
+        print('$2'); sys.exit(0)
+print(d)
+"; }
+
 TENANT=$(get externalDNS.azure.tenantId)
 SUBSCRIPTION=$(get externalDNS.azure.subscriptionId)
 CLIENT_ID=$(get externalDNS.azure.aadClientId)
@@ -61,6 +72,24 @@ for pair in "$SECRET_PRIVATE:$RG_PRIVATE" "$SECRET_PUBLIC:$RG_PUBLIC"; do
   echo "OK  secret/$name -n external-dns-operator (resourceGroup=$rg)"
 done
 
+# --- 3. nsg-rule: SPN para sincronizar a regra do NSG com o IP do LB ---
+#   O CronJob de nsg-rule usa este Secret para autenticar na Azure e
+#   criar/atualizar a inbound rule (80/443 do Internet) apontando para o IP
+#   publico do Load Balancer do IngressController.
+NSG_ENABLED=$(get2 nsgRule.enabled false)
+if [[ "$NSG_ENABLED" == "True" ]]; then
+  NSG_NS=$(get2 nsgRule.namespace nsg-rule)
+  oc create namespace "$NSG_NS" --dry-run=client -o yaml | oc apply -f -
+  oc create secret generic azure-spn -n "$NSG_NS" \
+    --from-literal=clientId="$CLIENT_ID" \
+    --from-literal=clientSecret="$CLIENT_SECRET" \
+    --from-literal=tenantId="$TENANT" \
+    --dry-run=client -o yaml | oc apply -f -
+  echo "OK  secret/azure-spn -n $NSG_NS (nsg-rule)"
+else
+  echo "SKIP nsgRule.enabled=false (sem secret azure-spn)"
+fi
+
 unset CLIENT_SECRET
 echo
-echo "Pronto. Agora vire operators/certManager/ingress/externalDNS para enabled: true em $VALUES e commite."
+echo "Pronto. Agora vire operators/certManager/ingress/externalDNS/nsgRule para enabled: true em $VALUES e commite."

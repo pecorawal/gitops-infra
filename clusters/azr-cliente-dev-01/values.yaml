@@ -378,3 +378,41 @@ externalDNS:
     excludeDomains:
       - "pri.cgibs.gov.br"
     configSecretName: azure-config-file-public
+
+# =============================================================================
+#  6. NSG RULE -- sincroniza a regra inbound do NSG com o IP do LB do ingress
+# =============================================================================
+#  Apos a criacao do IngressController (wave 30), o Load Balancer publico da
+#  Azure recebe um IP dinamico. Para o trafego chegar, o NSG da subnet precisa
+#  de uma inbound rule permitindo TCP 80/443 do Internet para esse IP.
+#
+#  Este bloco liga um CronJob (wave 50) que:
+#    1. espera o Service router-<nome> ter IP (ate ~25 min);
+#    2. autentica na Azure com o Service Principal (Secret azure-spn, criado
+#       pelo docs/cliente/scripts/criar-secrets-day2.sh -- nunca vai pro Git);
+#    3. cria/atualiza a regra Allow_HTTP_HTTPS_Ingress no NSG, idempotente.
+#
+#  O CronJob roda a cada 10 min e se auto-cura se o LB for recriado com outro IP.
+nsgRule:
+  enabled: false                    # <-- vire para true SÓ depois de preencher tudo abaixo
+
+  # Service do IngressController cujo IP publico vai para a regra do NSG.
+  # router-<nome>: router-public / router-private (o mesmo de ingress.*.name).
+  serviceName: router-public
+  serviceNamespace: openshift-ingress
+
+  # NSG alvo na Azure.
+  nsgName: "<PREENCHER>"            # ex: azr-cliente-dev-01-nsg
+  nsgResourceGroup: "<PREENCHER>"   # RG onde vive o NSG
+  subscriptionId: "<PREENCHER>"
+  ruleName: Allow_HTTP_HTTPS_Ingress
+  priority: 1000
+  schedule: "*/10 * * * *"
+  timeoutSeconds: 1800
+
+  image: mcr.microsoft.com/azure-cli
+  imageTag: latest
+
+  # Secret com clientId/clientSecret/tenantId do Service Principal (fora do Git).
+  secretName: azure-spn
+  namespace: nsg-rule
