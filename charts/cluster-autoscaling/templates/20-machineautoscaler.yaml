@@ -1,0 +1,22 @@
+{{- if .Values.autoscaling.enabled }}
+{{- range .Values.autoscaling.machineSets }}
+# MachineAutoscaler por MachineSet do worker: e ele que decide escalar para
+# cima/baixo (min..max) conforme a demanda das pods. O nome do objeto e o
+# mesmo do MachineSet, dentro do namespace openshift-machine-api.
+apiVersion: autoscaling.openshift.io/v1
+kind: MachineAutoscaler
+metadata:
+  name: {{ .name }}
+  namespace: openshift-machine-api
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  minReplicas: {{ .minReplicas }}
+  maxReplicas: {{ .maxReplicas }}
+  scaleTargetRef:
+    apiVersion: machine.openshift.io/v1beta1
+    kind: MachineSet
+    name: {{ .name }}
+---
+{{- end }}
+{{- end }}

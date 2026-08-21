@@ -422,3 +422,46 @@ nsgRule:
   # Secret com clientId/clientSecret/tenantId do Service Principal (fora do Git).
   secretName: azure-spn
   namespace: nsg-rule
+
+# =============================================================================
+#  7. AUTOSCALING DE CLUSTER -- ClusterAutoscaler + MachineAutoscaler
+# =============================================================================
+#  Liga o autoscaling de máquinas do pool worker: o cluster-autoscaler-operator
+#  escala os MachineSets entre min e max conforme a demanda das pods.
+#
+#  Requisito: o cluster JÁ PRECISA ESTAR PROVISIONADO (provision.enabled=true e
+#  o cluster de pé) para descobrir os nomes reais dos MachineSets:
+#
+#      oc get machineset -n openshift-machine-api
+#
+#  Exemplo de saída (IPI Azure, zona brazilsouth):
+#      azr-cliente-dev-01-worker-brazilsouth1
+#      azr-cliente-dev-01-worker-brazilsouth2
+#      azr-cliente-dev-01-worker-brazilsouth3
+#
+#  Copie os nomes para machineSets[].name, defina min/max e vire enabled: true.
+#  O ClusterAutoscaler global (scale-down etc.) nasce com defaults seguros.
+autoscaling:
+  enabled: false                    # <-- vire para true SÓ depois de preencher machineSets
+
+  # Configuração GLOBAL do autoscaler (CR "default").
+  clusterAutoscaler:
+    maxNodesTotal: 20
+    scaleDown:
+      enabled: true
+      unneededTime: 10m
+      delayAfterAdd: 10m
+      delayAfterDelete: 10m
+      delayAfterFailure: 10m
+
+  # Um MachineAutoscaler por MachineSet do pool worker.
+  machineSets:
+    - name: "<PREENCHER>"           # ex: azr-cliente-dev-01-worker-brazilsouth1
+      minReplicas: 2
+      maxReplicas: 6
+    - name: "<PREENCHER>"           # ex: azr-cliente-dev-01-worker-brazilsouth2
+      minReplicas: 2
+      maxReplicas: 6
+    - name: "<PREENCHER>"           # ex: azr-cliente-dev-01-worker-brazilsouth3
+      minReplicas: 2
+      maxReplicas: 6

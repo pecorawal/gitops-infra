@@ -1,0 +1,31 @@
+{{- if .Values.autoscaling.enabled }}
+# WAVE 60 -- SPOKE. Autoscaling de máquinas: ClusterAutoscaler global +
+# MachineAutoscaler por MachineSet do pool worker.
+# Roda DEPOIS do provisionamento (wave 0): os MachineSets só existem depois
+# que o cluster sobe, e o MachineAutoscaler referencia os nomes reais deles.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: autoscale-{{ .Values.clusterName }}
+  namespace: {{ .Values.global.argoNamespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "60"
+spec:
+  project: {{ .Values.global.project }}
+  source:
+    {{- include "bundle.source" (dict "root" . "chart" "cluster-autoscaling") | nindent 4 }}
+  destination:
+    name: {{ .Values.clusterName }}
+    namespace: openshift-machine-api
+  ignoreDifferences:
+    # O cluster-autoscaler-operator atualiza status/scale dos objetos.
+    - group: autoscaling.openshift.io
+      kind: ClusterAutoscaler
+      jsonPointers:
+        - /status
+    - group: autoscaling.openshift.io
+      kind: MachineAutoscaler
+      jsonPointers:
+        - /status
+  {{- include "bundle.syncPolicy" . | nindent 2 }}
+{{- end }}

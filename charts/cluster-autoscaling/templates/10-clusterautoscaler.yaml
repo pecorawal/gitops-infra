@@ -1,0 +1,19 @@
+{{- if .Values.autoscaling.enabled }}
+# ClusterAutoscaler GLOBAL. O OpenShift aceita apenas o CR de nome "default" --
+# ele liga o autoscaler para o cluster inteiro (scale-down, limites gerais).
+# O escalonamento em si e feito pelos MachineAutoscaler (20-*), um por MachineSet.
+apiVersion: autoscaling.openshift.io/v1
+kind: ClusterAutoscaler
+metadata:
+  name: default
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  maxNodesTotal: {{ .Values.autoscaling.clusterAutoscaler.maxNodesTotal }}
+  scaleDown:
+    enabled: {{ .Values.autoscaling.clusterAutoscaler.scaleDown.enabled }}
+    unneededTime: {{ .Values.autoscaling.clusterAutoscaler.scaleDown.unneededTime }}
+    delayAfterAdd: {{ .Values.autoscaling.clusterAutoscaler.scaleDown.delayAfterAdd }}
+    delayAfterDelete: {{ .Values.autoscaling.clusterAutoscaler.scaleDown.delayAfterDelete }}
+    delayAfterFailure: {{ .Values.autoscaling.clusterAutoscaler.scaleDown.delayAfterFailure }}
+{{- end }}
