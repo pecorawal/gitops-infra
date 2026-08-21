@@ -153,6 +153,14 @@ provision:
 
   networking:
     networkType: OVNKubernetes
+    # clusterNetwork, machineNetwork e serviceNetwork aceitam DOIS formatos:
+    #
+    #   forma curta (abaixo)          forma do install-config
+    #   clusterNetwork: "10.128.0.0/14"    clusterNetwork:
+    #   hostPrefix: 23                       - cidr: 10.128.0.0/14
+    #                                          hostPrefix: 23
+    #
+    # Os dois geram o mesmo install-config. Use o que preferir.
     clusterNetwork: "10.128.0.0/14"
     hostPrefix: 23
     serviceNetwork: "172.30.0.0/16"

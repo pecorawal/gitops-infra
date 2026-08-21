@@ -49,13 +49,38 @@ compute:
         {{- end }}
 networking:
   networkType: {{ $p.networking.networkType }}
+  {{- /*
+    Os tres campos abaixo aceitam DOIS formatos, porque o nome e igual ao do
+    install-config, onde sao listas -- e e natural preenche-los assim:
+
+      clusterNetwork: "10.128.0.0/14"          # escalar (forma curta)
+      clusterNetwork:                          # lista (forma do install-config)
+        - cidr: 10.128.0.0/14
+          hostPrefix: 23
+
+    Sem este tratamento, uma lista era interpolada como texto e virava
+    "- cidr: [map[cidr:10.128.0.0/14]]", quebrando o YAML com
+    "did not find expected ',' or ']'".
+  */}}
   clusterNetwork:
+  {{- if kindIs "slice" $p.networking.clusterNetwork }}
+    {{- toYaml $p.networking.clusterNetwork | nindent 4 }}
+  {{- else }}
     - cidr: {{ $p.networking.clusterNetwork }}
       hostPrefix: {{ $p.networking.hostPrefix }}
+  {{- end }}
   machineNetwork:
+  {{- if kindIs "slice" $p.networking.machineNetwork }}
+    {{- toYaml $p.networking.machineNetwork | nindent 4 }}
+  {{- else }}
     - cidr: {{ $p.networking.machineNetwork }}
+  {{- end }}
   serviceNetwork:
+  {{- if kindIs "slice" $p.networking.serviceNetwork }}
+    {{- toYaml $p.networking.serviceNetwork | nindent 4 }}
+  {{- else }}
     - {{ $p.networking.serviceNetwork }}
+  {{- end }}
 platform:
   azure:
     region: {{ $p.azure.region }}
