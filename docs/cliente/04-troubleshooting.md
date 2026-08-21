@@ -1,5 +1,50 @@
 # 4. Troubleshooting
 
+## Operator recusado: "AllNamespaces InstallModeType not supported"
+
+Um `OperatorGroup` **sem** `spec.targetNamespaces` significa modo
+**AllNamespaces**. Operadores que só suportam `OwnNamespace` são recusados pelo
+OLM com essa mensagem, e a `Subscription` fica sem CSV.
+
+Era o caso do **ExternalDNS Operator** (o cert-manager já vinha com
+`targetNamespaces` e por isso subia normalmente). Corrigido no chart:
+
+```yaml
+spec:
+  targetNamespaces:
+    - external-dns-operator
+  upgradeStrategy: Default
+```
+
+O escopo restrito não limita nada aqui: os operandos e os Secrets `azure.json`
+ficam todos em `external-dns-operator`, e o CR `ExternalDNS` é **cluster-scoped**.
+
+Verificar:
+
+```bash
+oc get operatorgroup -A -o custom-columns=\
+NS:.metadata.namespace,NOME:.metadata.name,ALVOS:.spec.targetNamespaces
+
+oc get subscription -n external-dns-operator -o yaml | grep -A10 conditions
+oc get csv -n external-dns-operator
+```
+
+Se a `Subscription` já estiver travada, o OperatorGroup corrigido não é aplicado
+sozinho — remova a `Subscription` para o OLM reavaliar:
+
+```bash
+oc delete subscription external-dns-operator -n external-dns-operator
+# o ArgoCD recria na próxima sincronização
+```
+
+Ao instalar um operador novo (`05-estender.md`, 5.1), consulte os install modes
+suportados antes de decidir o escopo:
+
+```bash
+oc get packagemanifest <pacote> -n openshift-marketplace \
+  -o jsonpath='{range .status.channels[*].currentCSVDesc.installModes[*]}{.type}={.supported}{"\n"}{end}'
+```
+
 ## "could not unmarshal InstallConfig: error converting YAML to JSON"
 
 O `install-config.yaml` gerado saiu com YAML inválido. Veja exatamente o que o
