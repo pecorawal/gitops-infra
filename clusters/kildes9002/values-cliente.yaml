@@ -291,6 +291,48 @@ autoscaling:
 # =============================================================================
 #  8. IDENTITY PROVIDER -- desligado
 # =============================================================================
+#  ANTES DE LIGAR (enabled: true), tres coisas:
+#
+#  1. REGISTRO DE APLICACAO NO ENTRA ID
+#     Redirect URI (tipo Web), terminando com o "name" do provider abaixo:
+#       https://oauth-openshift.apps.kildes9002.pri.rt.cgibs.gov.br/oauth2callback/RTC_EntraID
+#     Confirme o host real (a rota oauth fica no IngressController DEFAULT):
+#       oc get route oauth-openshift -n openshift-authentication \
+#         -o jsonpath='{.spec.host}{"\n"}'
+#     Em Token configuration, adicione o claim opcional "groups" -- sem ele o
+#     claim chega vazio e nenhum RoleBinding por grupo funciona.
+#
+#  2. SECRET NO CLUSTER (nao vai para o Git), no namespace openshift-config,
+#     com a chave obrigatoriamente chamada clientSecret:
+#       oc create secret generic openid-client-secret -n openshift-config \
+#         --from-literal=clientSecret='<secret-do-registro>'
+#     (docs/cliente/scripts/criar-secrets-day2.sh faz isso na etapa 4)
+#
+#  3. ATENCAO: a lista abaixo SUBSTITUI spec.identityProviders do cluster.
+#     E atomica -- provider adicionado pela console e removido no proximo sync.
+#     Ao sincronizar, o login fica indisponivel por ~1 minuto.
+#     NAO remova o kubeadmin antes de validar o login novo.
 identityProvider:
-  enabled: false
-  providers: []
+  enabled: false                  # <-- vire para true so depois de 1 e 2
+
+  providers:
+    - name: RTC_EntraID           # entra na URL de callback -- nao mude depois
+      type: OpenID
+      mappingMethod: claim
+      openID:
+        clientID: "<PREENCHER>"   # Application (client) ID do registro no Entra ID
+        clientSecret:
+          name: openid-client-secret
+        issuer: "https://login.microsoftonline.com/15dcd909-8dc0-40e9-a1e5-cecb053cdd1a/v2.0"
+        extraScopes:
+          - profile
+          - openid
+        claims:
+          preferredUsername:
+            - preferred_username
+          name:
+            - name
+          email:
+            - email
+          groups:
+            - groups
