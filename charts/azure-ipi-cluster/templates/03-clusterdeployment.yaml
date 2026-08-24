@@ -1,4 +1,91 @@
 {{- if .Values.provision.enabled }}
+{{- /*
+  ===========================================================================
+   NOMES DOS SECRETS DE CREDENCIAL QUE O HIVE CONSOME
+  ---------------------------------------------------------------------------
+   O Hive so le Secrets do NAMESPACE do ClusterDeployment. Como a Credential do
+   ACM e uma so, compartilhada por todos os provisionamentos, ela precisa ser
+   materializada em cada namespace <clusterName>:
+
+     <cluster>-azure-creds   Opaque            osServicePrincipal.json (+ ssh-privatekey)
+     <cluster>-pull-secret   dockerconfigjson  .dockerconfigjson
+
+   modo "existing" (padrao): os Secrets ja existem no namespace do cluster,
+     criados por docs/cliente/scripts/preparar-credenciais.sh a partir da
+     Credential compartilhada do ACM. Seguem a MESMA convencao de nome, entao
+     nao e preciso informar nada -- os campos existing* sao apenas para nomes
+     fora do padrao.
+
+   modo "externalSecret": o ExternalSecret copia a Credential compartilhada e
+     ja entrega os dois formatos exigidos pelo Hive.
+
+   O "fail" NAO e decorativo: sem ele, um clusterName vazio produzia um ref
+   VAZIO e o webhook do Hive recusava o ClusterDeployment com
+     spec.platform.azure.credentialsSecretRef.name: Required value
+   -- um erro que nao dizia qual valor faltava.
+
+   NOTA: bloco IDENTICO ao de 01-externalsecret-credentials.yaml. Ao mudar um, mude o outro.
+  ===========================================================================
+*/}}
+{{- $azureCredsSecret := "" }}
+{{- if and (eq .Values.provision.credentials.mode "existing") .Values.provision.credentials.existingCredentialsSecret }}
+  {{- $azureCredsSecret = .Values.provision.credentials.existingCredentialsSecret }}
+{{- else if .Values.clusterName }}
+  {{- $azureCredsSecret = printf "%s-azure-creds" .Values.clusterName }}
+{{- end }}
+{{- if not $azureCredsSecret }}
+  {{- fail "\n\ncredentialsSecretRef ficaria VAZIO.\nclusterName esta vazio e provision.credentials.existingCredentialsSecret tambem.\nSem isso o webhook do Hive recusa o ClusterDeployment com\n  spec.platform.azure.credentialsSecretRef.name: Required value\n" }}
+{{- end }}
+{{- $pullSecret := "" }}
+{{- if and (eq .Values.provision.credentials.mode "existing") .Values.provision.credentials.existingPullSecret }}
+  {{- $pullSecret = .Values.provision.credentials.existingPullSecret }}
+{{- else if .Values.clusterName }}
+  {{- $pullSecret = printf "%s-pull-secret" .Values.clusterName }}
+{{- end }}
+{{- if not $pullSecret }}
+  {{- fail "\n\npullSecretRef ficaria VAZIO. Verifique clusterName no values.yaml.\n" }}
+{{- end }}
+{{- /*
+  Secret com ssh-privatekey. Por padrao e o MESMO do osServicePrincipal.json:
+  o Hive le chaves diferentes de refs diferentes, e nada impede que apontem
+  para o mesmo objeto.
+*/}}
+{{- $sshSecret := .Values.provision.credentials.existingSshPrivateKeySecret | default $azureCredsSecret }}
+{{- /*
+  ===========================================================================
+   RESOLUCAO DO ManagedClusterSet A PARTIR DE labels.env
+  ---------------------------------------------------------------------------
+   Ordem de decisao:
+     1. clusterSet preenchido no values  -> usa esse valor (escape hatch)
+     2. clusterSets.byEnv[<labels.env>]  -> usa o mapeamento
+     3. clusterSets.default              -> ultimo recurso
+
+   Se nada resolver, a renderizacao FALHA com mensagem explicita. E deliberado:
+   um ManagedCluster sem a label de clusterset nao entra em nenhuma Placement,
+   logo nao e registrado no ArgoCD e todo o day-2 fica sem destino -- um erro
+   silencioso que so apareceria 40 minutos depois, com o cluster provisionado.
+
+   O ManagedClusterSet precisa EXISTIR no hub e estar vinculado ao namespace
+   openshift-gitops por um ManagedClusterSetBinding (bootstrap/03-*.yaml).
+
+   NOTA: bloco IDENTICO ao de 05-managedcluster.yaml.
+   Ao mudar um, mude o outro -- os dois objetos precisam cair no mesmo
+   clusterset, senao o ClusterDeployment e o ManagedCluster divergem.
+  ===========================================================================
+*/}}
+{{- $env := .Values.labels.env | default .Values.environment | default "" }}
+{{- $byEnv := (.Values.clusterSets | default dict).byEnv | default dict }}
+{{- $clusterSet := "" }}
+{{- if .Values.clusterSet }}
+  {{- $clusterSet = .Values.clusterSet }}
+{{- else if hasKey $byEnv $env }}
+  {{- $clusterSet = get $byEnv $env }}
+{{- else }}
+  {{- $clusterSet = (.Values.clusterSets | default dict).default | default "" }}
+{{- end }}
+{{- if not $clusterSet }}
+  {{- fail (printf "\n\nManagedClusterSet indefinido para o cluster %q.\n  labels.env = %q\n  clusterSets.byEnv nao tem essa chave e clusterSets.default esta vazio.\nCorrija clusters/%s/values.yaml: defina labels.env com um valor mapeado, ou\nacrescente a chave em clusterSets.byEnv, ou preencha clusterSet explicitamente.\n" .Values.clusterName $env .Values.clusterName) }}
+{{- end }}
 # O objeto que dispara o provisionamento. O Hive cria um Job de instalacao no
 # namespace do cluster e roda o openshift-install com o install-config acima.
 apiVersion: hive.openshift.io/v1
@@ -17,7 +104,7 @@ metadata:
   labels:
     cloud: Azure
     vendor: OpenShift
-    cluster.open-cluster-management.io/clusterset: {{ include "azure-ipi-cluster.clusterSet" . }}
+    cluster.open-cluster-management.io/clusterset: {{ $clusterSet }}
 spec:
   baseDomain: {{ .Values.baseDomain }}
   clusterName: {{ .Values.clusterName }}
@@ -34,7 +121,7 @@ spec:
       # Secret com a chave osServicePrincipal.json. No modo externalSecret e o
       # <cluster>-azure-creds materializado em 01-externalsecret-credentials.
       credentialsSecretRef:
-        name: {{ include "azure-ipi-cluster.azureCredsSecret" . }}
+        name: {{ $azureCredsSecret }}
       region: {{ .Values.provision.azure.region }}
       baseDomainResourceGroupName: {{ .Values.provision.azure.baseDomainResourceGroupName }}
       cloudName: {{ .Values.provision.azure.cloudName }}
@@ -49,8 +136,8 @@ spec:
     # O bloco inteiro e OMITIDO quando credentials.sshPrivateKey e false --
     # o webhook do Hive recusa sshPrivateKeySecretRef presente com name vazio.
     sshPrivateKeySecretRef:
-      name: {{ include "azure-ipi-cluster.sshSecret" . }}
+      name: {{ $sshSecret }}
     {{- end }}
   pullSecretRef:
-    name: {{ include "azure-ipi-cluster.pullSecret" . }}
+    name: {{ $pullSecret }}
 {{- end }}
