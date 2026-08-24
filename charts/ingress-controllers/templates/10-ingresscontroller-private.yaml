@@ -1,6 +1,54 @@
 {{- if and .Values.ingress.enabled .Values.ingress.private.enabled }}
-# IngressController PRIVADO -- Load Balancer interno da Azure.
-# Publica *.{{ .Values.ingress.private.domain }} na Azure Private DNS Zone
-# (via ExternalDNS, wave 40).
-{{ include "ingress-controllers.controller" (dict "ic" .Values.ingress.private "wave" "0") }}
+{{- $ic := .Values.ingress.private }}
+# ---------------------------------------------------------------------------
+#  IngressController PRIVADO -- Load Balancer INTERNO da Azure
+# ---------------------------------------------------------------------------
+#  Publica *.{{ $ic.domain }} na Azure Private DNS Zone (via ExternalDNS,
+#  wave 40). So e alcancavel de dentro da VNet.
+#
+#  Admite apenas Routes com a label
+#      {{ $ic.routeSelector.key }}={{ $ic.routeSelector.value }}
+# ---------------------------------------------------------------------------
+apiVersion: operator.openshift.io/v1
+kind: IngressController
+metadata:
+  name: {{ $ic.name }}
+  namespace: openshift-ingress-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  domain: {{ $ic.domain | quote }}
+  replicas: {{ $ic.replicas }}
+  endpointPublishingStrategy:
+    type: LoadBalancerService
+    loadBalancer:
+      # Internal = Azure Internal Load Balancer (so acessivel pela VNet).
+      scope: {{ $ic.scope }}
+      # Unmanaged e obrigatorio: se o ingress-operator gerenciar o DNS, ele
+      # briga com o ExternalDNS pelos mesmos registros na zona da Azure.
+      dnsManagementPolicy: Unmanaged
+  # ---- ADMISSAO DE ROTA POR LABEL ----
+  # Somente Routes que carreguem esta label entram neste IngressController.
+  routeSelector:
+    matchLabels:
+      {{ $ic.routeSelector.key }}: {{ $ic.routeSelector.value | quote }}
+  {{- with $ic.namespaceSelector }}
+  namespaceSelector:
+    matchLabels:
+      {{- toYaml . | nindent 6 }}
+  {{- end }}
+  {{- if $ic.certificate.enabled }}
+  # Secret gerado pelo cert-manager no namespace openshift-ingress (wave 20).
+  defaultCertificate:
+    name: {{ $ic.certificate.secretName }}
+  {{- end }}
+  routeAdmission:
+    namespaceOwnership: InterNamespaceAllowed
+    wildcardPolicy: WildcardsDisallowed
+  {{- with $ic.nodePlacement }}
+  nodePlacement:
+    nodeSelector:
+      matchLabels:
+        {{- toYaml . | nindent 8 }}
+  {{- end }}
 {{- end }}

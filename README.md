@@ -136,8 +136,7 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 │   │   ├── templates
 │   │   │   ├── 00-default-route-selector.yaml
 │   │   │   ├── 10-ingresscontroller-private.yaml
-│   │   │   ├── 20-ingresscontroller-public.yaml
-│   │   │   └── _ingresscontroller.tpl
+│   │   │   └── 20-ingresscontroller-public.yaml
 │   │   └── values.yaml
 │   └── nsg-rule
 │       ├── Chart.yaml
