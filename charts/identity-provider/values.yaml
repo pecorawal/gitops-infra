@@ -1,0 +1,7 @@
+clusterName: ""
+identityProvider:
+  enabled: false
+  # Lista crua de identityProviders -- vai para spec.identityProviders do
+  # OAuth/cluster sem transformacao, entao qualquer type suportado pelo
+  # OpenShift funciona aqui (OpenID, LDAP, HTPasswd, GitHub, ...).
+  providers: []

@@ -508,3 +508,51 @@ autoscaling:
     - name: "<PREENCHER>"           # ex: azr-cliente-dev-01-worker-brazilsouth3
       minReplicas: 2
       maxReplicas: 6
+
+# ═══════════════ 8. IDENTITY PROVIDER (OAuth do cluster) ═══════════════
+# =============================================================================
+#  Configura os identity providers do OAuth do cluster (objeto OAuth/cluster).
+#
+#  ATENÇÃO -- a lista abaixo SUBSTITUI o spec.identityProviders do cluster.
+#  É uma lista atômica: provider adicionado pela console é removido no próximo
+#  sync (selfHeal). Todo provider tem que estar declarado aqui.
+#
+#  O CLIENT SECRET NÃO VAI PARA O GIT. Ele vive no Secret referenciado em
+#  openID.clientSecret.name, no namespace openshift-config, criado por:
+#      ./docs/cliente/scripts/criar-secrets-day2.sh clusters/<cluster>/values.yaml
+#
+#  Registro da aplicação no Entra ID (uma vez, pelo time de identidade):
+#    - Redirect URI (Web):
+#        https://oauth-openshift.apps.<cluster>.cgibs.gov.br/oauth2callback/<name>
+#      onde <name> é EXATAMENTE o campo name do provider abaixo.
+#    - Token configuration: adicione o claim opcional "groups" (senão o claim
+#      groups vem vazio e nenhum RoleBinding por grupo funciona).
+#    - Anote Application (client) ID e Directory (tenant) ID.
+#
+#  Depois do sync o authentication-operator reinicia o oauth-server: o login
+#  fica fora por ~1 minuto. Valide ANTES de mexer no kubeadmin.
+# =============================================================================
+identityProvider:
+  enabled: false                    # <-- vire para true só depois de preencher
+
+  providers:
+    - name: RTC_EntraID             # entra na URL de callback -- não mude depois
+      type: OpenID
+      mappingMethod: claim
+      openID:
+        clientID: "<PREENCHER>"     # Application (client) ID do registro no Entra ID
+        clientSecret:
+          name: openid-client-secret        # Secret em openshift-config (fora do Git)
+        issuer: "https://login.microsoftonline.com/<PREENCHER>/v2.0"   # <tenant-id>
+        extraScopes:
+          - profile
+          - openid
+        claims:
+          preferredUsername:
+            - preferred_username
+          name:
+            - name
+          email:
+            - email
+          groups:
+            - groups

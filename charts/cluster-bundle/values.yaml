@@ -23,3 +23,5 @@ nsgRule:
   enabled: false
 autoscaling:
   enabled: false
+identityProvider:
+  enabled: false

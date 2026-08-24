@@ -143,3 +143,4 @@ chave separada ou exigência de auditoria — ver
 3. [Day-2: ingress, DNS e certificados](03-day2-ingress-dns-certs.md)
 4. [Troubleshooting](04-troubleshooting.md)
 5. [Estender: novos operadores, manifestos e camadas](05-estender.md)
+6. [Identity Provider (OAuth do cluster)](06-identity-provider.md)

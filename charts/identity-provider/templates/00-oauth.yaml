@@ -1,0 +1,37 @@
+{{- if .Values.identityProvider.enabled }}
+{{- include "identity-provider.validate" . }}
+# ---------------------------------------------------------------------------
+#  OAuth "cluster" -- os identity providers do cluster
+# ---------------------------------------------------------------------------
+#  Este objeto e um SINGLETON que ja existe no cluster desde a instalacao (o
+#  installer o cria com spec vazio). Nos nao o criamos, so preenchemos
+#  spec.identityProviders -- por isso ServerSideApply=true, para o ArgoCD
+#  gerenciar apenas esse campo e nao assumir a posse do objeto inteiro.
+#
+#  ATENCAO -- identityProviders e uma LISTA ATOMICA no OpenShift: o que estiver
+#  aqui SUBSTITUI o conteudo do cluster. Se alguem adicionar um provider pela
+#  console, o selfHeal do ArgoCD vai remove-lo no proximo sync. Todo provider
+#  tem que estar declarado neste values.
+#
+#  O CLIENT SECRET NAO VAI PARA O GIT. Cada provider OpenID referencia um
+#  Secret no namespace openshift-config (campo openID.clientSecret.name),
+#  criado fora do Git por docs/cliente/scripts/criar-secrets-day2.sh.
+#
+#  Depois do sync, o authentication-operator reescreve a config e reinicia os
+#  pods do oauth-server -- o login fica indisponivel por ~1 minuto:
+#    oc get co authentication -w
+#    oc get pods -n openshift-authentication
+#
+#  NAO remova o kubeadmin antes de validar o login pelo IdP novo e de garantir
+#  que alguem tem cluster-admin (veja docs/cliente/06-identity-provider.md).
+# ---------------------------------------------------------------------------
+apiVersion: config.openshift.io/v1
+kind: OAuth
+metadata:
+  name: cluster
+  annotations:
+    argocd.argoproj.io/sync-options: ServerSideApply=true
+spec:
+  identityProviders:
+    {{- toYaml .Values.identityProvider.providers | nindent 4 }}
+{{- end }}
