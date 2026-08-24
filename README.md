@@ -75,11 +75,7 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 │   │   │   ├── 03-clusterdeployment.yaml
 │   │   │   ├── 04-machinepool-worker.yaml
 │   │   │   ├── 05-managedcluster.yaml
-│   │   │   ├── 06-klusterletaddonconfig.yaml
-│   │   │   ├── _clusterset.tpl
-│   │   │   ├── _credentials.tpl
-│   │   │   ├── _installconfig.tpl
-│   │   │   └── _validate.tpl
+│   │   │   └── 06-klusterletaddonconfig.yaml
 │   │   └── values.yaml
 │   ├── cert-manager-config
 │   │   ├── Chart.yaml

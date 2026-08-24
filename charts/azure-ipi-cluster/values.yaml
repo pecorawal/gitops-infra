@@ -2,7 +2,7 @@
 clusterName: ""
 environment: dev
 baseDomain: ""
-# Vazio = resolvido a partir de labels.env por clusterSets.byEnv (_clusterset.tpl).
+# Vazio = resolvido a partir de labels.env por clusterSets.byEnv (bloco no topo de 03-clusterdeployment.yaml e 05-managedcluster.yaml).
 # Preencher aqui e o escape hatch para forcar um set especifico.
 clusterSet: ""
 clusterSets:
