@@ -6,6 +6,16 @@ nsgRule:
   namespace: nsg-rule
 
   # Service do IngressController cujo IP publico vai para a regra do NSG.
+  #
+  # NAO inclua o clusterName aqui: o template acrescenta o sufixo sozinho.
+  #   values     : router-public
+  #   Service real: router-public-<clusterName>   (ex: router-public-kildes9002)
+  #
+  # O nome do Service e "router-<nome-do-IngressController>", e o nome do IC e
+  # "<ingress.public.name>-<clusterName>". Como o sufixo tem que acompanhar o
+  # cluster, ele e montado no template -- se estivesse escrito aqui, ficaria
+  # desatualizado no dia em que o values fosse copiado para outro cluster.
+  # A checagem em _validate.tpl confere isto contra ingress.public.name.
   serviceName: router-public
   serviceNamespace: openshift-ingress
 

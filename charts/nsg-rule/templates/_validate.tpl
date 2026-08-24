@@ -13,6 +13,27 @@
   {{- end -}}
 {{- end -}}
 {{- /*
+  COERENCIA COM O INGRESS
+  O CronJob le o Service "router-<nome-do-IngressController>". Se nsgRule.
+  serviceName nao casar com ingress.<tipo>.name, o pod fica 25 minutos
+  esperando o IP de um Service que nao existe e o Job falha por timeout --
+  sem dizer que o nome e que estava errado.
+
+  So checa quando o bloco ingress existe no values (o chart nsg-rule tambem e
+  renderizado sozinho, sem ele).
+*/ -}}
+{{- $ing := .Values.ingress | default dict -}}
+{{- if $ing }}
+  {{- $nomes := list -}}
+  {{- range $tipo := list "public" "private" -}}
+    {{- $b := get $ing $tipo | default dict -}}
+    {{- if $b.name -}}{{- $nomes = append $nomes (printf "router-%s" $b.name) -}}{{- end -}}
+  {{- end -}}
+  {{- if and $nomes (not (has $v.serviceName $nomes)) -}}
+    {{- fail (printf "\n\nnsgRule.serviceName = %q nao corresponde a nenhum IngressController.\nEsperado um destes: %s\n(o sufixo -%s e acrescentado pelo template, NAO escreva no values)\n\nO CronJob ficaria esperando o IP de um Service inexistente ate o timeout.\n" $v.serviceName (join ", " $nomes) .Values.clusterName) -}}
+  {{- end -}}
+{{- end }}
+{{- /*
   Nome do CronJob: "nsg-rule-<cluster>". O Kubernetes acrescenta o timestamp ao
   criar cada Job (nsg-rule-<cluster>-29012345), e nome de Job e limitado a 63
   caracteres -- por isso o CronJob nao pode passar de 52.
