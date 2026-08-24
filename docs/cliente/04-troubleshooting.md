@@ -1123,6 +1123,59 @@ oc logs -n cert-manager deploy/cert-manager -f
 - **Cota do Let's Encrypt** — 50 certificados por domínio por semana. Use o
   servidor de staging enquanto testa.
 
+## O autoscaling não cria nada (Application existe, cluster não escala)
+
+O `ClusterAutoscaler` de nome `default` apenas **liga** o autoscaler no cluster.
+Quem decide escalar é o `MachineAutoscaler`, **um por MachineSet**. Com
+`autoscaling.machineSets` vazio, o chart criava só o CR global — nenhum erro,
+nenhum evento, e nenhum nó a mais. Hoje o chart **falha o render** nesse caso.
+
+```bash
+# no SPOKE
+oc get clusterautoscaler                      # deve existir o "default"
+oc get machineautoscaler -n openshift-machine-api   # um por MachineSet
+```
+
+Se o `default` existe e não há `MachineAutoscaler`, é a lista vazia.
+
+### Como preencher
+
+Os MachineSets só existem **depois** do cluster provisionado, e o nome inclui um
+hash gerado na instalação:
+
+```bash
+oc get machineset -n openshift-machine-api
+# kildes9002-ab12c-worker-brazilsouth1
+# kildes9002-ab12c-worker-brazilsouth2
+# kildes9002-ab12c-worker-brazilsouth3
+```
+
+```yaml
+autoscaling:
+  enabled: true
+  machineSets:
+    - name: kildes9002-ab12c-worker-brazilsouth1
+      minReplicas: 2
+      maxReplicas: 6
+```
+
+O chart valida `<PREENCHER>` esquecido e `minReplicas > maxReplicas`.
+
+> O nome do `MachineAutoscaler` **tem que ser idêntico ao do MachineSet**. Se
+> não bater, o objeto é criado e fica inerte — o `scaleTargetRef` aponta para
+> algo que não existe. Confira com:
+> `oc describe machineautoscaler <nome> -n openshift-machine-api`
+
+### Escalou mas os nós não sobem
+
+Verifique a cota da Azure e os eventos do autoscaler:
+
+```bash
+oc -n openshift-machine-api logs deploy/cluster-autoscaler-default --tail=50
+oc get machines -n openshift-machine-api
+oc get events -n openshift-machine-api --sort-by=.lastTimestamp | tail -20
+```
+
 ## O IngressController fica `Degraded`
 
 ```bash

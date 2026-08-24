@@ -341,8 +341,40 @@ nsgRule:
 # =============================================================================
 #  7. AUTOSCALING -- desligado (exige os nomes reais dos MachineSets)
 # =============================================================================
+#  O ClusterAutoscaler global apenas LIGA o autoscaler. Quem escala e o
+#  MachineAutoscaler, UM POR MachineSet -- por isso machineSets nao pode ficar
+#  vazio (o chart falha o render se ficar).
+#
+#  Os MachineSets so existem DEPOIS do cluster provisionado. Descubra os nomes
+#  reais no spoke:
+#      oc get machineset -n openshift-machine-api
+#  Saida tipica (IPI Azure, brazilsouth):
+#      kildes9002-<hash>-worker-brazilsouth1
+#      kildes9002-<hash>-worker-brazilsouth2
+#      kildes9002-<hash>-worker-brazilsouth3
+#  O <hash> e gerado na instalacao -- copie os nomes exatos.
 autoscaling:
-  enabled: false
+  enabled: false                    # <-- vire para true so depois de preencher machineSets
+
+  clusterAutoscaler:
+    maxNodesTotal: 20
+    scaleDown:
+      enabled: true
+      unneededTime: 10m
+      delayAfterAdd: 10m
+      delayAfterDelete: 10m
+      delayAfterFailure: 10m
+
+  machineSets:
+    - name: "<PREENCHER>"           # ex: kildes9002-abcde-worker-brazilsouth1
+      minReplicas: 2
+      maxReplicas: 6
+    - name: "<PREENCHER>"           # ex: kildes9002-abcde-worker-brazilsouth2
+      minReplicas: 2
+      maxReplicas: 6
+    - name: "<PREENCHER>"           # ex: kildes9002-abcde-worker-brazilsouth3
+      minReplicas: 2
+      maxReplicas: 6
 
 # =============================================================================
 #  8. IDENTITY PROVIDER -- desligado
