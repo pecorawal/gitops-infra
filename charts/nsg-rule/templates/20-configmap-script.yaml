@@ -9,49 +9,109 @@ data:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    echo "[$(date -u)] Iniciando sincronizacao NSG: regra=${RULE_NAME} nsg=${NSG_NAME} (rg=${NSG_RG})"
+    log() { echo "[$(date -u '+%F %T')] $*"; }
 
-    # 1. Espera o Service do IngressController ter IP publico (ate ~25 min)
-    IP=""
-    DEADLINE=$((SECONDS + 1500))
-    while [[ $SECONDS -lt $DEADLINE ]]; do
-      IP=$(kubectl get svc "$SVC_NAME" -n "$SVC_NAMESPACE" \
-           -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
-      if [[ -n "$IP" && "$IP" != "<pending>" ]]; then
-        echo "[$(date -u)] IP do LB ${SVC_NAME}: ${IP}"
-        break
+    log "nsg-rule: regra=${RULE_NAME} nsg=${NSG_NAME} (rg=${NSG_RG})"
+
+    # -----------------------------------------------------------------------
+    # 1. IP do Load Balancer, lido pela API do Kubernetes
+    # -----------------------------------------------------------------------
+    # A imagem azure-cli NAO traz kubectl. A versao anterior deste script usava
+    # "kubectl get svc ... 2>/dev/null || true": o binario nao existia, o erro
+    # era engolido pelo redirecionamento e o laco ficava girando "Aguardando
+    # IP" ate o timeout, mesmo com o IP ja publicado no Service.
+    # Aqui falamos com a API direto, via curl + token da ServiceAccount.
+    API="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}"
+    SA=/var/run/secrets/kubernetes.io/serviceaccount
+    URL="${API}/api/v1/namespaces/${SVC_NAMESPACE}/services/${SVC_NAME}"
+
+    ler_ip() {
+      local corpo http
+      corpo=$(curl -sS --max-time 15 -w '\n%{http_code}' \
+                --cacert "${SA}/ca.crt" \
+                -H "Authorization: Bearer $(cat ${SA}/token)" \
+                "$URL") || { log "ERRO: curl falhou ao consultar a API"; return 1; }
+      http=$(tail -n1 <<<"$corpo")
+      corpo=$(sed '$d' <<<"$corpo")
+      if [[ "$http" != "200" ]]; then
+        log "ERRO: API respondeu HTTP ${http} para ${SVC_NAMESPACE}/${SVC_NAME}"
+        log "      $(head -c 300 <<<"$corpo")"
+        [[ "$http" == "404" ]] && log "      o Service nao existe -- confira nsgRule.serviceName"
+        [[ "$http" == "403" ]] && log "      sem permissao -- confira o RoleBinding nsg-rule-svc-reader"
+        return 1
       fi
-      echo "[$(date -u)] Aguardando IP do LB (${DEADLINE} seg restantes)..."
-      sleep 15
-    done
-    if [[ -z "$IP" || "$IP" == "<pending>" ]]; then
-      echo "ERRO: Service ${SVC_NAME} sem IP de LB apos o timeout" >&2
-      exit 1
-    fi
+      # Uma linha so: dentro de um bloco YAML "|", linhas na coluna 0
+      # encerrariam o bloco.
+      python3 -c 'import json,sys; ing=(json.load(sys.stdin).get("status",{}).get("loadBalancer",{}).get("ingress") or [{}])[0]; print(ing.get("ip") or ing.get("hostname") or "")' <<<"$corpo"
+    }
 
-    # 2. Autentica na Azure com o Service Principal (Secret azure-spn, fora do Git)
+    IP=""
+    DEADLINE=$((SECONDS + WAIT_SECONDS))
+    while :; do
+      IP=$(ler_ip) || IP=""
+      [[ -n "$IP" ]] && { log "IP do LB ${SVC_NAME}: ${IP}"; break; }
+      if [[ $SECONDS -ge $DEADLINE ]]; then
+        log "ERRO: ${SVC_NAME} sem IP de LB apos ${WAIT_SECONDS}s"
+        exit 1
+      fi
+      log "Aguardando IP do LB ($((DEADLINE - SECONDS))s restantes)..."
+      sleep 10
+    done
+
+    # -----------------------------------------------------------------------
+    # 2. Autenticacao na Azure (Secret fora do Git)
+    # -----------------------------------------------------------------------
     az login --service-principal -u "$AZURE_CLIENT_ID" -p "$AZURE_CLIENT_SECRET" \
       --tenant "$AZURE_TENANT_ID" --output none
     az account set --subscription "$SUBSCRIPTION"
 
-    # 3. Regra idempotente: cria ou atualiza quando o IP muda (upsert do az)
-    EXISTING=$(az network nsg rule show -g "$NSG_RG" --nsg-name "$NSG_NAME" -n "$RULE_NAME" \
-               --query destinationAddressPrefix -o tsv 2>/dev/null || true)
-    if [[ "$EXISTING" == "$IP" ]]; then
-      echo "[$(date -u)] OK: regra ${RULE_NAME} ja aponta para ${IP} - nada a fazer"
+    # -----------------------------------------------------------------------
+    # 3. Inbound rule: cria ou atualiza quando o IP muda
+    # -----------------------------------------------------------------------
+    ATUAL=$(az network nsg rule show -g "$NSG_RG" --nsg-name "$NSG_NAME" -n "$RULE_NAME" \
+              --query destinationAddressPrefix -o tsv 2>/dev/null || true)
+    if [[ "$ATUAL" == "$IP" ]]; then
+      log "regra ${RULE_NAME} ja aponta para ${IP} - nada a fazer"
+    else
+      log "criando/atualizando ${RULE_NAME} -> ${IP} (TCP 80/443 da Internet)"
+      az network nsg rule create -g "$NSG_RG" --nsg-name "$NSG_NAME" -n "$RULE_NAME" \
+        --priority "$PRIORITY" \
+        --access Allow --direction Inbound --protocol Tcp \
+        --source-address-prefixes Internet --source-port-ranges '*' \
+        --destination-address-prefixes "$IP" --destination-port-ranges 80 443 \
+        --output none
+      log "OK: regra ${RULE_NAME} sincronizada com ${IP}"
+    fi
+
+    # -----------------------------------------------------------------------
+    # 4. Associacao do NSG a subnet dos workers
+    # -----------------------------------------------------------------------
+    # Cluster IPI privado nasce SEM NSG na subnet. Sem a associacao, a regra
+    # criada acima nao vale para nada: o trafego externo nunca chega aos
+    # workers e as aplicacoes publicadas pelo ingress publico nao respondem.
+    if [[ "${ASSOCIATE_SUBNET}" != "true" ]]; then
+      log "associacao de subnet desligada (nsgRule.subnet.associate=false)"
       exit 0
     fi
 
-    echo "[$(date -u)] Criando/atualizando regra ${RULE_NAME} -> ${IP} (TCP 80/443 do Internet)"
-    az network nsg rule create -g "$NSG_RG" --nsg-name "$NSG_NAME" -n "$RULE_NAME" \
-      --priority "$PRIORITY" \
-      --access Allow \
-      --direction Inbound \
-      --protocol Tcp \
-      --source-address-prefixes Internet \
-      --source-port-ranges '*' \
-      --destination-address-prefixes "$IP" \
-      --destination-port-ranges 80 443 \
-      --output none
-    echo "[$(date -u)] OK: regra ${RULE_NAME} sincronizada com ${IP}"
+    NSG_ID=$(az network nsg show -g "$NSG_RG" -n "$NSG_NAME" --query id -o tsv)
+    ATUAL_ID=$(az network vnet subnet show -g "$VNET_RG" --vnet-name "$VNET_NAME" \
+                 -n "$SUBNET_NAME" --query 'networkSecurityGroup.id' -o tsv 2>/dev/null || true)
+
+    if [[ "$ATUAL_ID" == "$NSG_ID" ]]; then
+      log "subnet ${SUBNET_NAME} ja associada a ${NSG_NAME} - nada a fazer"
+    elif [[ -n "$ATUAL_ID" && "${ASSOCIATE_FORCE}" != "true" ]]; then
+      # Trocar o NSG de uma subnet substitui TODAS as regras que valem para ela.
+      # Nunca fazemos isso sozinhos: exige nsgRule.subnet.force=true.
+      log "AVISO: ${SUBNET_NAME} ja tem OUTRO NSG associado:"
+      log "       $ATUAL_ID"
+      log "       nada foi alterado. Para substituir, ligue nsgRule.subnet.force=true"
+      log "       (isso troca o conjunto de regras que vale para a subnet inteira)"
+      exit 0
+    else
+      log "associando NSG ${NSG_NAME} a subnet ${SUBNET_NAME} (vnet ${VNET_NAME})"
+      az network vnet subnet update -g "$VNET_RG" --vnet-name "$VNET_NAME" \
+        -n "$SUBNET_NAME" --network-security-group "$NSG_ID" --output none
+      log "OK: subnet ${SUBNET_NAME} associada a ${NSG_NAME}"
+    fi
 {{- end }}

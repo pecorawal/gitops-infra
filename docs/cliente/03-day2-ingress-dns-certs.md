@@ -438,6 +438,62 @@ O nome vem de `nsgRule.secretName` e o namespace de `nsgRule.namespace`.
 > falha (`CreateContainerConfigError`) até o Secret aparecer. Não é destrutivo,
 > mas polui o histórico de Jobs.
 
+### A associação do NSG à subnet
+
+Um cluster IPI privado nasce **sem NSG associado à subnet dos workers**. Enquanto
+isso for verdade, a inbound rule criada acima **não surte efeito nenhum**: o
+tráfego externo não chega aos workers e as aplicações publicadas pelo ingress
+público não respondem, mesmo com a regra correta e o LB com IP.
+
+Por isso o script, depois de criar a regra, associa o NSG à subnet:
+
+```yaml
+nsgRule:
+  subnet:
+    associate: true
+    name: ""              # vazio = provision.azure.computeSubnet
+    vnet: ""              # vazio = provision.azure.virtualNetwork
+    resourceGroup: ""     # vazio = provision.azure.networkResourceGroupName
+    force: false
+```
+
+Os três campos vazios reaproveitam o que `provision.azure` já declara — não há
+nada a repetir.
+
+> **Se a subnet já tiver outro NSG associado, o script apenas avisa e para.**
+> Trocar o NSG de uma subnet substitui **todas** as regras que valem para ela,
+> e isso não é decisão de um CronJob. Para substituir conscientemente,
+> `nsgRule.subnet.force: true`.
+
+O SPN precisa de `Network Contributor` **também no resource group da VNet**,
+além do RG do NSG.
+
+### Espera pelo IP × intervalo do CronJob
+
+`waitSeconds` (espera pelo IP do LB) tem que ser **menor** que o intervalo do
+`schedule`. Com espera maior, cada execução ainda estaria rodando quando a
+próxima dispara: o `concurrencyPolicy: Forbid` pula a nova, e o CronJob passa a
+acumular execuções puladas sem sincronizar nada. O chart **falha o render** se
+essa relação for violada, e também se `timeoutSeconds` não for maior que
+`waitSeconds`.
+
+Padrão: `waitSeconds: 180`, `timeoutSeconds: 600`, `schedule: a cada 10 min`.
+
+### Se o Job ficar preso em "Aguardando IP do LB"
+
+Com o IP já presente no Service, é a leitura que está falhando. O script agora
+consulta a **API do Kubernetes via curl** e imprime o motivo:
+
+| Mensagem | Causa |
+|---|---|
+| `API respondeu HTTP 404` | `nsgRule.serviceName` não corresponde ao Service — lembre do sufixo `-<cluster>` |
+| `API respondeu HTTP 403` | RoleBinding ausente em `openshift-ingress` |
+| `curl falhou ao consultar a API` | rede/NetworkPolicy no namespace do CronJob |
+
+> A versão anterior usava `kubectl`, que **não existe** na imagem
+> `mcr.microsoft.com/azure-cli`. O erro era engolido por `2>/dev/null || true` e
+> o laço girava até o timeout dizendo "Aguardando IP", mesmo com o IP publicado.
+
 ### Passo 4 — commitar e acompanhar
 
 ```bash

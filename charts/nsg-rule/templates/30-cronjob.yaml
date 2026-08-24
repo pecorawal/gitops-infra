@@ -40,6 +40,23 @@ spec:
                   value: {{ .Values.nsgRule.ruleName | quote }}
                 - name: PRIORITY
                   value: {{ .Values.nsgRule.priority | quote }}
+                # Espera pelo IP do LB. Tem que ser MENOR que o intervalo do
+                # schedule, senao uma execucao ainda estaria correndo quando a
+                # proxima e disparada (o concurrencyPolicy: Forbid pula a nova,
+                # mas ai o CronJob acumula execucoes puladas sem sincronizar).
+                - name: WAIT_SECONDS
+                  value: {{ .Values.nsgRule.waitSeconds | quote }}
+                # ---- associacao do NSG a subnet dos workers ----
+                - name: ASSOCIATE_SUBNET
+                  value: {{ .Values.nsgRule.subnet.associate | quote }}
+                - name: ASSOCIATE_FORCE
+                  value: {{ .Values.nsgRule.subnet.force | quote }}
+                - name: SUBNET_NAME
+                  value: {{ .Values.nsgRule.subnet.name | default .Values.provision.azure.computeSubnet | quote }}
+                - name: VNET_NAME
+                  value: {{ .Values.nsgRule.subnet.vnet | default .Values.provision.azure.virtualNetwork | quote }}
+                - name: VNET_RG
+                  value: {{ .Values.nsgRule.subnet.resourceGroup | default .Values.provision.azure.networkResourceGroupName | quote }}
                 - name: AZURE_CLIENT_ID
                   valueFrom:
                     secretKeyRef:

@@ -467,7 +467,17 @@ nsgRule:
   ruleName: Allow_HTTP_HTTPS_Ingress
   priority: 1000
   schedule: "*/10 * * * *"
-  timeoutSeconds: 1800
+  waitSeconds: 180                  # espera pelo IP do LB; < intervalo do schedule
+  timeoutSeconds: 600               # corte duro do Job; > waitSeconds
+
+  # Associação do NSG à subnet dos WORKERS. Sem ela a regra não surte efeito:
+  # cluster IPI privado nasce sem NSG na subnet. Vazio = usa provision.azure.
+  subnet:
+    associate: true
+    name: ""
+    vnet: ""
+    resourceGroup: ""
+    force: false
 
   image: mcr.microsoft.com/azure-cli
   imageTag: latest
