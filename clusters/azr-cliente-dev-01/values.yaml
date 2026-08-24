@@ -454,7 +454,9 @@ nsgRule:
   enabled: false                    # <-- vire para true SÓ depois de preencher tudo abaixo
 
   # Service do IngressController cujo IP publico vai para a regra do NSG.
-  # router-<nome>: router-public / router-private (o mesmo de ingress.*.name).
+  # SEM o clusterName: o template acrescenta o sufixo sozinho.
+  #   aqui         : router-public          (o mesmo nome de ingress.public.name)
+  #   Service real : router-public-<clusterName>
   serviceName: router-public
   serviceNamespace: openshift-ingress
 
