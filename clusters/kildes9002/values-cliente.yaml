@@ -117,6 +117,23 @@ operators:
     channel: stable-v1
     source: redhat-operators
 
+  # Operadores adicionais, sem mexer no chart: cada entrada gera Namespace,
+  # OperatorGroup e Subscription. Um namespace por operador (so cabe um
+  # OperatorGroup por namespace).
+  #
+  # O cluster-autoscaler NAO entra aqui: ele nao e operador de OperatorHub,
+  # vem no payload do OpenShift (openshift-machine-api) e ja esta instalado.
+  #
+  # Confira o pacote e os install modes antes de acrescentar:
+  #   oc get packagemanifest -n openshift-marketplace | grep -i <termo>
+  #   oc get packagemanifest <pacote> -n openshift-marketplace \
+  #     -o jsonpath='{range .status.channels[*].currentCSVDesc.installModes[*]}{.type}={.supported}{"\n"}{end}'
+  extra: []
+    # - name: kubernetes-nmstate-operator
+    #   namespace: openshift-nmstate
+    #   channel: stable
+    #   installMode: OwnNamespace
+
 # =============================================================================
 #  3. CERT-MANAGER -- ClusterIssuer e certificados
 # =============================================================================

@@ -1,0 +1,73 @@
+{{- if .Values.operators.enabled }}
+{{- range $i, $op := .Values.operators.extra }}
+{{- /*
+  Operadores adicionais, declarados inteiramente no values -- sem tocar no
+  chart. Cada entrada gera Namespace (opcional), OperatorGroup e Subscription.
+
+  ATENCAO: so cabe UM OperatorGroup por namespace. Duas entradas com o mesmo
+  namespace fazem o OLM recusar as duas ("multiple operator groups"), entao a
+  checagem abaixo barra isso antes de chegar ao cluster.
+*/}}
+{{- if not $op.name }}
+  {{- fail (printf "operators.extra[%d]: campo 'name' vazio -- e o nome do pacote no OperatorHub.\nDescubra com: oc get packagemanifest -n openshift-marketplace | grep -i <termo>" $i) }}
+{{- end }}
+{{- if not $op.namespace }}
+  {{- fail (printf "operators.extra[%d] (%s): campo 'namespace' vazio." $i $op.name) }}
+{{- end }}
+{{- $repetidos := 0 }}
+{{- range $outro := $.Values.operators.extra }}
+  {{- if eq ($outro.namespace | toString) ($op.namespace | toString) }}{{- $repetidos = add1 $repetidos }}{{- end }}
+{{- end }}
+{{- if gt $repetidos 1 }}
+  {{- fail (printf "operators.extra: %d entradas usam o namespace %q.\nSo cabe UM OperatorGroup por namespace -- o OLM recusaria todos.\nUse um namespace por operador." $repetidos $op.namespace) }}
+{{- end }}
+{{- if ne (default true $op.createNamespace) false }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $op.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+{{- end }}
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: {{ $op.namespace }}
+  namespace: {{ $op.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  {{- /*
+    OperatorGroup SEM targetNamespaces = modo AllNamespaces. Nem todo operador
+    suporta esse modo -- o ExternalDNS, por exemplo, e recusado com
+    "AllNamespaces InstallModeType not supported". Confira o que o pacote
+    aceita antes de escolher:
+      oc get packagemanifest <pacote> -n openshift-marketplace \
+        -o jsonpath='{range .status.channels[*].currentCSVDesc.installModes[*]}{.type}={.supported}{"\n"}{end}'
+  */}}
+  {{- if ne (default "OwnNamespace" $op.installMode) "AllNamespaces" }}
+  targetNamespaces:
+    - {{ $op.namespace }}
+  {{- end }}
+  upgradeStrategy: Default
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: {{ $op.name }}
+  namespace: {{ $op.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  name: {{ $op.name }}
+  channel: {{ required (printf "operators.extra[%d] (%s): 'channel' e obrigatorio" $i $op.name) $op.channel }}
+  source: {{ default "redhat-operators" $op.source }}
+  sourceNamespace: {{ default "openshift-marketplace" $op.sourceNamespace }}
+  installPlanApproval: {{ default "Automatic" $op.installPlanApproval }}
+  {{- with $op.startingCSV }}
+  startingCSV: {{ . }}
+  {{- end }}
+{{- end }}
+{{- end }}

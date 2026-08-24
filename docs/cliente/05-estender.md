@@ -381,3 +381,46 @@ Opcionalmente, mais uma `Placement` em
 | `values.yaml` não chega ao chart novo | o `bundle.source` já cuida disso; verifique se o chart está em `charts/<nome>` (dois níveis, por causa do `../../`) |
 | Rota nova indo para o router errado | valor de label novo não foi adicionado a `ingress.default.reservedValues` |
 | Application em `Unknown` / `Cluster not found` | o spoke ainda não foi registrado — ver [troubleshooting](04-troubleshooting.md) |
+
+## 5.8 Acrescentar um operador só pelo values
+
+Para operadores do **OperatorHub**, não é preciso mexer em chart nenhum. Basta
+uma entrada em `operators.extra`, que gera Namespace, OperatorGroup e
+Subscription:
+
+```yaml
+operators:
+  enabled: true
+  extra:
+    - name: kubernetes-nmstate-operator   # nome do PACOTE
+      namespace: openshift-nmstate        # um namespace por operador
+      channel: stable
+      source: redhat-operators            # default
+      sourceNamespace: openshift-marketplace  # default
+      installPlanApproval: Automatic      # default
+      installMode: OwnNamespace           # OwnNamespace (default) | AllNamespaces
+      createNamespace: true               # default
+      # startingCSV: kubernetes-nmstate-operator.4.18.0
+```
+
+Descubra o pacote e o que ele aceita:
+
+```bash
+oc get packagemanifest -n openshift-marketplace | grep -i nmstate
+oc get packagemanifest kubernetes-nmstate-operator -n openshift-marketplace \
+  -o jsonpath='{range .status.channels[*]}{.name}{"\n"}{end}'
+oc get packagemanifest kubernetes-nmstate-operator -n openshift-marketplace \
+  -o jsonpath='{range .status.channels[*].currentCSVDesc.installModes[*]}{.type}={.supported}{"\n"}{end}'
+```
+
+O chart valida antes de chegar ao cluster: `name`/`namespace`/`channel`
+obrigatórios, e **duas entradas no mesmo namespace falham o render** — só cabe
+um OperatorGroup por namespace, e o OLM recusaria os dois.
+
+> **Nem tudo é operador de OperatorHub.** Componentes do payload do OpenShift
+> (`cluster-autoscaler-operator`, `machine-api`, `ingress-operator`,
+> `authentication-operator`) já vêm instalados e **não têm packagemanifest** —
+> uma Subscription para eles falha com `not found`. Confirme antes:
+> `oc get packagemanifest -n openshift-marketplace | grep -i <termo>`
+> e `oc get clusteroperator` para os do payload.
+

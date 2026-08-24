@@ -10,3 +10,23 @@ operators:
     source: redhat-operators
     sourceNamespace: openshift-marketplace
     installPlanApproval: Automatic
+
+  # Operadores adicionais, sem mexer no chart. Cada entrada gera Namespace,
+  # OperatorGroup e Subscription.
+  #
+  # NAO serve para o cluster-autoscaler: ele NAO e um operador de OperatorHub.
+  # O cluster-autoscaler-operator faz parte do payload do OpenShift (roda em
+  # openshift-machine-api, junto com o machine-api) e ja vem instalado. Nao ha
+  # packagemanifest dele -- uma Subscription falharia com "not found".
+  #
+  #  extra:
+  #    - name: kubernetes-nmstate-operator   # nome do PACOTE no OperatorHub
+  #      namespace: openshift-nmstate        # um namespace por operador
+  #      channel: stable
+  #      source: redhat-operators
+  #      sourceNamespace: openshift-marketplace
+  #      installPlanApproval: Automatic
+  #      installMode: OwnNamespace           # OwnNamespace | AllNamespaces
+  #      createNamespace: true
+  #      # startingCSV: kubernetes-nmstate-operator.4.18.0
+  extra: []
