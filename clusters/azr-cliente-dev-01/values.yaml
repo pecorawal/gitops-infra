@@ -230,6 +230,41 @@ operators:
 certManager:
   enabled: false
 
+  # ---- Overrides do OPERANDO cert-manager (CR CertManager/cluster) ----------
+  # O cert-manager-operator cria sozinho o CR "cluster"; aqui apenas ajustamos
+  # o spec dele (ServerSideApply, sem tomar posse do objeto).
+  #
+  # Os dois argumentos abaixo NAO sao opcionais num cluster privado:
+  # o desafio DNS01 grava o TXT _acme-challenge na zona PUBLICA e depois faz a
+  # auto-checagem. Com o resolver padrao do pod, essa consulta cai no DNS da
+  # VNet, que enxerga a Private DNS Zone -- o TXT nao e encontrado e o
+  # Certificate trava em "Waiting for DNS-01 challenge propagation".
+  # Forcando resolvers publicos, a auto-checagem consulta a zona certa.
+  #
+  # Se a saida para 53/udp na internet for bloqueada, troque a lista por um
+  # resolver interno que enxergue a zona PUBLICA.
+  operatorConfig:
+    enabled: true
+    managementState: Managed
+    logLevel: Normal
+    operatorLogLevel: Normal
+    controller:
+      overrideArgs:
+        - "--dns01-recursive-nameservers-only"
+        - "--dns01-recursive-nameservers=1.1.1.1:53,8.8.8.8:53"
+      # Ex.: proxy de saida do cliente
+      # overrideEnv:
+      #   - name: HTTPS_PROXY
+      #     value: "http://proxy.cgibs.gov.br:3128"
+      #   - name: NO_PROXY
+      #     value: ".cluster.local,.svc,169.254.169.254"
+      overrideEnv: []
+      overrideResources: {}
+    webhook:
+      overrideArgs: []
+    cainjector:
+      overrideArgs: []
+
   # ClusterIssuer "letsencrypt-prod": ACME com desafio DNS01 na Azure DNS Zone
   # PÚBLICA. É este issuer que emite os DOIS wildcards:
   #

@@ -948,15 +948,29 @@ oc logs -n cert-manager deploy/cert-manager -f
   O TXT precisa ser gravado na zona **pública** `cgibs.gov.br`. Se
   `pri.cgibs.gov.br` estiver delegado a outro servidor, o Let's Encrypt procura o
   TXT lá e não encontra.
-- **`propagation check failed`** — em cluster privado, o cert-manager pode não
-  alcançar os NS autoritativos. Configure nameservers recursivos no operator:
+- **`propagation check failed`** / **`Waiting for DNS-01 challenge propagation`**
+  — em cluster privado o resolver do pod é o DNS interno do OpenShift, que
+  encaminha para o DNS da VNet e enxerga a **Private** DNS Zone; a auto-checagem
+  do cert-manager consulta o servidor errado e nunca acha o TXT.
+
+  Isto **já vem resolvido pelo chart**: `certManager.operatorConfig` aplica no CR
+  `CertManager/cluster` os argumentos `--dns01-recursive-nameservers-only` e
+  `--dns01-recursive-nameservers`. Confirme que o override chegou:
 
   ```bash
-  oc patch certmanager cluster --type=merge -p \
-    '{"spec":{"controllerConfig":{"overrideArgs":[
-       "--dns01-recursive-nameservers=8.8.8.8:53",
-       "--dns01-recursive-nameservers-only"]}}}'
+  oc get certmanager cluster -o jsonpath='{.spec.controllerConfig.overrideArgs}'
+  oc get deploy cert-manager -n cert-manager -o yaml | grep dns01
   ```
+
+  Se o `oc get certmanager` não mostrar os argumentos, a Application de
+  cert-manager não sincronizou a wave `-1` — ressincronize. Se mostrar mas o
+  deployment não, o operator ainda não reconciliou (ele reinicia o deployment;
+  aguarde ou `oc rollout status deploy/cert-manager -n cert-manager`).
+
+  Se a rede do cliente bloqueia saída em 53/udp para a internet, os resolvers
+  públicos padrão (`1.1.1.1`, `8.8.8.8`) não respondem — troque a lista em
+  `certManager.operatorConfig.controller.overrideArgs` por um resolver interno
+  que enxergue a zona **pública**.
 
 - **Cota do Let's Encrypt** — 50 certificados por domínio por semana. Use o
   servidor de staging enquanto testa.

@@ -1,6 +1,21 @@
 clusterName: ""
 certManager:
   enabled: false
+  operatorConfig:
+    enabled: true
+    managementState: Managed
+    logLevel: Normal
+    operatorLogLevel: Normal
+    controller:
+      overrideArgs:
+        - "--dns01-recursive-nameservers-only"
+        - "--dns01-recursive-nameservers=1.1.1.1:53,8.8.8.8:53"
+      overrideEnv: []
+      overrideResources: {}
+    webhook:
+      overrideArgs: []
+    cainjector:
+      overrideArgs: []
   acme:
     enabled: false
     email: ""

@@ -52,6 +52,44 @@ certManager:
   enabled: true
 ```
 
+### Overrides do operando cert-manager (obrigatório em cluster privado)
+
+Antes dos issuers (sync-wave `-1`), o chart ajusta o CR `CertManager/cluster` —
+o objeto que o cert-manager-operator cria sozinho para configurar o operando.
+O ArgoCD usa `ServerSideApply`, então mexe só nos campos declarados.
+
+```yaml
+certManager:
+  operatorConfig:
+    enabled: true
+    controller:
+      overrideArgs:
+        - "--dns01-recursive-nameservers-only"
+        - "--dns01-recursive-nameservers=1.1.1.1:53,8.8.8.8:53"
+```
+
+**Por que isso é necessário:** depois de gravar o TXT `_acme-challenge` na zona
+pública, o cert-manager faz uma auto-checagem antes de avisar o Let's Encrypt.
+Num cluster privado o resolver do pod é o DNS interno do OpenShift, que
+encaminha para o DNS da VNet — e esse enxerga a **Private** DNS Zone. A consulta
+vai para o servidor errado, o TXT não é encontrado e o `Certificate` trava
+indefinidamente em *Waiting for DNS-01 challenge propagation*. Os dois
+argumentos fazem o cert-manager consultar resolvers públicos diretamente,
+ignorando o `/etc/resolv.conf` do pod.
+
+> Se a saída para 53/udp na internet for bloqueada, substitua a lista por um
+> resolver interno que enxergue a zona **pública**.
+
+O mesmo bloco aceita `controller.overrideEnv` (útil para `HTTPS_PROXY`/`NO_PROXY`),
+`controller.overrideResources`, `webhook.overrideArgs` e `cainjector.overrideArgs`.
+
+Conferir depois do sync:
+
+```bash
+oc get certmanager cluster -o jsonpath='{.spec.controllerConfig.overrideArgs}{"\n"}'
+oc rollout status deploy/cert-manager -n cert-manager
+```
+
 ### Um único issuer para os dois wildcards
 
 O `ClusterIssuer` **`letsencrypt-prod`** usa desafio **DNS01 na Azure DNS Zone

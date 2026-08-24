@@ -1,0 +1,73 @@
+{{- if and .Values.certManager.enabled .Values.certManager.operatorConfig.enabled }}
+{{- $o := .Values.certManager.operatorConfig }}
+# ---------------------------------------------------------------------------
+#  CertManager "cluster" -- overrides do operando cert-manager
+# ---------------------------------------------------------------------------
+#  Este CR NAO e criado por nos: o cert-manager-operator o cria sozinho assim
+#  que sobe (nome fixo "cluster", cluster-scoped, com os finalizers dele). Aqui
+#  so ajustamos campos do spec -- por isso ServerSideApply=true, para o ArgoCD
+#  mexer apenas nos campos declarados e nao assumir a posse do objeto.
+#
+#  POR QUE isto e necessario nesta arquitetura:
+#
+#  O desafio DNS01 do letsencrypt-prod grava o TXT _acme-challenge na zona
+#  PUBLICA da Azure e depois faz a auto-checagem antes de avisar o Let's
+#  Encrypt. Num cluster privado o resolver padrao dos pods e o DNS interno do
+#  OpenShift, que encaminha para o DNS da VNet -- e esse DNS enxerga a Private
+#  DNS Zone. Resultado: a auto-checagem consulta o servidor errado, nao acha o
+#  TXT (ou acha a resposta da zona privada) e o Certificate fica eternamente
+#  em "Waiting for DNS-01 challenge propagation".
+#
+#  Os dois argumentos abaixo mandam o cert-manager consultar resolvers publicos
+#  diretamente, ignorando o resolver do cluster:
+#
+#    --dns01-recursive-nameservers-only  ignora o /etc/resolv.conf do pod
+#    --dns01-recursive-nameservers=...   os servidores a usar
+#
+#  Se a rede do cliente bloquear saida para 53/udp na internet, troque a lista
+#  por um resolver interno que enxergue a zona PUBLICA.
+#
+#  Conferir depois do sync:
+#    oc get certmanager cluster -o jsonpath='{.spec.controllerConfig.overrideArgs}'
+#    oc get pods -n cert-manager -l app=cert-manager -o yaml | grep dns01
+#  (o operator reinicia o deployment cert-manager ao aplicar o override)
+# ---------------------------------------------------------------------------
+apiVersion: operator.openshift.io/v1alpha1
+kind: CertManager
+metadata:
+  name: cluster
+  annotations:
+    # Wave -1: antes dos ClusterIssuers (wave 2), senao o primeiro Certificate
+    # tenta o desafio com o resolver errado e queima uma tentativa.
+    argocd.argoproj.io/sync-wave: "-1"
+    argocd.argoproj.io/sync-options: ServerSideApply=true,SkipDryRunOnMissingResource=true
+spec:
+  managementState: {{ $o.managementState }}
+  logLevel: {{ $o.logLevel }}
+  operatorLogLevel: {{ $o.operatorLogLevel }}
+  {{- if or $o.controller.overrideArgs $o.controller.overrideEnv $o.controller.overrideResources }}
+  controllerConfig:
+    {{- if $o.controller.overrideArgs }}
+    overrideArgs:
+      {{- toYaml $o.controller.overrideArgs | nindent 6 }}
+    {{- end }}
+    {{- if $o.controller.overrideEnv }}
+    overrideEnv:
+      {{- toYaml $o.controller.overrideEnv | nindent 6 }}
+    {{- end }}
+    {{- if $o.controller.overrideResources }}
+    overrideResources:
+      {{- toYaml $o.controller.overrideResources | nindent 6 }}
+    {{- end }}
+  {{- end }}
+  {{- if $o.webhook.overrideArgs }}
+  webhookConfig:
+    overrideArgs:
+      {{- toYaml $o.webhook.overrideArgs | nindent 6 }}
+  {{- end }}
+  {{- if $o.cainjector.overrideArgs }}
+  cainjectorConfig:
+    overrideArgs:
+      {{- toYaml $o.cainjector.overrideArgs | nindent 6 }}
+  {{- end }}
+{{- end }}
