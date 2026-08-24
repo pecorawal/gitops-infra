@@ -119,10 +119,10 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 │   ├── external-dns-config
 │   │   ├── Chart.yaml
 │   │   ├── templates
-│   │   │   ├── 00-azure-config-secret.yaml
+│   │   │   ├── 00-azure-config-secret-private.yaml
+│   │   │   ├── 01-azure-config-secret-public.yaml
 │   │   │   ├── 10-externaldns-private.yaml
-│   │   │   ├── 20-externaldns-public.yaml
-│   │   │   └── _externaldns.tpl
+│   │   │   └── 20-externaldns-public.yaml
 │   │   └── values.yaml
 │   ├── import-cluster
 │   │   ├── Chart.yaml
