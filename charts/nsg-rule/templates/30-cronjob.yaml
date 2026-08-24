@@ -24,6 +24,16 @@ spec:
               imagePullPolicy: IfNotPresent
               command: ["/bin/bash", "/scripts/nsg-rule.sh"]
               env:
+                # O az CLI grava configuracao e cache de token no HOME. No
+                # OpenShift o pod roda com UID arbitrario e HOME=/ nao e
+                # gravavel -- o az morre com
+                #   PermissionError: [Errno 13] Permission denied: '/.azure'
+                # antes mesmo de executar o comando. Apontamos os dois para o
+                # emptyDir montado abaixo.
+                - name: HOME
+                  value: /tmp/az
+                - name: AZURE_CONFIG_DIR
+                  value: /tmp/az/.azure
                 - name: SVC_NAME
                   # Service do router: "router-<nome-do-IngressController>", e o
                   # nome do IC carrega o clusterName no final.
@@ -75,7 +85,20 @@ spec:
               volumeMounts:
                 - name: script
                   mountPath: /scripts
+                - name: az-home
+                  mountPath: /tmp/az
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                capabilities:
+                  drop: ["ALL"]
+                seccompProfile:
+                  type: RuntimeDefault
           volumes:
+            # HOME gravavel para o az CLI. emptyDir: some com o Job, e nada
+            # aqui precisa sobreviver -- o login e refeito a cada execucao.
+            - name: az-home
+              emptyDir: {}
             - name: script
               configMap:
                 name: nsg-rule-script-{{ .Values.clusterName }}
