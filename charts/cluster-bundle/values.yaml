@@ -1,10 +1,28 @@
-# Valores injetados pelo ApplicationSet (bootstrap/02-appset-cliente.yaml).
-# Nao edite aqui -- o arquivo do cliente e clusters/<cluster>/values.yaml.
+# ---------------------------------------------------------------------------
+#  DEFAULTS INERTES -- de proposito.
+# ---------------------------------------------------------------------------
+#  Todo valor real vem de clusters/<cluster>/values.yaml, carregado pelo
+#  ApplicationSet (bootstrap/02-appset-cliente.yaml) via helm.valueFiles.
+#
+#  NAO coloque aqui nenhum valor que "funcione". Se este arquivo tiver um
+#  default utilizavel e o values do cluster NAO for carregado (valueFiles com
+#  caminho errado, chave duplicada no YAML, revisao errada), o chart renderiza
+#  sem erro nenhum usando o default -- e o sintoma e o pior possivel: o
+#  interruptor que voce ligou no values do cluster simplesmente nao surte
+#  efeito, sem uma linha de log dizendo por que.
+#
+#  Foi exatamente o que aconteceu: valuesPath apontava para
+#  "clusters/azr-cliente-dev-01/values.yaml" e os enabled vinham false daqui.
+#
+#  Por isso clusterName e valuesPath ficam VAZIOS e templates/_validate.tpl
+#  falha o render se continuarem vazios na hora do sync.
+# ---------------------------------------------------------------------------
 global:
   repoURL: "https://github.com/pecorawal/gitops-infra.git"
   targetRevision: cliente
   # Caminho, a partir da raiz do repo, do values.yaml do cluster.
-  valuesPath: "clusters/azr-cliente-dev-01/values.yaml"
+  # VAZIO de proposito -- quem preenche e o ApplicationSet.
+  valuesPath: ""
   argoNamespace: openshift-gitops
   project: default
 
