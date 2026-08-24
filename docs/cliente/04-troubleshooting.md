@@ -1063,9 +1063,16 @@ oc get route <rota> -n <ns> --show-labels
 
 | `routerName` observado | Causa |
 |---|---|
-| `default` (esperava `private`) | label `ingress-type` ausente ou com valor errado |
-| `default` **e** `private` | `ingress.default.isolateByLabel` está `false` |
+| `default` (esperava `private-<cluster>`) | label `ingress-type` ausente ou com valor errado |
+| `default` **e** `private-<cluster>` | `ingress.default.isolateByLabel` está `false` |
 | nenhum | o `domain` do IngressController não bate com o host da rota |
+
+> Os IngressControllers adicionais chamam-se `private-<cluster>` e
+> `public-<cluster>` — o `clusterName` entra no nome. Consequência: o Service do
+> router é `router-public-<cluster>` em `openshift-ingress`, e o `routerName` do
+> ExternalDNS precisa do mesmo sufixo. Os charts montam os três a partir de
+> `clusterName`, então não há nada a preencher — mas ao conferir na mão, use o
+> nome completo.
 
 Lembre que `NotIn` casa também com Routes **sem** a label — por isso o que não
 tiver `ingress-type: public|private` vai parar no `default`. É o comportamento

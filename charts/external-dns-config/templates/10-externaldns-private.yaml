@@ -30,7 +30,10 @@ spec:
   source:
     type: OpenShiftRoute
     openshiftRouteOptions:
-      routerName: {{ .Values.externalDNS.private.routerName }}
+      # Tem que ser EXATAMENTE o nome do IngressController, que carrega o
+      # clusterName no final (private-<cluster>). Se divergir, o ExternalDNS
+      # nao enxerga nenhuma Route e nao cria registro nenhum -- sem erro.
+      routerName: {{ .Values.externalDNS.private.routerName }}-{{ .Values.clusterName }}
     hostnameAnnotation: Ignore
   domains:
     - filterType: Include

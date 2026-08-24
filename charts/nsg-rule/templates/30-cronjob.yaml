@@ -25,7 +25,9 @@ spec:
               command: ["/bin/bash", "/scripts/nsg-rule.sh"]
               env:
                 - name: SVC_NAME
-                  value: {{ .Values.nsgRule.serviceName | quote }}
+                  # Service do router: "router-<nome-do-IngressController>", e o
+                  # nome do IC carrega o clusterName no final.
+                  value: {{ printf "%s-%s" .Values.nsgRule.serviceName .Values.clusterName | quote }}
                 - name: SVC_NAMESPACE
                   value: {{ .Values.nsgRule.serviceNamespace | quote }}
                 - name: NSG_NAME
