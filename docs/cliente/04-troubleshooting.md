@@ -762,6 +762,73 @@ usa o modelo de subscription do ACM, pode remover `bootstrap/channel.yaml` e
 menos. Foram mantidos por virem do fluxo original em `main`.
 
 
+## Liguei `enabled: true` e nada acontece
+
+O sintoma é sempre o mesmo: o `bundle-<cluster>` fica **`Synced/Healthy`**, não
+há erro em lugar nenhum e a Application filha simplesmente não existe. Isso
+acontece porque as filhas são condicionais — sem o `enabled`, não sobra objeto
+para ficar `OutOfSync`.
+
+Comece pelo script, que compara o arquivo em disco, o que o Helm lê e o que o
+ArgoCD leu de fato:
+
+```bash
+./docs/cliente/scripts/verificar-values.sh <cluster>
+```
+
+### Causa 1 — o interruptor de topo continuou `false`
+
+Vários blocos têm **dois níveis** de `enabled`, e só o de topo decide se a
+Application é criada:
+
+```yaml
+ingress:
+  enabled: true       # <-- ESTE cria a Application ingress-<cluster>
+  private:
+    enabled: true     # já vem true no template -- não é o que faltava
+  public:
+    enabled: true     # idem
+```
+
+O mesmo vale para `externalDNS`. Como os aninhados já vêm `true` de fábrica, é
+fácil abrir o bloco, ver `true` e concluir que está tudo ligado.
+
+### Causa 2 — chave duplicada no `values.yaml`
+
+Um segundo `ingress:` (ou `certManager:`, `externalDNS:`…) mais abaixo no
+arquivo **substitui inteiramente** o primeiro — o YAML aceita sem reclamar e a
+última ocorrência vence. Costuma acontecer depois de colar um bloco novo no fim
+do arquivo. O passo 1 do script aponta as linhas.
+
+### Causa 3 — o ArgoCD não está lendo o seu `values.yaml`
+
+Compare os passos 2 e 3 do script. Se divergirem, o arquivo do cluster não
+entrou no merge e o bundle renderizou os defaults do chart. Confirme qual
+arquivo a Application está carregando:
+
+```bash
+oc get applications.argoproj.io bundle-<cluster> -n openshift-gitops \
+  -o jsonpath='{.spec.source.helm}{"\n"}'
+```
+
+`valueFiles` tem que resolver para `../../clusters/<cluster>/values.yaml` e
+`global.valuesPath` para `clusters/<cluster>/values.yaml`.
+
+> Desde a correção dos defaults inertes, esse caso **falha alto**: o chart
+> `cluster-bundle` aborta o render com `clusterName vazio` ou `INCOERENTE:
+> clusterName=... mas global.valuesPath=...`, em vez de renderizar em silêncio o
+> values de outro cluster. Se você vê essa mensagem na Application, é aqui.
+
+### Causa 4 — o commit não está na revisão que o generator lê
+
+O ApplicationSet lê a branch `cliente`. Confirme que o commit chegou lá
+(`git log origin/cliente -1`) e force um refresh:
+
+```bash
+oc annotate applications.argoproj.io bundle-<cluster> -n openshift-gitops \
+  argocd.argoproj.io/refresh=hard --overwrite
+```
+
 ## As Applications de day-2 estão em erro "Cluster not found"
 
 **Esperado** enquanto o cluster não terminou de ser provisionado e registrado.

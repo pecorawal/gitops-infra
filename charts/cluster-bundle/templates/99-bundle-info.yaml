@@ -1,0 +1,39 @@
+{{- include "bundle.validate" . }}
+# ---------------------------------------------------------------------------
+#  Espelho do que o bundle REALMENTE leu.
+# ---------------------------------------------------------------------------
+#  Todas as Applications filhas sao condicionais (um "if" no topo do arquivo),
+#  entao quando um interruptor nao surte efeito nao sobra objeto nenhum para
+#  inspecionar -- o bundle fica Synced/Healthy e nao ha o que olhar.
+#
+#  Este ConfigMap e o unico objeto INCONDICIONAL do chart. Ele mostra qual
+#  values.yaml foi carregado e o estado de cada interruptor no momento do
+#  render, e da uma casa para a validacao acima rodar sempre.
+#
+#    oc get cm bundle-<cluster>-info -n openshift-gitops -o yaml
+#
+#  Se o que aparece aqui nao bate com clusters/<cluster>/values.yaml, o
+#  problema esta no carregamento do arquivo (valueFiles/revisao/chave
+#  duplicada), nao no chart que voce estava investigando.
+# ---------------------------------------------------------------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bundle-{{ .Values.clusterName }}-info
+  namespace: {{ .Values.global.argoNamespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-100"
+data:
+  clusterName: {{ .Values.clusterName | quote }}
+  valuesPath: {{ .Values.global.valuesPath | quote }}
+  targetRevision: {{ .Values.global.targetRevision | quote }}
+  # Estado dos interruptores de TOPO -- e so este nivel que decide se a
+  # Application filha e criada.
+  enabled.provision: {{ .Values.provision.enabled | quote }}
+  enabled.operators: {{ .Values.operators.enabled | quote }}
+  enabled.certManager: {{ .Values.certManager.enabled | quote }}
+  enabled.ingress: {{ .Values.ingress.enabled | quote }}
+  enabled.externalDNS: {{ .Values.externalDNS.enabled | quote }}
+  enabled.nsgRule: {{ .Values.nsgRule.enabled | quote }}
+  enabled.autoscaling: {{ .Values.autoscaling.enabled | quote }}
+  enabled.identityProvider: {{ .Values.identityProvider.enabled | quote }}
