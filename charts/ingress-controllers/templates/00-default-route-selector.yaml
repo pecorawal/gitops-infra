@@ -1,30 +1,42 @@
 {{- if and .Values.ingress.enabled .Values.ingress.default.isolateByLabel }}
+{{- if not .Values.ingress.default.scope }}
+  {{- fail "\n\ningress.default.scope nao definido.\nEm cluster PRIVADO tem que ser Internal. Se ficar indefinido e este objeto\nfor aplicado inteiro (nao como merge), o ingress-operator recria o Load\nBalancer do router default com o padrao dele, que e External -- o LB vira\nPUBLICO e o acesso a console pelo IP interno se perde.\n" }}
+{{- end }}
 # ---------------------------------------------------------------------------
 #  IngressController "default" -- reservado as aplicacoes internas do OpenShift
 # ---------------------------------------------------------------------------
+#  ATENCAO: este objeto NAO e criado por nos. Ele nasce com a instalacao do
+#  cluster e serve a console, o OAuth e todas as rotas de plataforma. Perde-lo,
+#  ou alterar o Load Balancer dele, derruba o acesso ao cluster.
+#
+#  POR QUE endpointPublishingStrategy ESTA DECLARADO AQUI
+#  -----------------------------------------------------
+#  A versao anterior deste arquivo declarava SOMENTE spec.routeSelector, na
+#  premissa de que o ServerSideApply garantiria um merge e o resto do spec
+#  ficaria intacto. Essa premissa e fragil: qualquer caminho em que o objeto
+#  seja aplicado INTEIRO (client-side apply, o fallback Replace do ArgoCD,
+#  alguem rodando "oc apply -f" com este arquivo) substitui o spec e apaga o
+#  endpointPublishingStrategy. O ingress-operator entao o recria com o padrao
+#  dele -- LoadBalancerService de escopo EXTERNAL.
+#
+#  Num cluster privado o efeito e imediato e grave: o Load Balancer do router
+#  default e recriado como PUBLICO, com IP novo, e o acesso a console pelo
+#  endereco interno se perde.
+#
+#  Declarar o escopo explicitamente torna o manifesto correto sob QUALQUER
+#  estrategia de aplicacao: mesmo uma substituicao integral do spec deixa o
+#  default onde ele ja estava.
+#
+#  ROUTE SELECTOR
+#  --------------
 #  Uma Route e admitida por TODO IngressController cujo routeSelector case com
-#  ela. O "default" nasce com routeSelector vazio, ou seja, admite tudo -- e
-#  isso inclui as rotas marcadas como public/private, que passariam a ser
-#  servidas tambem pelo ingress default.
+#  ela. O default nasce com routeSelector vazio, ou seja, admite tudo -- e isso
+#  inclui as rotas public/private, que seriam servidas em duplicidade.
 #
-#  O patch abaixo faz o default admitir apenas o que NAO for public nem private:
+#  NotIn casa tambem com objetos que NAO tem a label, entao o default continua
+#  servindo as rotas de plataforma (console, oauth), que nao a possuem.
 #
-#    routeSelector:
-#      matchExpressions:
-#        - key: {{ .Values.ingress.default.labelKey }}
-#          operator: NotIn
-#          values: [{{ join ", " .Values.ingress.default.reservedValues }}]
-#
-#  Semantica do seletor de labels do Kubernetes: NotIn tambem casa com objetos
-#  que NAO tem a label. Logo o default continua servindo:
-#    - as rotas de plataforma (console, oauth, ...), que nao tem a label;
-#    - qualquer rota com {{ .Values.ingress.default.labelKey }} de valor
-#      diferente de {{ join " e " .Values.ingress.default.reservedValues }}.
-#
-#  ServerSideApply: o ArgoCD altera apenas o campo routeSelector, sem assumir a
-#  posse do objeto inteiro, que pertence ao ingress-operator.
-#
-#  Para reverter:
+#  Para reverter o routeSelector (sem tocar no Load Balancer):
 #    oc patch ingresscontroller default -n openshift-ingress-operator \
 #      --type=json -p '[{"op":"remove","path":"/spec/routeSelector"}]'
 # ---------------------------------------------------------------------------
@@ -35,8 +47,19 @@ metadata:
   namespace: openshift-ingress-operator
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
-    argocd.argoproj.io/sync-options: ServerSideApply=true
+    # ServerSideApply -- altera campos, nao assume a posse do objeto.
+    # Prune=false     -- nunca remover num sync.
+    # Delete=false    -- nunca remover na delecao em cascata da Application.
+    # Sem os dois ultimos, apagar a Application de ingress apagaria o
+    # IngressController default junto, derrubando a console.
+    argocd.argoproj.io/sync-options: ServerSideApply=true,Prune=false,Delete=false
 spec:
+  # Escopo do Load Balancer do router default. Internal = LB interno da Azure.
+  # NAO mude para External num cluster privado.
+  endpointPublishingStrategy:
+    type: LoadBalancerService
+    loadBalancer:
+      scope: {{ .Values.ingress.default.scope }}
   routeSelector:
     matchExpressions:
       - key: {{ .Values.ingress.default.labelKey }}

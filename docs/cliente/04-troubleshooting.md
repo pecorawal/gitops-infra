@@ -762,6 +762,55 @@ usa o modelo de subscription do ACM, pode remover `bootstrap/channel.yaml` e
 menos. Foram mantidos por virem do fluxo original em `main`.
 
 
+## EMERGÊNCIA — o LB do IngressController `default` virou público
+
+**Sintoma:** cluster privado, o IP do Load Balancer do router `default` mudou,
+a console ficou inacessível pelo endereço interno.
+
+```bash
+oc get ingresscontroller default -n openshift-ingress-operator \
+  -o jsonpath='{.spec.endpointPublishingStrategy.loadBalancer.scope}{"\n"}'
+oc get svc router-default -n openshift-ingress \
+  -o jsonpath='{.metadata.annotations}{"\n"}' | tr ',' '\n' | grep -i internal
+```
+
+Se o `scope` estiver `External` (ou vazio), foi isto.
+
+### Recuperação
+
+```bash
+# 1. impedir que o ArgoCD reaplique enquanto você conserta
+oc patch applications.argoproj.io ingress-<cluster> -n openshift-gitops \
+  --type=merge -p '{"spec":{"syncPolicy":{"automated":null}}}'
+
+# 2. restaurar (roda em dry-run primeiro; --confirmar executa)
+oc login <api-do-spoke>
+./docs/cliente/scripts/restaurar-ingress-default.sh
+./docs/cliente/scripts/restaurar-ingress-default.sh --confirmar
+```
+
+O script faz o patch de `scope` para `Internal` e **deleta o Service
+`router-default`** — necessário porque o operator não converte um LB público
+existente em interno; ele precisa recriar o Service já com a anotação
+`azure-load-balancer-internal`. O IP resultante é **diferente**, então o
+registro `*.apps` na Private DNS Zone precisa ser atualizado.
+
+### Causa
+
+A versão anterior de `charts/ingress-controllers/templates/00-default-route-selector.yaml`
+declarava **apenas** `spec.routeSelector`, contando com o `ServerSideApply` para
+preservar o resto do spec. Basta um caminho de aplicação que grave o objeto
+inteiro — client-side apply, o fallback `Replace` do ArgoCD, ou um `oc apply -f`
+manual do arquivo — para que `spec.endpointPublishingStrategy` seja apagado. O
+ingress-operator então o recria com o padrão dele, que é
+`LoadBalancerService` de escopo **External**.
+
+Corrigido: o manifesto passa a declarar `endpointPublishingStrategy` com
+`scope` vindo de `ingress.default.scope` (padrão `Internal`), e leva
+`Prune=false,Delete=false` além do `ServerSideApply`. Assim o objeto está
+correto sob qualquer estratégia de aplicação, e nem um prune nem uma deleção em
+cascata da Application podem removê-lo.
+
 ## Liguei `enabled: true` e nada acontece
 
 O sintoma é sempre o mesmo: o `bundle-<cluster>` fica **`Synced/Healthy`**, não

@@ -2,6 +2,11 @@ ingress:
   enabled: false
   default:
     isolateByLabel: false
+    # Escopo do LB do router default. Internal = LB interno (cluster privado).
+    # Declarado explicitamente de proposito: se o objeto for aplicado inteiro,
+    # o operator recriaria o LB com o padrao dele (External) e o cluster
+    # privado perderia o acesso interno a console.
+    scope: Internal
     labelKey: ingress-type
     reservedValues:
       - public
