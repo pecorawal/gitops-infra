@@ -26,9 +26,34 @@ nsgRule:
   ruleName: Allow_HTTP_HTTPS_Ingress
   priority: 1000
   schedule: "*/10 * * * *"
-  timeoutSeconds: 1800
+
+  # Quanto o script espera pelo IP do LB antes de desistir.
+  # MANTENHA MENOR que o intervalo do schedule: com 25 min de espera e schedule
+  # de 10 min, cada execucao ainda estaria rodando quando a proxima dispara.
+  # (concurrencyPolicy: Forbid evita o encavalamento, mas o CronJob acumula
+  # execucoes puladas e a regra so sincroniza quando a lenta finalmente sai.)
+  waitSeconds: 180
+  # Corte duro do Job. Deve ser > waitSeconds, com folga para as chamadas az.
+  timeoutSeconds: 600
+
+  # ---- Associacao do NSG a subnet dos workers ----
+  # Cluster IPI privado nasce SEM NSG na subnet. Sem associar, a inbound rule
+  # criada acima nao surte efeito nenhum: o trafego externo nao chega aos
+  # workers e as aplicacoes do ingress publico nao respondem.
+  # Vazio nos tres campos = reaproveita o que provision.azure ja declara.
+  subnet:
+    associate: true
+    name: ""              # default: provision.azure.computeSubnet
+    vnet: ""              # default: provision.azure.virtualNetwork
+    resourceGroup: ""     # default: provision.azure.networkResourceGroupName
+    # Substituir um NSG ja associado troca TODAS as regras que valem para a
+    # subnet. Por isso, com outro NSG presente o script apenas avisa e para.
+    force: false
 
   # Imagem com az CLI + kubectl (mcr.microsoft.com/azure-cli inclui ambos).
+  # A imagem precisa de: az CLI, curl e python3. A azure-cli oficial traz os
+  # tres. NAO precisa de kubectl -- o script fala com a API do Kubernetes via
+  # curl, justamente porque esta imagem nao inclui kubectl.
   image: mcr.microsoft.com/azure-cli
   imageTag: latest
 

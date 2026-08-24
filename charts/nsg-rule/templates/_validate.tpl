@@ -42,6 +42,23 @@
 {{- if gt (len $nomeCron) 52 -}}
   {{- fail (printf "\n\nNome do CronJob muito longo: %q (%d caracteres).\nO Kubernetes acrescenta o timestamp ao criar cada Job, e nome de Job e\nlimitado a 63 caracteres -- sobram 52 para o CronJob. Encurte clusterName.\n" $nomeCron (len $nomeCron)) -}}
 {{- end -}}
+{{- /*
+  Espera x schedule: com waitSeconds maior que o intervalo do CronJob, cada
+  execucao ainda estaria rodando quando a proxima dispara. O
+  concurrencyPolicy: Forbid evita o encavalamento, mas ai o CronJob so acumula
+  execucoes puladas e a regra deixa de sincronizar.
+  So checa o formato de intervalo (barra-N nos minutos), que e o usado aqui.
+*/ -}}
+{{- $sched := $v.schedule | toString -}}
+{{- if regexMatch "^\\*/[0-9]+ \\* \\* \\* \\*$" $sched -}}
+  {{- $min := int (regexFind "[0-9]+" $sched) -}}
+  {{- if ge (int $v.waitSeconds) (mul $min 60) -}}
+    {{- fail (printf "\n\nnsgRule.waitSeconds (%ds) >= intervalo do schedule (%dmin = %ds).\nCada execucao ainda estaria rodando quando a proxima dispara: o\nconcurrencyPolicy Forbid pula a nova e a regra para de sincronizar.\nUse waitSeconds bem menor que %d.\n" (int $v.waitSeconds) $min (mul $min 60) (mul $min 60)) -}}
+  {{- end -}}
+{{- end -}}
+{{- if le (int $v.timeoutSeconds) (int $v.waitSeconds) -}}
+  {{- fail (printf "\n\nnsgRule.timeoutSeconds (%d) <= waitSeconds (%d).\nO Job seria morto antes de terminar a espera pelo IP. Deixe folga para as\nchamadas do az depois da espera.\n" (int $v.timeoutSeconds) (int $v.waitSeconds)) -}}
+{{- end -}}
 {{- if $pendentes -}}
   {{- fail (printf "\n\nCluster %q: valor(es) ainda por preencher em clusters/%s/values.yaml:\n  - %s\n\nPreencha antes de ligar nsgRule.enabled: true.\n" .Values.clusterName .Values.clusterName (join "\n  - " (sortAlpha $pendentes))) -}}
 {{- end -}}

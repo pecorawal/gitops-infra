@@ -308,7 +308,28 @@ nsgRule:
   ruleName: Allow_HTTP_HTTPS_Ingress
   priority: 1000
   schedule: "*/10 * * * *"          # reavalia a cada 10 min
-  timeoutSeconds: 1800
+
+  # Espera pelo IP do LB. MENOR que o intervalo do schedule, senao uma execucao
+  # ainda estaria rodando quando a proxima dispara.
+  waitSeconds: 180
+  timeoutSeconds: 600               # corte duro do Job; > waitSeconds
+
+  # ---- Associacao do NSG a subnet dos WORKERS ----
+  # Obrigatorio: cluster IPI privado nasce SEM NSG na subnet, e sem a
+  # associacao a inbound rule nao surte efeito -- o trafego externo nao chega
+  # aos workers e as aplicacoes do ingress publico nao respondem.
+  # Vazio = reaproveita o que provision.azure ja declara:
+  #   name          -> rrtdocw1.azu1-10.219.23.0_24
+  #   vnet          -> vnet-des-rt
+  #   resourceGroup -> rg-des-rt
+  subnet:
+    associate: true
+    name: ""
+    vnet: ""
+    resourceGroup: ""
+    # Se a subnet ja tiver OUTRO NSG, o script apenas avisa e para. Trocar
+    # substituiria todas as regras que valem para a subnet inteira.
+    force: false
 
   image: mcr.microsoft.com/azure-cli
   imageTag: latest
