@@ -135,20 +135,22 @@ Exemplo: um terceiro IngressController, para parceiros.
 
 `charts/ingress-controllers/templates/30-ingresscontroller-partner.yaml`:
 
-Os manifestos deste chart são **autocontidos de propósito**: não há helper
-compartilhado, cada IngressController está inteiro num arquivo só. Para o
-terceiro, copie `20-ingresscontroller-public.yaml` e troque as duas primeiras
-linhas:
+Os manifestos deste chart são **autocontidos de propósito**: sem helper
+compartilhado e sem variável intermediária. Cada IngressController está inteiro
+num arquivo, e todo campo aponta direto para o caminho no values — o que você lê
+no template é exatamente o que sai no objeto.
 
-```yaml
-{{- if and .Values.ingress.enabled .Values.ingress.partner.enabled }}
-{{- $ic := .Values.ingress.partner }}
-# ... o resto do arquivo não muda: tudo já vem de $ic
+Para o terceiro, copie `20-ingresscontroller-public.yaml` e troque
+`.Values.ingress.public` por `.Values.ingress.partner` no arquivo todo:
+
+```bash
+sed 's/\.Values\.ingress\.public/.Values.ingress.partner/g' \
+  charts/ingress-controllers/templates/20-ingresscontroller-public.yaml \
+  > charts/ingress-controllers/templates/30-ingresscontroller-partner.yaml
 ```
 
-Todo o corpo do manifesto lê `$ic`, então basta declarar o bloco
-`ingress.partner` no values, no mesmo formato de `private`/`public`, e ajustar
-os comentários do cabeçalho.
+Depois declare o bloco `ingress.partner` no values, no mesmo formato de
+`private`/`public`, e ajuste os comentários do cabeçalho.
 
 **Não esqueça:** ao criar um valor novo para a label, adicione-o a
 `ingress.default.reservedValues`, senão o IngressController `default` continuará

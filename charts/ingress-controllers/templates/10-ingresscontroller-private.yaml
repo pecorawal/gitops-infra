@@ -1,29 +1,28 @@
 {{- if and .Values.ingress.enabled .Values.ingress.private.enabled }}
-{{- $ic := .Values.ingress.private }}
 # ---------------------------------------------------------------------------
 #  IngressController PRIVADO -- Load Balancer INTERNO da Azure
 # ---------------------------------------------------------------------------
-#  Publica *.{{ $ic.domain }} na Azure Private DNS Zone (via ExternalDNS,
-#  wave 40). So e alcancavel de dentro da VNet.
+#  Publica *.{{ .Values.ingress.private.domain }} na Azure Private DNS Zone
+#  (via ExternalDNS, wave 40). So e alcancavel de dentro da VNet.
 #
 #  Admite apenas Routes com a label
-#      {{ $ic.routeSelector.key }}={{ $ic.routeSelector.value }}
+#      {{ .Values.ingress.private.routeSelector.key }}={{ .Values.ingress.private.routeSelector.value }}
 # ---------------------------------------------------------------------------
 apiVersion: operator.openshift.io/v1
 kind: IngressController
 metadata:
-  name: {{ $ic.name }}
+  name: {{ .Values.ingress.private.name }}
   namespace: openshift-ingress-operator
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 spec:
-  domain: {{ $ic.domain | quote }}
-  replicas: {{ $ic.replicas }}
+  domain: {{ .Values.ingress.private.domain | quote }}
+  replicas: {{ .Values.ingress.private.replicas }}
   endpointPublishingStrategy:
     type: LoadBalancerService
     loadBalancer:
       # Internal = Azure Internal Load Balancer (so acessivel pela VNet).
-      scope: {{ $ic.scope }}
+      scope: {{ .Values.ingress.private.scope }}
       # Unmanaged e obrigatorio: se o ingress-operator gerenciar o DNS, ele
       # briga com o ExternalDNS pelos mesmos registros na zona da Azure.
       dnsManagementPolicy: Unmanaged
@@ -31,21 +30,21 @@ spec:
   # Somente Routes que carreguem esta label entram neste IngressController.
   routeSelector:
     matchLabels:
-      {{ $ic.routeSelector.key }}: {{ $ic.routeSelector.value | quote }}
-  {{- with $ic.namespaceSelector }}
+      {{ .Values.ingress.private.routeSelector.key }}: {{ .Values.ingress.private.routeSelector.value | quote }}
+  {{- with .Values.ingress.private.namespaceSelector }}
   namespaceSelector:
     matchLabels:
       {{- toYaml . | nindent 6 }}
   {{- end }}
-  {{- if $ic.certificate.enabled }}
+  {{- if .Values.ingress.private.certificate.enabled }}
   # Secret gerado pelo cert-manager no namespace openshift-ingress (wave 20).
   defaultCertificate:
-    name: {{ $ic.certificate.secretName }}
+    name: {{ .Values.ingress.private.certificate.secretName }}
   {{- end }}
   routeAdmission:
     namespaceOwnership: InterNamespaceAllowed
     wildcardPolicy: WildcardsDisallowed
-  {{- with $ic.nodePlacement }}
+  {{- with .Values.ingress.private.nodePlacement }}
   nodePlacement:
     nodeSelector:
       matchLabels:
