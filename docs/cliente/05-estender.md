@@ -135,15 +135,20 @@ Exemplo: um terceiro IngressController, para parceiros.
 
 `charts/ingress-controllers/templates/30-ingresscontroller-partner.yaml`:
 
+Os manifestos deste chart são **autocontidos de propósito**: não há helper
+compartilhado, cada IngressController está inteiro num arquivo só. Para o
+terceiro, copie `20-ingresscontroller-public.yaml` e troque as duas primeiras
+linhas:
+
 ```yaml
 {{- if and .Values.ingress.enabled .Values.ingress.partner.enabled }}
-{{ include "ingress-controllers.controller" (dict "ic" .Values.ingress.partner "wave" "0") }}
-{{- end }}
+{{- $ic := .Values.ingress.partner }}
+# ... o resto do arquivo não muda: tudo já vem de $ic
 ```
 
-O helper `ingress-controllers.controller` já cobre scope, routeSelector,
-`defaultCertificate` e `dnsManagementPolicy` — basta declarar o bloco
-`ingress.partner` no values, no mesmo formato de `private`/`public`.
+Todo o corpo do manifesto lê `$ic`, então basta declarar o bloco
+`ingress.partner` no values, no mesmo formato de `private`/`public`, e ajustar
+os comentários do cabeçalho.
 
 **Não esqueça:** ao criar um valor novo para a label, adicione-o a
 `ingress.default.reservedValues`, senão o IngressController `default` continuará
