@@ -230,7 +230,9 @@ Duas instâncias, uma por IngressController:
 source:
   type: OpenShiftRoute
   openshiftRouteOptions:
-    routerName: private        # só olha as Routes admitidas por este router
+    # <nome>-<cluster>: só olha as Routes admitidas por este router.
+    # O chart monta esse sufixo sozinho, a partir de clusterName.
+    routerName: private-<cluster>
 ```
 
 O que separa a zona privada da pública **não** é o provider (é `Azure` nos dois
@@ -299,7 +301,7 @@ spec:
 
 A partir daí, sem mais nenhuma ação:
 
-1. o IngressController `private` admite a rota (label bate com o `routeSelector`);
+1. o IngressController `private-<cluster>` admite a rota (label bate com o `routeSelector`);
 2. o ExternalDNS cria `checkout.pri.cgibs.gov.br` na Azure Private DNS Zone
    apontando para o LB interno;
 3. o wildcard `*.pri.cgibs.gov.br` já serve o TLS.
