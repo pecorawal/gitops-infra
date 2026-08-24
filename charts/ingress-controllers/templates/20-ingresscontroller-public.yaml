@@ -1,29 +1,28 @@
 {{- if and .Values.ingress.enabled .Values.ingress.public.enabled }}
-{{- $ic := .Values.ingress.public }}
 # ---------------------------------------------------------------------------
 #  IngressController PUBLICO -- Load Balancer PUBLICO da Azure
 # ---------------------------------------------------------------------------
-#  Publica *.{{ $ic.domain }} na Azure DNS Zone PUBLICA (via ExternalDNS,
-#  wave 40). Fica exposto na internet.
+#  Publica *.{{ .Values.ingress.public.domain }} na Azure DNS Zone PUBLICA
+#  (via ExternalDNS, wave 40). Fica exposto na internet.
 #
 #  Admite apenas Routes com a label
-#      {{ $ic.routeSelector.key }}={{ $ic.routeSelector.value }}
+#      {{ .Values.ingress.public.routeSelector.key }}={{ .Values.ingress.public.routeSelector.value }}
 # ---------------------------------------------------------------------------
 apiVersion: operator.openshift.io/v1
 kind: IngressController
 metadata:
-  name: {{ $ic.name }}
+  name: {{ .Values.ingress.public.name }}
   namespace: openshift-ingress-operator
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 spec:
-  domain: {{ $ic.domain | quote }}
-  replicas: {{ $ic.replicas }}
+  domain: {{ .Values.ingress.public.domain | quote }}
+  replicas: {{ .Values.ingress.public.replicas }}
   endpointPublishingStrategy:
     type: LoadBalancerService
     loadBalancer:
       # External = Azure Public Load Balancer (exposto na internet).
-      scope: {{ $ic.scope }}
+      scope: {{ .Values.ingress.public.scope }}
       # Unmanaged e obrigatorio: se o ingress-operator gerenciar o DNS, ele
       # briga com o ExternalDNS pelos mesmos registros na zona da Azure.
       dnsManagementPolicy: Unmanaged
@@ -31,21 +30,21 @@ spec:
   # Somente Routes que carreguem esta label entram neste IngressController.
   routeSelector:
     matchLabels:
-      {{ $ic.routeSelector.key }}: {{ $ic.routeSelector.value | quote }}
-  {{- with $ic.namespaceSelector }}
+      {{ .Values.ingress.public.routeSelector.key }}: {{ .Values.ingress.public.routeSelector.value | quote }}
+  {{- with .Values.ingress.public.namespaceSelector }}
   namespaceSelector:
     matchLabels:
       {{- toYaml . | nindent 6 }}
   {{- end }}
-  {{- if $ic.certificate.enabled }}
+  {{- if .Values.ingress.public.certificate.enabled }}
   # Secret gerado pelo cert-manager no namespace openshift-ingress (wave 20).
   defaultCertificate:
-    name: {{ $ic.certificate.secretName }}
+    name: {{ .Values.ingress.public.certificate.secretName }}
   {{- end }}
   routeAdmission:
     namespaceOwnership: InterNamespaceAllowed
     wildcardPolicy: WildcardsDisallowed
-  {{- with $ic.nodePlacement }}
+  {{- with .Values.ingress.public.nodePlacement }}
   nodePlacement:
     nodeSelector:
       matchLabels:
