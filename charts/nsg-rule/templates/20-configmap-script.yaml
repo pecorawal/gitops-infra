@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: nsg-rule-script
+  name: nsg-rule-script-{{ .Values.clusterName }}
   namespace: {{ .Values.nsgRule.namespace }}
 data:
   nsg-rule.sh: |
