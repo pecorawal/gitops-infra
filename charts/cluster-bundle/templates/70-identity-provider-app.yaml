@@ -1,0 +1,21 @@
+{{- if .Values.identityProvider.enabled }}
+# WAVE 70 -- SPOKE. Identity providers do OAuth do cluster (Entra ID/OpenID).
+# Fica por ultimo de proposito: e a camada que mexe no login. Se algo estiver
+# errado aqui, tudo o mais ja subiu e o kubeadmin continua valendo para entrar
+# e corrigir.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: idp-{{ .Values.clusterName }}
+  namespace: {{ .Values.global.argoNamespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "70"
+spec:
+  project: {{ .Values.global.project }}
+  source:
+    {{- include "bundle.source" (dict "root" . "chart" "identity-provider") | nindent 4 }}
+  destination:
+    name: {{ .Values.clusterName }}
+    namespace: openshift-config
+  {{- include "bundle.syncPolicy" . | nindent 2 }}
+{{- end }}

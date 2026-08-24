@@ -28,8 +28,12 @@ d=yaml.safe_load(open('$VALUES'))
 for k in '$1'.split('.'):
     if isinstance(d, dict) and k in d:
         d=d[k]
+    elif isinstance(d, list) and k.isdigit() and int(k) < len(d):
+        d=d[int(k)]
     else:
         print('$2'); sys.exit(0)
+if d is None:
+    print('$2'); sys.exit(0)
 print(d)
 "; }
 
@@ -90,6 +94,27 @@ else
   echo "SKIP nsgRule.enabled=false (sem secret azure-spn)"
 fi
 
+# --- 4. identity provider: client secret do registro no Entra ID -------------
+#   Secret referenciado por openID.clientSecret.name, sempre no namespace
+#   openshift-config (exigencia do authentication-operator). A chave TEM que
+#   se chamar clientSecret.
+IDP_ENABLED=$(get2 identityProvider.enabled false)
+if [[ "$IDP_ENABLED" == "True" ]]; then
+  IDP_SECRET=$(get2 identityProvider.providers.0.openID.clientSecret.name openid-client-secret)
+  echo
+  echo "Identity provider: Secret $IDP_SECRET em openshift-config"
+  echo "(este e o client secret do REGISTRO DE APLICACAO no Entra ID --"
+  echo " nao e o mesmo Service Principal usado acima para DNS/NSG)"
+  read -rsp "Client secret do registro no Entra ID: " IDP_CLIENT_SECRET; echo
+  oc create secret generic "$IDP_SECRET" -n openshift-config \
+    --from-literal=clientSecret="$IDP_CLIENT_SECRET" \
+    --dry-run=client -o yaml | oc apply -f -
+  unset IDP_CLIENT_SECRET
+  echo "OK  secret/$IDP_SECRET -n openshift-config"
+else
+  echo "SKIP identityProvider.enabled=false (sem secret de client OIDC)"
+fi
+
 unset CLIENT_SECRET
 echo
-echo "Pronto. Agora vire operators/certManager/ingress/externalDNS/nsgRule para enabled: true em $VALUES e commite."
+echo "Pronto. Agora vire operators/certManager/ingress/externalDNS/nsgRule/identityProvider para enabled: true em $VALUES e commite."
