@@ -341,6 +341,14 @@ ingress:
     # label "ingress-type" seja DIFERENTE de public e private (ou que não
     # tenham a label -- é assim que o seletor NotIn do Kubernetes funciona).
     isolateByLabel: true
+
+    # Escopo do Load Balancer do router DEFAULT (console, OAuth, plataforma).
+    # CLUSTER PRIVADO = Internal. NUNCA External aqui: o LB do default seria
+    # recriado como público, com IP novo, e o acesso interno à console cairia.
+    # Confira o valor atual ANTES de sincronizar:
+    #   oc get ingresscontroller default -n openshift-ingress-operator \
+    #     -o jsonpath='{.spec.endpointPublishingStrategy.loadBalancer.scope}{"\n"}'
+    scope: Internal
     labelKey: ingress-type
     reservedValues:
       - public
