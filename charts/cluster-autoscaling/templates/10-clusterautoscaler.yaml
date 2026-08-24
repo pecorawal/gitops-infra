@@ -1,4 +1,22 @@
 {{- if .Values.autoscaling.enabled }}
+{{- /*
+  GUARDA -- machineSets vazio nao escala nada.
+  O ClusterAutoscaler "default" apenas LIGA o autoscaler no cluster; quem
+  decide escalar e o MachineAutoscaler, um por MachineSet. Com a lista vazia,
+  o chart criava so o CR global e nada acontecia: nenhum erro, nenhum evento,
+  nenhum no a mais. E o modo de falha mais confuso possivel.
+*/ -}}
+{{- if not .Values.autoscaling.machineSets }}
+  {{- fail "\n\nautoscaling.enabled=true mas autoscaling.machineSets esta vazio.\nO ClusterAutoscaler sozinho nao escala nada -- quem escala e o\nMachineAutoscaler, um por MachineSet.\n\nDescubra os nomes reais NO CLUSTER (eles so existem depois do provisionamento):\n  oc get machineset -n openshift-machine-api\n\nE preencha:\n  autoscaling:\n    machineSets:\n      - name: <cluster>-worker-<zona>\n        minReplicas: 2\n        maxReplicas: 6\n" }}
+{{- end }}
+{{- range .Values.autoscaling.machineSets }}
+  {{- if or (not .name) (contains "<PREENCHER>" .name) }}
+    {{- fail (printf "\n\nautoscaling.machineSets tem entrada com name=%q.\nO name TEM que ser o nome exato do MachineSet:\n  oc get machineset -n openshift-machine-api\n" (.name | toString)) }}
+  {{- end }}
+  {{- if gt (int .minReplicas) (int .maxReplicas) }}
+    {{- fail (printf "\n\nmachineSet %q: minReplicas (%d) maior que maxReplicas (%d).\n" .name (int .minReplicas) (int .maxReplicas)) }}
+  {{- end }}
+{{- end }}
 # ClusterAutoscaler GLOBAL. O OpenShift aceita apenas o CR de nome "default" --
 # ele liga o autoscaler para o cluster inteiro (scale-down, limites gerais).
 # O escalonamento em si e feito pelos MachineAutoscaler (20-*), um por MachineSet.
