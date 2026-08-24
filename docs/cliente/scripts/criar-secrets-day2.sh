@@ -80,18 +80,22 @@ done
 #   O CronJob de nsg-rule usa este Secret para autenticar na Azure e
 #   criar/atualizar a inbound rule (80/443 do Internet) apontando para o IP
 #   publico do Load Balancer do IngressController.
+#   O SPN aqui e o MESMO usado para DNS. Ele precisa, alem dos papeis de DNS,
+#   de "Network Contributor" no resource group do NSG -- senao o az falha com
+#   AuthorizationFailed ja na primeira execucao do CronJob.
 NSG_ENABLED=$(get2 nsgRule.enabled false)
 if [[ "$NSG_ENABLED" == "True" ]]; then
   NSG_NS=$(get2 nsgRule.namespace nsg-rule)
+  NSG_SECRET=$(get2 nsgRule.secretName azure-spn)
   oc create namespace "$NSG_NS" --dry-run=client -o yaml | oc apply -f -
-  oc create secret generic azure-spn -n "$NSG_NS" \
+  oc create secret generic "$NSG_SECRET" -n "$NSG_NS" \
     --from-literal=clientId="$CLIENT_ID" \
     --from-literal=clientSecret="$CLIENT_SECRET" \
     --from-literal=tenantId="$TENANT" \
     --dry-run=client -o yaml | oc apply -f -
-  echo "OK  secret/azure-spn -n $NSG_NS (nsg-rule)"
+  echo "OK  secret/$NSG_SECRET -n $NSG_NS (nsg-rule)"
 else
-  echo "SKIP nsgRule.enabled=false (sem secret azure-spn)"
+  echo "SKIP nsgRule.enabled=false (sem secret do nsg-rule)"
 fi
 
 # --- 4. identity provider: client secret do registro no Entra ID -------------

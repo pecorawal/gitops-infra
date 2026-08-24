@@ -383,3 +383,74 @@ que usam `CreateNamespace=true`.
 
 ➡️ [4. Troubleshooting](04-troubleshooting.md)
 ➡️ [5. Estender: novos operadores, manifestos e camadas](05-estender.md)
+
+## 3.7 Regra do NSG para o ingress público (opcional)
+
+O `nsg-rule` mantém uma inbound rule do Network Security Group (TCP 80/443
+vindo da `Internet`) apontando para o **IP público do LB do IngressController
+público**. Um CronJob lê o Service, compara e faz upsert na Azure — só escreve
+quando o IP muda. Existe porque o IP do LB pode mudar (recriação do Service,
+troca de escopo) e a regra ficaria apontando para o endereço antigo.
+
+### Passo 1 — papel na Azure
+
+O Service Principal é o **mesmo** já usado para DNS (`externalDNS.azure.aadClientId`).
+Além dos papéis de DNS, ele precisa de **`Network Contributor`** no resource
+group do NSG. Sem isso o CronJob falha com `AuthorizationFailed` na primeira
+execução.
+
+### Passo 2 — preencher o values e ligar
+
+```yaml
+nsgRule:
+  enabled: true
+  serviceName: router-public        # SEM o clusterName -- o chart põe o sufixo
+  nsgName: "<nome-do-nsg>"
+  nsgResourceGroup: "<rg-do-nsg>"
+  subscriptionId: "<subscription>"
+```
+
+`serviceName` é validado contra `ingress.public.name`/`ingress.private.name`:
+um nome que não corresponda a nenhum IngressController **falha o render**, em
+vez de deixar o Job esperando 25 minutos pelo IP de um Service inexistente.
+
+### Passo 3 — criar o Secret no spoke
+
+O `criar-secrets-day2.sh` só cria este Secret quando encontra
+`nsgRule.enabled: true` no arquivo. Então ligue o `enabled` **antes** de rodar
+o script, e commite **depois**:
+
+```bash
+oc login <api-do-spoke>
+./docs/cliente/scripts/criar-secrets-day2.sh clusters/<cluster>/values.yaml
+```
+
+Ele pede o client secret do SPN uma vez e o reaproveita para cert-manager,
+ExternalDNS e nsg-rule. A saída confirma:
+
+```
+OK  secret/azure-spn -n nsg-rule (nsg-rule)
+```
+
+O nome vem de `nsgRule.secretName` e o namespace de `nsgRule.namespace`.
+
+> Ordem importa: se você commitar antes de criar o Secret, o CronJob nasce e
+> falha (`CreateContainerConfigError`) até o Secret aparecer. Não é destrutivo,
+> mas polui o histórico de Jobs.
+
+### Passo 4 — commitar e acompanhar
+
+```bash
+oc get cronjob -n nsg-rule
+oc get jobs -n nsg-rule
+oc logs -n nsg-rule job/<nome-do-job>
+```
+
+O log diz o que fez: `regra ... ja aponta para <ip> - nada a fazer` ou
+`Criando/atualizando regra ... -> <ip>`. Para forçar uma execução sem esperar
+o `schedule`:
+
+```bash
+oc create job -n nsg-rule --from=cronjob/nsg-rule-<cluster> nsg-rule-manual
+```
+

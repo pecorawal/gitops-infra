@@ -279,8 +279,43 @@ externalDNS:
 # =============================================================================
 #  6. NSG RULE -- desligado
 # =============================================================================
+#  Sincroniza uma inbound rule do NSG (TCP 80/443 vindo da Internet) com o IP
+#  publico do LB do IngressController publico. Um CronJob le o Service e faz
+#  upsert da regra na Azure; e idempotente, so escreve quando o IP muda.
+#
+#  ANTES DE LIGAR:
+#   1. o Service Principal (o MESMO do DNS, aadClientId acima) precisa de
+#      "Network Contributor" no resource group do NSG
+#   2. criar o Secret no spoke -- com nsgRule.enabled ja true NESTE arquivo:
+#        oc login <api-do-spoke>
+#        ./docs/cliente/scripts/criar-secrets-day2.sh clusters/kildes9002/values.yaml
+#      (o script pula esta etapa se enabled estiver false)
+#   3. so entao commitar
 nsgRule:
-  enabled: false
+  enabled: false                    # <-- vire para true so depois de preencher
+
+  # Service do IngressController cujo IP publico vai para a regra do NSG.
+  # SEM o clusterName: o template acrescenta o sufixo sozinho.
+  #   aqui         : router-public
+  #   Service real : router-public-kildes9002
+  serviceName: router-public
+  serviceNamespace: openshift-ingress
+
+  # NSG alvo na Azure.
+  nsgName: "<PREENCHER>"            # az network nsg list -g rg-des-rt -o table
+  nsgResourceGroup: "rg-des-rt"     # RG onde vive o NSG
+  subscriptionId: "6f0d13fd-719c-47ac-9ed8-026069789d3c"
+  ruleName: Allow_HTTP_HTTPS_Ingress
+  priority: 1000
+  schedule: "*/10 * * * *"          # reavalia a cada 10 min
+  timeoutSeconds: 1800
+
+  image: mcr.microsoft.com/azure-cli
+  imageTag: latest
+
+  # Secret com clientId/clientSecret/tenantId do SPN, criado pelo script.
+  secretName: azure-spn
+  namespace: nsg-rule
 
 # =============================================================================
 #  7. AUTOSCALING -- desligado (exige os nomes reais dos MachineSets)
