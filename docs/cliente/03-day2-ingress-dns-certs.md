@@ -494,6 +494,30 @@ consulta a **API do Kubernetes via curl** e imprime o motivo:
 > `mcr.microsoft.com/azure-cli`. O erro era engolido por `2>/dev/null || true` e
 > o laço girava até o timeout dizendo "Aguardando IP", mesmo com o IP publicado.
 
+### Se o `az` falhar com `Permission denied: '/.azure'`
+
+```
+PermissionError: [Errno 13] Permission denied: '/.azure'
+```
+
+O `az` grava configuração e cache de token no `HOME`. No OpenShift o pod roda
+com **UID arbitrário** e `HOME=/`, que não é gravável — o CLI morre antes de
+executar qualquer comando. O CronJob resolve isso com um `emptyDir` e duas
+variáveis:
+
+```yaml
+env:
+  - name: HOME
+    value: /tmp/az
+  - name: AZURE_CONFIG_DIR
+    value: /tmp/az/.azure
+volumeMounts:
+  - name: az-home
+    mountPath: /tmp/az
+```
+
+Nada precisa sobreviver ao Job: o login é refeito a cada execução.
+
 ### Passo 4 — commitar e acompanhar
 
 ```bash
