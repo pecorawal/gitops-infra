@@ -1,0 +1,296 @@
+# =============================================================================
+#  kildes9002 -- valores do cluster
+# =============================================================================
+#  COMO USAR
+#    Este arquivo substitui clusters/kildes9002/values.yaml:
+#
+#      cp clusters/kildes9002/values-cliente.yaml clusters/kildes9002/values.yaml
+#      ./docs/cliente/scripts/verificar-values.sh kildes9002
+#      git add clusters/kildes9002/values.yaml && git commit && git push
+#
+#  REGRA QUE CAUSOU O INCIDENTE -- leia antes de editar
+#    NUNCA use uma linha "---" neste arquivo. Ela inicia um SEGUNDO documento
+#    YAML e o Helm carrega apenas o PRIMEIRO: tudo abaixo e ignorado em
+#    silencio, sem erro. Foi o que apagou o bloco ingress inteiro e, por
+#    consequencia, o IngressController default do cluster.
+#    Para separar secoes, use SOMENTE comentarios (#).
+# =============================================================================
+
+clusterName: "kildes9002"
+environment: des
+baseDomain: "pri.rt.cgibs.gov.br"
+
+# Escape hatch: preenchido, ignora o mapeamento por labels.env.
+clusterSet: "non-pro"
+clusterSets:
+  default: ""
+  byEnv: {}
+
+cloudProvider: Azure
+
+labels:
+  env: "des"
+  region: "brazilsouth"
+  vendor: "OpenShift"
+  cloud: "Azure"
+  criticality: "high"
+  compliance: "pci-dss"
+  # NAO REMOVA: e ela que faz o ACM registrar este cluster como destino de
+  # deploy no ArgoCD (via GitOpsCluster + Placement).
+  apps.open-cluster-management.io/replicate-to-argocd: "true"
+
+addons:
+  policyController: true
+  searchCollector: true
+  applicationManager: true
+  certPolicyController: true
+
+# =============================================================================
+#  1. PROVISIONAMENTO (Hive / openshift-install)
+# =============================================================================
+provision:
+  enabled: true
+  imageSetRef: "img4.22.9-multi-appsub"
+
+  credentials:
+    mode: existing                # existing | externalSecret (este exige o ESO)
+    sourceNamespace: procergs-azure-rtc
+    sourceSecret: "azure-rtc"
+    refreshInterval: "1h"
+    # SO vale no modo externalSecret; ignorado com mode: existing.
+    copySshKey: false
+    # Vale nos DOIS modos: false remove o bloco sshPrivateKeySecretRef inteiro
+    # do ClusterDeployment (cluster sem acesso SSH aos nos).
+    sshPrivateKey: true
+    existingCredentialsSecret: "azure-rtc"
+    existingPullSecret: "azure-rtc"
+    existingSshPrivateKeySecret: "azure-rtc"
+
+  publish: Internal
+  fips: false
+  preserveOnDelete: false
+  acmImport:
+    enabled: true
+
+  azure:
+    region: "brazilsouth"
+    cloudName: AzurePublicCloud
+    baseDomainResourceGroupName: "rg-compartilhado-rt"
+    networkResourceGroupName: "rg-des-rt"
+    virtualNetwork: "vnet-des-rt"
+    controlPlaneSubnet: "rrtdocm1.azu1-10.219.22.0_24"
+    computeSubnet: "rrtdocw1.azu1-10.219.23.0_24"
+    outboundType: Loadbalancer
+
+  networking:
+    networkType: OVNKubernetes
+    clusterNetwork: "172.22.0.0/16"
+    hostPrefix: 23
+    serviceNetwork: "172.23.0.0/16"
+    machineNetwork: "10.219.16.0/21"   # address space da VNet
+
+  controlPlane:
+    replicas: 3
+    type: Standard_D4s_v3
+    osDisk:
+      diskSizeGB: 1024
+      diskType: Premium_LRS
+    zones: ["1", "2", "3"]
+
+  compute:
+    replicas: 3
+    type: Standard_E8s_v3
+    osDisk:
+      diskSizeGB: 128
+      diskType: Premium_LRS
+    zones: ["1", "2", "3"]
+
+# =============================================================================
+#  2. OPERATORS -- instalados no cluster provisionado (spoke)
+# =============================================================================
+operators:
+  enabled: true
+  certManager:
+    channel: stable-v1
+    source: redhat-operators
+  externalDNS:
+    channel: stable-v1
+    source: redhat-operators
+
+# =============================================================================
+#  3. CERT-MANAGER -- ClusterIssuer e certificados
+# =============================================================================
+certManager:
+  enabled: true
+
+  # Overrides do OPERANDO (CR CertManager/cluster). Obrigatorio em cluster
+  # privado: sem os resolvers publicos, a auto-checagem do desafio DNS01 cai no
+  # DNS da VNet, nao acha o TXT na zona publica e o Certificate trava em
+  # "Waiting for DNS-01 challenge propagation".
+  operatorConfig:
+    enabled: true
+    managementState: Managed
+    logLevel: Normal
+    operatorLogLevel: Normal
+    controller:
+      overrideArgs:
+        - "--dns01-recursive-nameservers-only"
+        - "--dns01-recursive-nameservers=1.1.1.1:53,8.8.8.8:53"
+      overrideEnv: []
+      overrideResources: {}
+    webhook:
+      overrideArgs: []
+    cainjector:
+      overrideArgs: []
+
+  acme:
+    enabled: true
+    email: "cert-manager-rtc@procergs.rs.gov.br"
+    # Producao: https://acme-v02.api.letsencrypt.org/directory
+    # Staging (nao conta na cota, cert nao confiavel) -- em uso agora:
+    server: "https://acme-staging-v02.api.letsencrypt.org/directory"
+    azureDNS:
+      subscriptionID: "6f0d13fd-719c-47ac-9ed8-026069789d3c"
+      tenantID: "15dcd909-8dc0-40e9-a1e5-cecb053cdd1a"
+      resourceGroupName: "rg-hub-rt"        # RG da Azure DNS Zone PUBLICA
+      hostedZoneName: "rt.cgibs.gov.br"     # zona publica: atende os dois wildcards
+      environment: AzurePublicCloud
+      clientID: "a423e9f7-b616-4a75-922f-fd69fea454ae"
+      # O clientSecret NUNCA vai para o Git: vem do Secret abaixo, criado no
+      # namespace cert-manager por docs/cliente/scripts/criar-secrets-day2.sh
+      clientSecretRef:
+        name: azuredns-config
+        key: client-secret
+
+  internalCA:
+    enabled: false
+    selfSigned: true
+    caSecretName: internal-ca-key-pair
+    commonName: "PROCERGS Internal CA"
+    durationHours: 87600
+
+  appCertificates: []
+
+# =============================================================================
+#  4. INGRESS CONTROLLERS -- um privado e um publico, alem do default
+# =============================================================================
+#  Separacao pela label "ingress-type" na Route:
+#    ingress-type: private  -> IC private-kildes9002 -> LB interno -> Private DNS
+#    ingress-type: public   -> IC public-kildes9002  -> LB publico -> Azure DNS
+#    outro valor / sem label -> IC default (console, oauth, plataforma)
+ingress:
+  enabled: true
+
+  default:
+    # Passa a admitir apenas Routes cuja label ingress-type seja DIFERENTE de
+    # public e private (NotIn casa tambem com Routes SEM a label, entao console
+    # e oauth continuam aqui).
+    isolateByLabel: true
+
+    # ESCOPO DO LB DO ROUTER DEFAULT. Cluster privado = Internal.
+    # NUNCA External: o LB seria recriado como publico, com IP novo, e o acesso
+    # interno a console cairia. Confira o valor atual antes de sincronizar:
+    #   oc get ingresscontroller default -n openshift-ingress-operator \
+    #     -o jsonpath='{.spec.endpointPublishingStrategy.loadBalancer.scope}{"\n"}'
+    scope: Internal
+
+    labelKey: ingress-type
+    reservedValues:
+      - public
+      - private
+
+  # ---- PRIVADO: Load Balancer interno da Azure ----
+  # Nome final do IngressController: private-kildes9002
+  private:
+    enabled: true
+    name: private
+    domain: "pri.rt.cgibs.gov.br"
+    replicas: 2
+    scope: Internal
+    routeSelector:
+      key: ingress-type
+      value: private
+    namespaceSelector: {}
+    nodePlacement: {}
+    certificate:
+      enabled: true
+      issuer: letsencrypt-prod
+      secretName: private-ingress-tls
+
+  # ---- PUBLICO: Load Balancer publico da Azure ----
+  # Nome final do IngressController: public-kildes9002
+  public:
+    enabled: true
+    name: public
+    domain: "rt.cgibs.gov.br"
+    replicas: 2
+    scope: External
+    routeSelector:
+      key: ingress-type
+      value: public
+    namespaceSelector: {}
+    nodePlacement: {}
+    certificate:
+      enabled: true
+      issuer: letsencrypt-prod
+      secretName: public-ingress-tls
+
+# =============================================================================
+#  5. EXTERNAL DNS -- uma instancia por zona / por IngressController
+# =============================================================================
+#  routerName recebe o sufixo -kildes9002 automaticamente, para casar com o
+#  nome do IngressController. Nao acrescente o sufixo aqui.
+externalDNS:
+  enabled: true
+
+  azure:
+    subscriptionId: "6f0d13fd-719c-47ac-9ed8-026069789d3c"
+    tenantId: "15dcd909-8dc0-40e9-a1e5-cecb053cdd1a"
+    aadClientId: "a423e9f7-b616-4a75-922f-fd69fea454ae"
+    # DEIXE SEMPRE VAZIO NO GIT. Os Secrets azure.json (um por zona) sao
+    # criados por docs/cliente/scripts/criar-secrets-day2.sh.
+    aadClientSecret: ""
+
+  # ---- Azure PRIVATE DNS Zone <- rotas com ingress-type=private ----
+  private:
+    enabled: true
+    name: private
+    routerName: private
+    domain: "pri.rt.cgibs.gov.br"
+    resourceGroup: "rg-compartilhado-rt"
+    zoneId: "/subscriptions/6f0d13fd-719c-47ac-9ed8-026069789d3c/resourceGroups/rg-compartilhado-rt/providers/Microsoft.Network/privateDnsZones/pri.rt.cgibs.gov.br"
+    excludeDomains: []
+    configSecretName: azure-config-file-private
+
+  # ---- Azure PUBLIC DNS Zone <- rotas com ingress-type=public ----
+  public:
+    enabled: true
+    name: public
+    routerName: public
+    domain: "rt.cgibs.gov.br"
+    resourceGroup: "rg-hub-rt"
+    zoneId: "/subscriptions/6f0d13fd-719c-47ac-9ed8-026069789d3c/resourceGroups/rg-hub-rt/providers/Microsoft.Network/dnszones/rt.cgibs.gov.br"
+    # pri.rt.cgibs.gov.br e SUBDOMINIO de rt.cgibs.gov.br: sem esta exclusao o
+    # filtro da instancia publica tambem casaria com os hosts privados.
+    excludeDomains:
+      - "pri.rt.cgibs.gov.br"
+    configSecretName: azure-config-file-public
+
+# =============================================================================
+#  6. NSG RULE -- desligado
+# =============================================================================
+nsgRule:
+  enabled: false
+
+# =============================================================================
+#  7. AUTOSCALING -- desligado (exige os nomes reais dos MachineSets)
+# =============================================================================
+autoscaling:
+  enabled: false
+
+# =============================================================================
+#  8. IDENTITY PROVIDER -- desligado
+# =============================================================================
+identityProvider:
+  enabled: false
+  providers: []
