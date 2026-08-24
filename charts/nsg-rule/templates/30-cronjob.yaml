@@ -3,7 +3,7 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: nsg-rule
+  name: nsg-rule-{{ .Values.clusterName }}
   namespace: {{ .Values.nsgRule.namespace }}
 spec:
   schedule: {{ .Values.nsgRule.schedule | quote }}
@@ -16,7 +16,7 @@ spec:
       activeDeadlineSeconds: {{ .Values.nsgRule.timeoutSeconds }}
       template:
         spec:
-          serviceAccountName: nsg-rule-sa
+          serviceAccountName: nsg-rule-sa-{{ .Values.clusterName }}
           restartPolicy: Never
           containers:
             - name: nsg-rule
@@ -61,6 +61,6 @@ spec:
           volumes:
             - name: script
               configMap:
-                name: nsg-rule-script
+                name: nsg-rule-script-{{ .Values.clusterName }}
                 defaultMode: 0555
 {{- end }}

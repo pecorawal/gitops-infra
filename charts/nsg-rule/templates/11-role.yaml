@@ -4,7 +4,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: nsg-rule-svc-reader
+  name: nsg-rule-svc-reader-{{ .Values.clusterName }}
   namespace: {{ .Values.nsgRule.serviceNamespace }}
 rules:
   - apiGroups: [""]
