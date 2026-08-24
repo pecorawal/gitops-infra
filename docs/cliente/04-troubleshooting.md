@@ -825,6 +825,38 @@ ArgoCD leu de fato:
 ./docs/cliente/scripts/verificar-values.sh <cluster>
 ```
 
+### Causa 0 — uma linha `---` no meio do `values.yaml`
+
+**A causa mais silenciosa de todas.** `---` inicia um **segundo documento YAML**,
+e o Helm carrega apenas o **primeiro**. Tudo abaixo dessa linha é ignorado — sem
+erro, sem aviso, sem log.
+
+```yaml
+certManager:
+  enabled: true
+---                    # <-- daqui para baixo o Helm NÃO enxerga nada
+ingress:
+  enabled: true        # invisível: o chart usa o default do próprio chart (false)
+```
+
+O sintoma é duplo e confunde: a Application do bloco perdido **não é criada**
+(ou, se já existia, passa a renderizar zero objetos) e o bundle continua
+`Synced/Healthy`, porque está coerente com o que conseguiu ler.
+
+> **Se a Application já existia**, o efeito é destrutivo: os objetos que ela
+> gerenciava somem do manifesto e o `prune` os **apaga do cluster**. Foi assim
+> que o `IngressController/default` de um cluster privado foi deletado — o
+> ingress-operator o recriou do zero, com Load Balancer **público** e sem
+> `routeSelector`, derrubando o acesso interno à console.
+
+Detecte com o script (passo 1) ou direto:
+
+```bash
+grep -n '^---$' clusters/<cluster>/values.yaml
+```
+
+Para separar seções visualmente, use **apenas comentários** (`#`). Nunca `---`.
+
 ### Causa 1 — o interruptor de topo continuou `false`
 
 Vários blocos têm **dois níveis** de `enabled`, e só o de topo decide se a

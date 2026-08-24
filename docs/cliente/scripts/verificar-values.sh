@@ -21,6 +21,15 @@ BLOCOS="provision operators certManager ingress externalDNS nsgRule autoscaling 
 
 echo "=== 1. ARQUIVO EM DISCO: $VALUES"
 
+# --- separador de documento: o Helm le SO o primeiro documento do arquivo ---
+if grep -qE '^---[[:space:]]*$' "$VALUES"; then
+  echo "  !! LINHA '---' ENCONTRADA (linha(s): $(grep -nE '^---[[:space:]]*$' "$VALUES" | cut -d: -f1 | tr '\n' ' '))"
+  echo "     '---' inicia um SEGUNDO documento YAML. O Helm carrega apenas o"
+  echo "     PRIMEIRO -- tudo abaixo dessa linha e ignorado em silencio, sem erro."
+  echo "     Remova a linha. Para separar secoes, use so comentarios (#)."
+  echo
+fi
+
 # --- chave duplicada: o YAML aceita, e a ULTIMA ocorrencia vence em silencio ---
 python3 - "$VALUES" <<'PY'
 import sys, yaml
@@ -39,7 +48,12 @@ def mapa(loader, node, deep=False):
     return yaml.SafeLoader.construct_mapping(loader, node, deep)
 
 Dup.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, mapa)
-d = yaml.load(open(caminho), Dup)
+# Le apenas o PRIMEIRO documento -- e exatamente o que o Helm faz.
+docs = list(yaml.load_all(open(caminho), Dup))
+if len(docs) > 1:
+    print(f"  !! o arquivo tem {len(docs)} documentos YAML; o Helm so le o 1o")
+    print(f"     blocos perdidos: {sorted(k for doc in docs[1:] if doc for k in doc)}")
+d = docs[0] or {}
 
 if achadas:
     print("  !! CHAVE DUPLICADA -- a ultima ocorrencia vence e a primeira e ignorada:")
