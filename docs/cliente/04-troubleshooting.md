@@ -1153,8 +1153,15 @@ platform:
   azure:
     networkResourceGroupName: rg-rede
     virtualNetwork: vnet-hub
-    subnet: subnet-worker
+    computeSubnet: subnet-worker   # computeSubnet, NAO subnet
+    outboundType: Loadbalancer
 ```
+
+> **O nome do campo muda conforme o objeto**: o install-config usa
+> `computeSubnet`, o `providerSpec` do MachineSet usa `subnet`, e o CRD do
+> MachinePool usa `computeSubnet`. Errar não gera erro — o Kubernetes descarta
+> em silêncio o campo que o CRD não conhece. Confirme o que a sua versão aceita:
+> `oc explain machinepool.spec.platform.azure`
 
 Confirme no hub, depois do sync:
 

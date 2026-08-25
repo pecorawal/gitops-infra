@@ -75,9 +75,23 @@ spec:
         maquina nova falha com
           ResourceNotFound: virtualNetworks/<infraID>-vnet ... not found
       */}}
+      {{- /*
+        ATENCAO AO NOME: aqui o campo e computeSubnet, NAO subnet.
+        O install-config usa computeSubnet, o providerSpec do MachineSet usa
+        subnet, e o CRD do MachinePool usa computeSubnet. Errar o nome nao da
+        erro: o Kubernetes descarta em silencio campo que o CRD nao conhece, o
+        MachinePool sai sem a rede e as maquinas novas falham com
+        ResourceNotFound. Confira o que a sua versao aceita com:
+          oc explain machinepool.spec.platform.azure
+      */}}
       networkResourceGroupName: {{ .Values.provision.azure.networkResourceGroupName }}
       virtualNetwork: {{ .Values.provision.azure.virtualNetwork }}
-      subnet: {{ .Values.provision.azure.computeSubnet }}
+      computeSubnet: {{ .Values.provision.azure.computeSubnet }}
+      {{- end }}
+      {{- with .Values.provision.azure.outboundType }}
+      # Mesmo valor do install-config: define como a maquina sai para a
+      # internet (Loadbalancer | UserDefinedRouting).
+      outboundType: {{ . }}
       {{- end }}
       {{- with .Values.provision.compute.zones }}
       zones:
