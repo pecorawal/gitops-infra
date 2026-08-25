@@ -36,10 +36,22 @@
 {{- else }}
 # Escala manual: mude provision.compute.replicas e commite.
 {{- end }}
+{{- /*
+  NOME DO POOL -- parametrizavel de proposito.
+  spec.platform do MachinePool e IMUTAVEL: corrigir a rede exige recriar o
+  objeto. Como os MachineSets herdam o nome do pool (<infraID>-<pool>-<zona>),
+  recriar com o MESMO nome colide com os MachineSets que ainda existem. A saida
+  e criar o pool com um nome novo -- "worker-v2", por exemplo -- e drenar o
+  antigo.
+
+  Este campo existe para que o chart passe a gerenciar esse pool novo, em vez
+  de recriar o antigo em paralelo (dois pools = o dobro de nos).
+*/}}
+{{- $pool := .Values.provision.machinePool.name | default "worker" }}
 apiVersion: hive.openshift.io/v1
 kind: MachinePool
 metadata:
-  name: {{ .Values.clusterName }}-worker
+  name: {{ .Values.clusterName }}-{{ $pool }}
   namespace: {{ .Values.clusterName }}
   annotations:
     argocd.argoproj.io/sync-wave: "1"
@@ -47,7 +59,7 @@ metadata:
 spec:
   clusterDeploymentRef:
     name: {{ .Values.clusterName }}
-  name: worker
+  name: {{ $pool }}
   {{- if $porPool }}
   autoscaling:
     minReplicas: {{ $as.minReplicas }}
