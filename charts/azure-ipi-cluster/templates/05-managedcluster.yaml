@@ -54,15 +54,22 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "2"
     argocd.argoproj.io/sync-options: Prune=false,Delete=false
+  {{- /*
+    As labels do values e as estruturais sao MESCLADAS antes de sair, e nao
+    concatenadas. Emitir os dois blocos em sequencia gerava chaves repetidas
+    (cloud, vendor, replicate-to-argocd aparecem nos dois) -- YAML aceita e a
+    ultima vence, mas o objeto fica ilegivel e um parser estrito recusa.
+    As estruturais sao aplicadas POR CIMA: o clusterset nao pode ser
+    sobrescrito por engano a partir de labels.
+  */}}
+  {{- $labels := dict }}
+  {{- range $k, $v := .Values.labels }}{{- $_ := set $labels $k ($v | toString) }}{{- end }}
+  {{- $_ := set $labels "cloud" (.Values.cloudProvider | default "Azure") }}
+  {{- $_ := set $labels "vendor" "OpenShift" }}
+  {{- $_ := set $labels "cluster.open-cluster-management.io/clusterset" $clusterSet }}
+  {{- $_ := set $labels "apps.open-cluster-management.io/replicate-to-argocd" "true" }}
   labels:
-    cloud: {{ .Values.cloudProvider | default "Azure" }}
-    vendor: OpenShift
-    cluster.open-cluster-management.io/clusterset: {{ $clusterSet }}
-    apps.open-cluster-management.io/replicate-to-argocd: "true"
-    {{- /* labels.env entra pelo bloco abaixo; nao repetir a chave aqui */}}
-    {{- with .Values.labels }}
-    {{- toYaml . | nindent 4 }}
-    {{- end }}
+    {{- toYaml $labels | nindent 4 }}
 spec:
   hubAcceptsClient: true
 {{- end }}
