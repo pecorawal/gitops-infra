@@ -18,6 +18,8 @@
 #  falha o render se continuarem vazios na hora do sync.
 # ---------------------------------------------------------------------------
 global:
+  # AO REPLICAR EM OUTRO CLIENTE: troque tambem em bootstrap/02-appset-cliente.yaml,
+  # que e quem realmente injeta este valor. Ver docs/cliente/07-replicar.md
   repoURL: "https://github.com/pecorawal/gitops-infra.git"
   targetRevision: cliente
   # Caminho, a partir da raiz do repo, do values.yaml do cluster.

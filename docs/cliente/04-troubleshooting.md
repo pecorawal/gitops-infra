@@ -1126,9 +1126,9 @@ oc logs -n cert-manager deploy/cert-manager -f
 ## Máquina nova falha com `ResourceNotFound: virtualNetworks/<infraID>-vnet`
 
 ```
-failed to create nic ...: subnet meu-cluster-92s7h-worker-subnet not found:
-The Resource 'Microsoft.Network/virtualNetworks/meu-cluster-92s7h-vnet'
-under resource group 'meu-cluster-92s7h-rg' was not found
+failed to create nic ...: subnet meu-cluster-a1b2c-worker-subnet not found:
+The Resource 'Microsoft.Network/virtualNetworks/meu-cluster-a1b2c-vnet'
+under resource group 'meu-cluster-a1b2c-rg' was not found
 ```
 
 Os nomes citados (`<infraID>-vnet`, `<infraID>-worker-subnet`, `<infraID>-rg`)

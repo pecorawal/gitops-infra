@@ -8,7 +8,7 @@
 -}}
 {{- $pendentes := list -}}
 {{- range $chave, $valor := $campos -}}
-  {{- if or (not $valor) (contains "<PREENCHER>" (toString $valor)) -}}
+  {{- if or (not $valor) (regexMatch "<[A-Z_]{2,}>" (toString $valor)) -}}
     {{- $pendentes = append $pendentes $chave -}}
   {{- end -}}
 {{- end -}}
