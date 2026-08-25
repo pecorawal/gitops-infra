@@ -1,7 +1,4 @@
 {{- if .Values.autoscaling.enabled }}
-{{- if ne (default "machinePool" .Values.autoscaling.mode) "spoke" }}
-  {{- fail "\n\nEste chart so vale para autoscaling.mode: spoke.\n\nEm cluster gerenciado pelo ACM (mode: machinePool, o padrao) o autoscaling\nse configura em spec.autoscaling do MachinePool do Hive, no hub -- e o proprio\nHive cria ClusterAutoscaler e MachineAutoscaler no cluster gerenciado.\nAplicar estes CRs por fora disputaria com o Hive.\n" }}
-{{- end }}
 {{- /*
   GUARDA -- machineSets vazio nao escala nada.
   O ClusterAutoscaler "default" apenas LIGA o autoscaler no cluster; quem
@@ -9,10 +6,10 @@
   o chart criava so o CR global e nada acontecia: nenhum erro, nenhum evento,
   nenhum no a mais. E o modo de falha mais confuso possivel.
 */ -}}
-{{- if not .Values.autoscaling.machineSets }}
+{{- if and (eq (default "machinePool" .Values.autoscaling.mode) "spoke") (not .Values.autoscaling.machineSets) }}
   {{- fail "\n\nautoscaling.enabled=true mas autoscaling.machineSets esta vazio.\nO ClusterAutoscaler sozinho nao escala nada -- quem escala e o\nMachineAutoscaler, um por MachineSet.\n\nDescubra os nomes reais NO CLUSTER (eles so existem depois do provisionamento):\n  oc get machineset -n openshift-machine-api\n\nE preencha:\n  autoscaling:\n    machineSets:\n      - name: <cluster>-worker-<zona>\n        minReplicas: 2\n        maxReplicas: 6\n" }}
 {{- end }}
-{{- range .Values.autoscaling.machineSets }}
+{{- range (eq (default "machinePool" .Values.autoscaling.mode) "spoke" | ternary .Values.autoscaling.machineSets list) }}
   {{- if or (not .name) (contains "<PREENCHER>" .name) }}
     {{- fail (printf "\n\nautoscaling.machineSets tem entrada com name=%q.\nO name TEM que ser o nome exato do MachineSet:\n  oc get machineset -n openshift-machine-api\n" (.name | toString)) }}
   {{- end }}
