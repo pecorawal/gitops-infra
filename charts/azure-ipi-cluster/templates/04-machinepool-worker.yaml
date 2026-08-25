@@ -61,6 +61,24 @@ spec:
       osDisk:
         diskSizeGB: {{ .Values.provision.compute.osDisk.diskSizeGB }}
         diskType: {{ .Values.provision.compute.osDisk.diskType }}
+      {{- if .Values.provision.azure.virtualNetwork }}
+      {{- /*
+        BYO VNet -- OBRIGATORIO aqui, nao basta estar no install-config.
+        O install-config so e usado na INSTALACAO. Depois, quem gera os
+        MachineSets do spoke e este MachinePool, e o Hive monta o providerSpec
+        a partir do que esta DECLARADO NELE. Sem estes tres campos ele assume
+        os nomes que o instalador criaria numa VNet propria:
+          vnet   <infraID>-vnet
+          subnet <infraID>-worker-subnet
+          rg     <infraID>-rg
+        Num cluster com VNet pre-existente esses recursos nao existem, e cada
+        maquina nova falha com
+          ResourceNotFound: virtualNetworks/<infraID>-vnet ... not found
+      */}}
+      networkResourceGroupName: {{ .Values.provision.azure.networkResourceGroupName }}
+      virtualNetwork: {{ .Values.provision.azure.virtualNetwork }}
+      subnet: {{ .Values.provision.azure.computeSubnet }}
+      {{- end }}
       {{- with .Values.provision.compute.zones }}
       zones:
         {{- toYaml . | nindent 8 }}
