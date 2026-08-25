@@ -2,6 +2,10 @@
 # Nao edite aqui -- o arquivo do cliente e clusters/<cluster>/values.yaml.
 autoscaling:
   enabled: false
+  # machinePool (padrao) -> ACM/Hive: o autoscaling vai no MachinePool, no hub,
+  #                         e este chart NAO e usado.
+  # spoke                -> cluster sem Hive: os CRs abaixo vao direto no cluster.
+  mode: machinePool
 
   # Configuracao GLOBAL do cluster-autoscaler (CR "default", unico aceito).
   clusterAutoscaler:

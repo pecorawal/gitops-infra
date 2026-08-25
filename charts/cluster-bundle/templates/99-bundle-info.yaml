@@ -36,4 +36,6 @@ data:
   enabled.externalDNS: {{ .Values.externalDNS.enabled | quote }}
   enabled.nsgRule: {{ .Values.nsgRule.enabled | quote }}
   enabled.autoscaling: {{ .Values.autoscaling.enabled | quote }}
+  # machinePool = MachinePool do Hive (hub) | spoke = CRs no cluster gerenciado
+  autoscaling.mode: {{ default "machinePool" .Values.autoscaling.mode | quote }}
   enabled.identityProvider: {{ .Values.identityProvider.enabled | quote }}

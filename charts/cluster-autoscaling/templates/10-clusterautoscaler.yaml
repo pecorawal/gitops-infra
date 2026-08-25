@@ -1,4 +1,7 @@
 {{- if .Values.autoscaling.enabled }}
+{{- if ne (default "machinePool" .Values.autoscaling.mode) "spoke" }}
+  {{- fail "\n\nEste chart so vale para autoscaling.mode: spoke.\n\nEm cluster gerenciado pelo ACM (mode: machinePool, o padrao) o autoscaling\nse configura em spec.autoscaling do MachinePool do Hive, no hub -- e o proprio\nHive cria ClusterAutoscaler e MachineAutoscaler no cluster gerenciado.\nAplicar estes CRs por fora disputaria com o Hive.\n" }}
+{{- end }}
 {{- /*
   GUARDA -- machineSets vazio nao escala nada.
   O ClusterAutoscaler "default" apenas LIGA o autoscaler no cluster; quem

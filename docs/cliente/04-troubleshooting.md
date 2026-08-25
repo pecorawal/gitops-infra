@@ -1125,10 +1125,48 @@ oc logs -n cert-manager deploy/cert-manager -f
 
 ## O autoscaling não cria nada (Application existe, cluster não escala)
 
-O `ClusterAutoscaler` de nome `default` apenas **liga** o autoscaler no cluster.
-Quem decide escalar é o `MachineAutoscaler`, **um por MachineSet**. Com
-`autoscaling.machineSets` vazio, o chart criava só o CR global — nenhum erro,
-nenhum evento, e nenhum nó a mais. Hoje o chart **falha o render** nesse caso.
+**Primeiro, confirme o modo.** Em cluster provisionado pelo ACM/Hive — o caso
+desta esteira — o autoscaling **não** se configura criando `MachineAutoscaler`
+no cluster gerenciado. Quem manda nos MachineSets do spoke é o **MachinePool do
+Hive**, no hub. Declarar `spec.autoscaling` nele faz o próprio Hive criar, no
+cluster gerenciado, o `ClusterAutoscaler` e um `MachineAutoscaler` por
+MachineSet.
+
+```yaml
+autoscaling:
+  enabled: true
+  mode: machinePool     # padrão; ACM/Hive
+  minReplicas: 3        # totais do pool; o Hive reparte entre as zonas
+  maxReplicas: 9
+```
+
+Com `mode: machinePool` a Application `autoscale-<cluster>` **não é criada** —
+não há nada a aplicar no spoke. Verifique pelo MachinePool, no hub:
+
+```bash
+# HUB
+oc get machinepool <cluster>-worker -n <cluster> \
+  -o jsonpath='{.spec.autoscaling}{"\n"}{.spec.replicas}{"\n"}'
+```
+
+E o resultado, no spoke — objetos criados **pelo Hive**:
+
+```bash
+# SPOKE
+oc get clusterautoscaler
+oc get machineautoscaler -n openshift-machine-api
+```
+
+> `spec.replicas` e `spec.autoscaling` são **mutuamente exclusivos** no Hive: o
+> webhook recusa o MachinePool com os dois. Com o autoscaling ligado,
+> `provision.compute.replicas` deixa de valer.
+
+### Modo `spoke` (cluster sem Hive)
+
+Só nesse modo o chart `cluster-autoscaling` é usado. Aí sim é preciso listar os
+MachineSets, e o `ClusterAutoscaler` de nome `default` apenas **liga** o
+autoscaler: quem escala é o `MachineAutoscaler`, um por MachineSet. Com
+`autoscaling.machineSets` vazio o chart **falha o render**.
 
 ```bash
 # no SPOKE
