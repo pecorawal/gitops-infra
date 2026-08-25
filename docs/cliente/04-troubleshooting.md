@@ -106,7 +106,7 @@ apagar o `ClusterDeployment`, esperar o deprovision, e só então recriar.
 
 ```
 admission webhook "clusterdeploymentvalidators.admission.hive.openshift.io" denied the request:
-ClusterDeployment "kildes9002" is invalid:
+ClusterDeployment "meu-cluster" is invalid:
   spec.platform.azure.credentialsSecretRef.name: Required value: must specify secrets for Azure access
   spec.provisioning.sshPrivateKeySecretRef.name: Required value: must specify a name for the ssh private key secret
 ```
@@ -1085,16 +1085,16 @@ oc logs -n cert-manager deploy/cert-manager -f
 
 - **Challenge parado em `pending`** — o Service Principal não tem
   `DNS Zone Contributor` na zona pública, ou `azuredns-config` está errado.
-- **Wildcard privado (`*.pri.cgibs.gov.br`) falhando** — confirme que o
+- **Wildcard privado (`*.pri.example.com`) falhando** — confirme que o
   subdomínio não está delegado publicamente:
 
   ```bash
-  dig +short NS pri.cgibs.gov.br     # não deve retornar nada
-  dig +short TXT _acme-challenge.pri.cgibs.gov.br
+  dig +short NS pri.example.com     # não deve retornar nada
+  dig +short TXT _acme-challenge.pri.example.com
   ```
 
-  O TXT precisa ser gravado na zona **pública** `cgibs.gov.br`. Se
-  `pri.cgibs.gov.br` estiver delegado a outro servidor, o Let's Encrypt procura o
+  O TXT precisa ser gravado na zona **pública** `example.com`. Se
+  `pri.example.com` estiver delegado a outro servidor, o Let's Encrypt procura o
   TXT lá e não encontra.
 - **`propagation check failed`** / **`Waiting for DNS-01 challenge propagation`**
   — em cluster privado o resolver do pod é o DNS interno do OpenShift, que
@@ -1126,9 +1126,9 @@ oc logs -n cert-manager deploy/cert-manager -f
 ## Máquina nova falha com `ResourceNotFound: virtualNetworks/<infraID>-vnet`
 
 ```
-failed to create nic ...: subnet kildes9002-92s7h-worker-subnet not found:
-The Resource 'Microsoft.Network/virtualNetworks/kildes9002-92s7h-vnet'
-under resource group 'kildes9002-92s7h-rg' was not found
+failed to create nic ...: subnet meu-cluster-a1b2c-worker-subnet not found:
+The Resource 'Microsoft.Network/virtualNetworks/meu-cluster-a1b2c-vnet'
+under resource group 'meu-cluster-a1b2c-rg' was not found
 ```
 
 Os nomes citados (`<infraID>-vnet`, `<infraID>-worker-subnet`, `<infraID>-rg`)
@@ -1151,9 +1151,9 @@ está preenchido:
 ```yaml
 platform:
   azure:
-    networkResourceGroupName: rg-des-rt
-    virtualNetwork: vnet-des-rt
-    computeSubnet: rrtdocw1.azu1-10.219.23.0_24   # computeSubnet, NAO subnet
+    networkResourceGroupName: rg-rede
+    virtualNetwork: vnet-hub
+    computeSubnet: subnet-worker   # computeSubnet, NAO subnet
     outboundType: Loadbalancer
 ```
 
@@ -1251,16 +1251,16 @@ hash gerado na instalação:
 
 ```bash
 oc get machineset -n openshift-machine-api
-# kildes9002-ab12c-worker-brazilsouth1
-# kildes9002-ab12c-worker-brazilsouth2
-# kildes9002-ab12c-worker-brazilsouth3
+# meu-cluster-ab12c-worker-brazilsouth1
+# meu-cluster-ab12c-worker-brazilsouth2
+# meu-cluster-ab12c-worker-brazilsouth3
 ```
 
 ```yaml
 autoscaling:
   enabled: true
   machineSets:
-    - name: kildes9002-ab12c-worker-brazilsouth1
+    - name: meu-cluster-ab12c-worker-brazilsouth1
       minReplicas: 2
       maxReplicas: 6
 ```

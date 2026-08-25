@@ -7,9 +7,9 @@ Neste repositório está a definição de um OpenShift GitOps para importação 
 Esta branch entrega o fluxo completo, dirigido por **um único `values.yaml` por cluster**:
 
 1. **Provisionamento** — cluster OpenShift IPI na Azure (BYO VNet, privado) via Hive/ACM, a partir de uma **única Credential do ACM** compartilhada por todos os clusters
-2. **IngressControllers** — privado (LB interno, `pri.cgibs.gov.br`) e público (LB externo, `cgibs.gov.br`), separados pela label `ingress-type`; o `default` fica reservado às aplicações internas do OpenShift
+2. **IngressControllers** — privado (LB interno, `pri.example.com`) e público (LB externo, `example.com`), separados pela label `ingress-type`; o `default` fica reservado às aplicações internas do OpenShift
 3. **ExternalDNS** — uma instância para a Azure Private DNS Zone e outra para a Azure DNS Zone pública
-4. **cert-manager** — `ClusterIssuer` ACME/DNS01 emitindo os wildcards `*.cgibs.gov.br` e `*.pri.cgibs.gov.br`
+4. **cert-manager** — `ClusterIssuer` ACME/DNS01 emitindo os wildcards `*.example.com` e `*.pri.example.com`
 5. **NSG rule** — CronJob idempotente que sincroniza a inbound rule do NSG da Azure com o IP público do Load Balancer do IngressController (TCP 80/443 do Internet)
 
 ```bash

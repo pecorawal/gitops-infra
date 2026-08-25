@@ -9,7 +9,7 @@ nsgRule:
   #
   # NAO inclua o clusterName aqui: o template acrescenta o sufixo sozinho.
   #   values     : router-public
-  #   Service real: router-public-<clusterName>   (ex: router-public-kildes9002)
+  #   Service real: router-public-<clusterName>   (ex: router-public-meu-cluster)
   #
   # O nome do Service e "router-<nome-do-IngressController>", e o nome do IC e
   # "<ingress.public.name>-<clusterName>". Como o sufixo tem que acompanhar o

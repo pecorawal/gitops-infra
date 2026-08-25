@@ -6,8 +6,8 @@
 */}}
 {{- define "identity-provider.validate" -}}
 {{- $rendered := toYaml .Values.identityProvider.providers -}}
-{{- if contains "<PREENCHER>" $rendered -}}
-{{- fail (printf "identityProvider.providers ainda contem <PREENCHER>. Preencha (ou desligue identityProvider.enabled) antes de commitar.\n%s" $rendered) -}}
+{{- if regexMatch "<[A-Z_]{2,}>" $rendered -}}
+{{- fail (printf "identityProvider.providers ainda contem placeholder <MAIUSCULAS>. Preencha (ou desligue identityProvider.enabled) antes de commitar.\n%s" $rendered) -}}
 {{- end -}}
 {{- if not .Values.identityProvider.providers -}}
 {{- fail "identityProvider.enabled=true mas identityProvider.providers esta vazio -- o OAuth ficaria sem nenhum provider e so o kubeadmin conseguiria entrar." -}}

@@ -10,8 +10,8 @@
   {{- fail "\n\nautoscaling.enabled=true mas autoscaling.machineSets esta vazio.\nO ClusterAutoscaler sozinho nao escala nada -- quem escala e o\nMachineAutoscaler, um por MachineSet.\n\nDescubra os nomes reais NO CLUSTER (eles so existem depois do provisionamento):\n  oc get machineset -n openshift-machine-api\n\nE preencha:\n  autoscaling:\n    machineSets:\n      - name: <cluster>-worker-<zona>\n        minReplicas: 2\n        maxReplicas: 6\n" }}
 {{- end }}
 {{- range (eq (default "machinePool" .Values.autoscaling.mode) "spoke" | ternary .Values.autoscaling.machineSets list) }}
-  {{- if or (not .name) (contains "<PREENCHER>" .name) }}
-    {{- fail (printf "\n\nautoscaling.machineSets tem entrada com name=%q.\nO name TEM que ser o nome exato do MachineSet:\n  oc get machineset -n openshift-machine-api\n" (.name | toString)) }}
+  {{- if or (not .name) (regexMatch "<[A-Z_]{2,}>" (.name | toString)) }}
+    {{- fail (printf "\n\nautoscaling.machineSets tem entrada com name=%q (placeholder).\nO name TEM que ser o nome exato do MachineSet:\n  oc get machineset -n openshift-machine-api\n" (.name | toString)) }}
   {{- end }}
   {{- if gt (int .minReplicas) (int .maxReplicas) }}
     {{- fail (printf "\n\nmachineSet %q: minReplicas (%d) maior que maxReplicas (%d).\n" .name (int .minReplicas) (int .maxReplicas)) }}

@@ -1,14 +1,15 @@
 {{- if .Values.provision.enabled }}
 {{- /*
   ===========================================================================
-   GUARDA CONTRA <PREENCHER> ESQUECIDO
+   GUARDA CONTRA PLACEHOLDER ESQUECIDO
   ---------------------------------------------------------------------------
    Roda aqui, no primeiro objeto do chart, para abortar o render inteiro antes
    de qualquer coisa ser aplicada.
 
-   "required" do Helm so barra valor vazio -- o placeholder <PREENCHER> passa
-   por ser uma string valida. Sem esta checagem o ClusterDeployment seria
-   aplicado com "<PREENCHER>" no lugar do resource group, e a falha so
+   "required" do Helm so barra valor vazio -- um placeholder como
+   <AZURE_REGION> passa por ser uma string valida. Qualquer <MAIUSCULAS> e
+   tratado como nao preenchido. Sem esta checagem o ClusterDeployment seria
+   aplicado com "<VNET_RESOURCE_GROUP>" no lugar do resource group, e a falha so
    apareceria minutos depois, num log do Job de instalacao do Hive.
   ===========================================================================
 */}}
@@ -30,7 +31,7 @@
 {{- end }}
 {{- $pendentes := list }}
 {{- range $chave, $valor := $campos }}
-  {{- if or (not $valor) (contains "<PREENCHER>" (toString $valor)) }}
+  {{- if or (not $valor) (regexMatch "<[A-Z_]{2,}>" (toString $valor)) }}
     {{- $pendentes = append $pendentes $chave }}
   {{- end }}
 {{- end }}

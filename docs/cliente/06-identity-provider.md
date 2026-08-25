@@ -41,7 +41,7 @@ oc get pods -n openshift-authentication
 1. **Redirect URI** (tipo *Web*), com o `name` do provider no final:
 
    ```
-   https://oauth-openshift.apps.<cluster>.cgibs.gov.br/oauth2callback/RTC_EntraID
+   https://oauth-openshift.apps.<cluster>.example.com/oauth2callback/CorpEntraID
    ```
 
    > O `name` do provider entra na URL. Mudá-lo depois quebra o callback e exige
@@ -87,7 +87,7 @@ oc create secret generic openid-client-secret -n openshift-config \
 identityProvider:
   enabled: true
   providers:
-    - name: RTC_EntraID
+    - name: CorpEntraID
       type: OpenID
       mappingMethod: claim
       openID:
@@ -115,7 +115,7 @@ oc get co authentication
 oc get pods -n openshift-authentication
 ```
 
-E teste o login pela console — o botão `RTC_EntraID` deve aparecer ao lado de
+E teste o login pela console — o botão `CorpEntraID` deve aparecer ao lado de
 `kube:admin`.
 
 ## 6.5 Dar permissão aos usuários

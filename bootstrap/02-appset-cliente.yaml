@@ -7,6 +7,9 @@
 #  de day-2 conforme os interruptores "enabled" do values.yaml.
 #
 #  Adicionar um cluster novo = criar clusters/<nome>/values.yaml e commitar.
+#
+#  AO REPLICAR EM OUTRO CLIENTE: TROQUE PARA O REPO DELE os dois repoURL abaixo
+#  (o do generator e o do template) e a revision. Ver docs/cliente/07-replicar.md
 # ---------------------------------------------------------------------------
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet

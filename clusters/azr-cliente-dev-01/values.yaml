@@ -1,71 +1,53 @@
 # =============================================================================
-#  ARQUIVO ÚNICO DE CONFIGURAÇÃO DO CLUSTER
+#  MODELO DE CLUSTER -- copie este diretorio para criar um cluster novo
 # =============================================================================
-#  Este é o ÚNICO arquivo que você precisa editar.
-#  O nome do diretório que contém este arquivo DEVE ser igual a clusterName.
+#  cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
+#  # edite clusters/<seu-cluster>/values.yaml
+#  ./docs/cliente/scripts/verificar-values.sh <seu-cluster>
+#  git add clusters/<seu-cluster> && git commit && git push
 #
-#  Preencha todos os campos marcados como <PREENCHER> e vire os interruptores
-#  "enabled: true" camada por camada. O ArgoCD fica escutando este arquivo e
-#  materializa cada camada assim que ela é habilitada.
+#  CONVENCAO DOS PLACEHOLDERS
+#    Tudo entre <MAIUSCULAS> precisa ser substituido. Os charts FALHAM o render
+#    se sobrar algum, entao um esquecimento aparece como erro na Application, e
+#    nao como cluster instalado errado.
 #
-#  Ordem recomendada:
-#    1) provision.enabled    -> cria o cluster       (~40 min)
-#    2) operators.enabled    -> instala os operators
-#    3) certManager.enabled  -> emite os certificados
-#    4) ingress.enabled      -> cria os IngressControllers
-#    5) externalDNS.enabled  -> publica os registros de DNS
+#  DUAS REGRAS QUE JA CUSTARAM CARO
+#    1. NUNCA use uma linha "---" neste arquivo. Ela inicia um segundo
+#       documento YAML e o Helm le apenas o PRIMEIRO: tudo abaixo e ignorado em
+#       silencio. Para separar secoes, use somente comentarios (#).
+#    2. O nome do diretorio em clusters/ tem que ser IGUAL a clusterName.
 #
-#  Guia completo: docs/cliente/
+#  ORDEM DE ATIVACAO -- ligue um bloco por vez, confirmando cada camada:
+#    provision -> operators -> certManager -> ingress -> externalDNS
+#              -> nsgRule -> autoscaling -> identityProvider
 # =============================================================================
 
+# ---- IDENTIDADE -------------------------------------------------------------
+clusterName: "azr-cliente-dev-01"   # == nome deste diretorio
+environment: dev                    # rotulo livre (dev, des, hml, prd...)
 
-# =============================================================================
-#  IDENTIDADE DO CLUSTER
-# =============================================================================
-clusterName: azr-cliente-dev-01     # == nome deste diretório, do namespace no hub e do ManagedCluster
-baseDomain: "cgibs.gov.br"          # domínio base (Azure DNS Zone pública)
+# Dominio base do cluster. E dele que saem api.<cluster>.<baseDomain> e
+# *.apps.<cluster>.<baseDomain>. Em cluster privado costuma ser o dominio da
+# Private DNS Zone. ex: pri.example.com
+baseDomain: "<BASE_DOMAIN>"
+
+# ManagedClusterSet do ACM. Preenchido aqui, ignora o mapeamento por labels.env.
+# Vazio = resolvido por clusterSets.byEnv abaixo. ex: non-pro | pro
+clusterSet: "<CLUSTER_SET>"
+clusterSets:
+  default: ""
+  byEnv: {}
+
 cloudProvider: Azure
 
-# ---------------------------------------------------------------------------
-#  ManagedClusterSet -- decidido por labels.env
-# ---------------------------------------------------------------------------
-#  Os dois ManagedClusterSets ja existem no ACM e NAO sao criados por este
-#  repositorio. O que este values decide e em qual deles o cluster entra.
-#
-#  Para o vinculo funcionar, o set precisa estar ligado ao namespace
-#  openshift-gitops por um ManagedClusterSetBinding -- ja aplicado em
-#  bootstrap/03-cluster-set-bindings.yaml para pro e non-pro.
-#
-#  A ESQUERDA do mapa e o valor de labels.env (o AMBIENTE).
-#  A DIREITA e o nome do ManagedClusterSet como ele existe no ACM.
-#  Confira os nomes reais com: oc get managedclusterset
-# ---------------------------------------------------------------------------
-clusterSets:
-  default: non-pro           # usado quando labels.env nao consta no mapa abaixo
-  byEnv:
-    prod: pro
-    pro: pro
-    non-prod: non-pro
-    non-pro: non-pro
-    # atalhos, para nao obrigar o env a ser literalmente "non-pro"
-    dev: non-pro
-    qa: non-pro
-    hml: non-pro
-
-# Escape hatch: preencha para ignorar o mapeamento acima e forcar um set.
-clusterSet: ""
-
 labels:
-  # env DECIDE O CLUSTERSET (ver clusterSets acima). Valor obrigatorio:
-  # se nao resolver nenhum set, a renderizacao do chart falha de proposito.
-  env: "dev"
-  region: "brazilsouth"
+  env: "dev"                        # usado por clusterSets.byEnv quando clusterSet e vazio
+  region: "<AZURE_REGION>"          # ex: brazilsouth
   vendor: "OpenShift"
   cloud: "Azure"
   criticality: "high"
-  compliance: "pci-dss"
-  # NÃO REMOVA a label abaixo: é ela que faz o ACM registrar este cluster
-  # como destino de deploy no ArgoCD (via GitOpsCluster + Placement).
+  # NAO REMOVA: e ela que faz o ACM registrar este cluster como destino de
+  # deploy no ArgoCD (via GitOpsCluster + Placement).
   apps.open-cluster-management.io/replicate-to-argocd: "true"
 
 addons:
@@ -74,97 +56,69 @@ addons:
   applicationManager: true
   certPolicyController: true
 
-
 # =============================================================================
-#  1. PROVISIONAMENTO -- OpenShift IPI na Azure (Hive / openshift-install)
+#  1. PROVISIONAMENTO (Hive / openshift-install)
 # =============================================================================
 provision:
-  enabled: false                    # <-- vire para true SÓ depois de preencher tudo abaixo
+  enabled: false                    # <-- true so com TUDO abaixo preenchido
 
-  # Versão do OpenShift. Liste as disponíveis no hub com:
-  #   oc get clusterimageset
-  imageSetRef: "img4.18.20-multi-appsub"
+  # oc get clusterimageset      ex: img4.18.20-multi-appsub
+  imageSetRef: "<CLUSTER_IMAGE_SET>"
 
-  # -------------------------------------------------------------------------
-  #  CREDENCIAIS
-  #  O Hive só lê Secrets do namespace do ClusterDeployment, mas a Credential do
-  #  ACM é UMA SÓ para todos os provisionamentos. Há dois caminhos para levá-la
-  #  até o namespace de cada cluster:
-  #
-  #  mode: existing  (PADRÃO, não exige operador nenhum)
-  #      Rode UMA vez por cluster, antes de commitar:
-  #          ./docs/cliente/scripts/preparar-credenciais.sh <cluster>
-  #      Ele cria o namespace e os dois Secrets a partir da Credential do ACM,
-  #      já nos formatos que o Hive exige. Os nomes seguem a convenção
-  #      <cluster>-azure-creds e <cluster>-pull-secret, que é o que o chart
-  #      procura -- nada mais precisa ser preenchido aqui.
-  #
-  #  mode: externalSecret  (exige o External Secrets Operator no hub)
-  #      O ESO copia a Credential sozinho, a cada sincronização. Sem passo
-  #      manual algum, mas o CRD ExternalSecret precisa existir.
-  #      ATENÇÃO: sem o ESO instalado, este modo faz a Application inteira ir a
-  #      ComparisonError ("no matches for kind ExternalSecret") e NADA é
-  #      aplicado -- nem o Namespace.
-  # -------------------------------------------------------------------------
   credentials:
-    mode: existing
-
-    # ---- modo externalSecret (ignorado quando mode=existing) ----
-    sourceNamespace: acm-credentials
-    sourceSecret: ""
-    clusterSecretStore: acm-credentials-hub
+    mode: existing                  # existing | externalSecret (este exige o ESO)
+    # Namespace e nome da Credential compartilhada do ACM (origem).
+    sourceNamespace: "<ACM_CREDENTIALS_NAMESPACE>"   # ex: acm-credentials
+    sourceSecret: "<ACM_CREDENTIAL_NAME>"            # ex: azure-hub
     refreshInterval: "1h"
-    copySshKey: true
-
-    # Vale para os DOIS modos. Com false, o ClusterDeployment sai SEM o bloco
-    # sshPrivateKeySecretRef (cluster sem acesso SSH aos nós). Use false quando
-    # a Credential do ACM não tem ssh-privatekey -- o webhook do Hive recusa o
-    # bloco presente com name vazio.
+    copySshKey: false               # SO no modo externalSecret
+    # false remove o bloco sshPrivateKeySecretRef inteiro do ClusterDeployment
+    # (cluster sem acesso SSH aos nos).
     sshPrivateKey: true
+    # Secrets JA existentes no namespace do cluster, no hub. Vazio = a
+    # convencao <cluster>-azure-creds / <cluster>-pull-secret.
+    # Criados por docs/cliente/scripts/preparar-credenciais.sh
+    existingCredentialsSecret: "<HUB_AZURE_CREDS_SECRET>"    # ex: azure-hub
+    existingPullSecret: "<HUB_PULL_SECRET>"                  # ex: azure-hub
+    existingSshPrivateKeySecret: "<HUB_SSH_SECRET>"          # ex: azure-hub
 
-    # ---- modo existing ----
-    # Vazios = usa a convenção <cluster>-azure-creds / <cluster>-pull-secret,
-    # exatamente os nomes que preparar-credenciais.sh gera.
-    # Preencha só se os seus Secrets tiverem outros nomes.
-    existingCredentialsSecret: ""
-    existingPullSecret: ""
-    existingSshPrivateKeySecret: ""
+  # Nome do pool de workers. Define o MachinePool (<cluster>-<nome>) e os
+  # MachineSets (<infraID>-<nome>-<zona>).
+  # spec.platform do MachinePool e IMUTAVEL: para corrigir a rede depois,
+  # troca-se este nome (worker-v2, worker-v3...) e drena-se o pool antigo.
+  machinePool:
+    name: worker
 
-  # Internal = API e ingress default só acessíveis pela VNet (cluster privado).
-  # External = API e ingress default publicados na internet.
-  publish: Internal
+  publish: Internal                 # Internal = cluster privado | External
+  fips: false
+  preserveOnDelete: false           # true = apagar o ClusterDeployment NAO destroi a Azure
+  acmImport:
+    enabled: true
 
   azure:
-    region: "brazilsouth"
+    region: "<AZURE_REGION>"                    # ex: brazilsouth
     cloudName: AzurePublicCloud
+    # RG da Azure DNS Zone PUBLICA (a do baseDomain publico)
+    baseDomainResourceGroupName: "<DNS_RESOURCE_GROUP>"   # ex: rg-dns
 
-    # Resource Group onde está a Azure DNS Zone PÚBLICA do baseDomain.
-    baseDomainResourceGroupName: "<PREENCHER>"
-
-    # ---- BYO VNet: a VNet e as subnets já existem e NÃO são criadas pelo installer ----
-    networkResourceGroupName: "<PREENCHER>"   # RG que contém a VNet
-    virtualNetwork: "<PREENCHER>"             # nome da VNet
-    controlPlaneSubnet: "<PREENCHER>"         # subnet dos masters
-    computeSubnet: "<PREENCHER>"              # subnet dos workers
-
-    # UserDefinedRouting = a saída para a internet passa pela sua rota/firewall.
-    # Use Loadbalancer se não houver UDR configurado na subnet.
-    outboundType: UserDefinedRouting
+    # ---- BYO VNet: rede PRE-EXISTENTE ----
+    # Deixe os quatro vazios para o instalador criar a rede sozinho.
+    # ATENCAO: estes valores tambem vao para o MachinePool -- sem eles, cada
+    # maquina NOVA falha com ResourceNotFound apontando para uma VNet que o
+    # instalador criaria e que nao existe.
+    networkResourceGroupName: "<VNET_RESOURCE_GROUP>"  # ex: rg-rede
+    virtualNetwork: "<VNET_NAME>"                      # ex: vnet-hub
+    controlPlaneSubnet: "<MASTER_SUBNET>"              # ex: subnet-master
+    computeSubnet: "<WORKER_SUBNET>"                   # ex: subnet-worker
+    outboundType: Loadbalancer                         # Loadbalancer | UserDefinedRouting
 
   networking:
     networkType: OVNKubernetes
-    # clusterNetwork, machineNetwork e serviceNetwork aceitam DOIS formatos:
-    #
-    #   forma curta (abaixo)          forma do install-config
-    #   clusterNetwork: "10.128.0.0/14"    clusterNetwork:
-    #   hostPrefix: 23                       - cidr: 10.128.0.0/14
-    #                                          hostPrefix: 23
-    #
-    # Os dois geram o mesmo install-config. Use o que preferir.
+    # Aceitam escalar (forma curta) ou lista (forma do install-config).
     clusterNetwork: "10.128.0.0/14"
     hostPrefix: 23
     serviceNetwork: "172.30.0.0/16"
-    machineNetwork: "<PREENCHER>"             # CIDR da VNet acima, ex: 10.0.0.0/16
+    machineNetwork: "<VNET_CIDR>"   # address space da VNet. ex: 10.0.0.0/16
 
   controlPlane:
     replicas: 3
@@ -175,39 +129,12 @@ provision:
     zones: ["1", "2", "3"]
 
   compute:
-    replicas: 3
+    replicas: 3                     # ignorado quando autoscaling.enabled = true
     type: Standard_D4s_v3
     osDisk:
       diskSizeGB: 512
       diskType: Premium_LRS
     zones: ["1", "2", "3"]
-
-  fips: false
-
-  # Rede de seguranca contra descomissionamento acidental.
-  # true  = se o ClusterDeployment for apagado, o Hive NAO destroi a
-  #         infraestrutura na Azure; sobram recursos orfaos para limpar a mao.
-  # false = comportamento padrao do Hive: apagar o ClusterDeployment dispara o
-  #         job de deprovision e o cluster e destruido.
-  # Os objetos criticos ja levam Prune=false,Delete=false; isto e a camada extra
-  # para quem nao quer nem a possibilidade de perder um cluster por engano.
-  preserveOnDelete: false
-
-  # Separa os objetos do ACM (ManagedCluster, KlusterletAddonConfig) dos objetos
-  # do Hive (Namespace, install-config, ClusterDeployment, MachinePool).
-  #
-  # Deixe false para BISSECAR o problema "o namespace some durante o sync":
-  # no ACM, o namespace de mesmo nome pertence ao ciclo de vida do
-  # ManagedCluster, e o managedcluster-import-controller o APAGA se o
-  # ManagedCluster for rejeitado ou entrar em detach. Com acmImport desligado,
-  # o sync aplica so o Hive e o namespace fica fora do alcance desse controlador.
-  #
-  # Depois que o provisionamento andar, volte para true -- sem o ManagedCluster
-  # o cluster nao e importado no ACM nem registrado no ArgoCD, e nenhuma
-  # Application de day-2 encontra destino.
-  acmImport:
-    enabled: true
-
 
 # =============================================================================
 #  2. OPERATORS -- instalados no cluster provisionado (spoke)
@@ -223,26 +150,27 @@ operators:
     channel: stable-v1
     source: redhat-operators
 
+  # Operadores adicionais, sem mexer no chart: cada entrada gera Namespace,
+  # OperatorGroup e Subscription. UM namespace por operador.
+  # NAO serve para componentes do payload do OpenShift (cluster-autoscaler,
+  # machine-api, ingress): eles ja vem instalados e nao tem packagemanifest.
+  #   oc get packagemanifest -n openshift-marketplace | grep -i <termo>
+  extra: []
+    # - name: kubernetes-nmstate-operator
+    #   namespace: openshift-nmstate
+    #   channel: stable
+    #   installMode: OwnNamespace      # OwnNamespace | AllNamespaces
 
 # =============================================================================
-#  3. CERT-MANAGER -- ClusterIssuers e certificados
+#  3. CERT-MANAGER -- ClusterIssuer e certificados
 # =============================================================================
 certManager:
   enabled: false
 
-  # ---- Overrides do OPERANDO cert-manager (CR CertManager/cluster) ----------
-  # O cert-manager-operator cria sozinho o CR "cluster"; aqui apenas ajustamos
-  # o spec dele (ServerSideApply, sem tomar posse do objeto).
-  #
-  # Os dois argumentos abaixo NAO sao opcionais num cluster privado:
-  # o desafio DNS01 grava o TXT _acme-challenge na zona PUBLICA e depois faz a
-  # auto-checagem. Com o resolver padrao do pod, essa consulta cai no DNS da
-  # VNet, que enxerga a Private DNS Zone -- o TXT nao e encontrado e o
+  # Overrides do OPERANDO (CR CertManager/cluster).
+  # OBRIGATORIO em cluster privado: sem resolvers publicos, a auto-checagem do
+  # desafio DNS01 cai no DNS da VNet, nao acha o TXT na zona publica, e o
   # Certificate trava em "Waiting for DNS-01 challenge propagation".
-  # Forcando resolvers publicos, a auto-checagem consulta a zona certa.
-  #
-  # Se a saida para 53/udp na internet for bloqueada, troque a lista por um
-  # resolver interno que enxergue a zona PUBLICA.
   operatorConfig:
     enabled: true
     managementState: Managed
@@ -252,12 +180,6 @@ certManager:
       overrideArgs:
         - "--dns01-recursive-nameservers-only"
         - "--dns01-recursive-nameservers=1.1.1.1:53,8.8.8.8:53"
-      # Ex.: proxy de saida do cliente
-      # overrideEnv:
-      #   - name: HTTPS_PROXY
-      #     value: "http://proxy.cgibs.gov.br:3128"
-      #   - name: NO_PROXY
-      #     value: ".cluster.local,.svc,169.254.169.254"
       overrideEnv: []
       overrideResources: {}
     webhook:
@@ -265,124 +187,103 @@ certManager:
     cainjector:
       overrideArgs: []
 
-  # ClusterIssuer "letsencrypt-prod": ACME com desafio DNS01 na Azure DNS Zone
-  # PÚBLICA. É este issuer que emite os DOIS wildcards:
+  # ClusterIssuer letsencrypt-prod: ACME com desafio DNS01 na Azure DNS Zone
+  # PUBLICA. E ele que emite os DOIS wildcards -- inclusive o do dominio
+  # privado, porque o desafio so precisa gravar o TXT _acme-challenge na zona
+  # publica; o nome final continua resolvendo apenas na Private DNS Zone.
   #
-  #   *.cgibs.gov.br       -> IngressController público
-  #   *.pri.cgibs.gov.br   -> IngressController privado
-  #
-  # Sim, o wildcard privado também sai daqui. O desafio DNS01 grava o TXT
-  # _acme-challenge.pri.cgibs.gov.br na zona PÚBLICA cgibs.gov.br, e é só esse
-  # registro que o Let's Encrypt consulta -- o nome final continua resolvendo
-  # apenas na Private DNS Zone.
-  #
-  # REQUISITO: pri.cgibs.gov.br NÃO pode estar delegado publicamente para outro
-  # servidor. Se estiver, o TXT não seria encontrado. Confirme com:
-  #   dig +short NS pri.cgibs.gov.br
-  # (não deve retornar nada; a zona autoritativa tem que ser cgibs.gov.br)
+  # REQUISITO: o dominio privado NAO pode estar delegado publicamente a outro
+  # servidor. Confirme com: dig +short NS <PRIVATE_DOMAIN>   (nao deve responder)
   acme:
     enabled: true
-    email: "<PREENCHER>"
+    email: "<ACME_EMAIL>"           # ex: plataforma@example.com
+    # Producao:
     server: "https://acme-v02.api.letsencrypt.org/directory"
-    # Para testes use o staging (não conta na cota, mas o cert não é confiável):
+    # Staging (nao conta na cota, cert nao confiavel) -- use enquanto testa:
     # server: "https://acme-staging-v02.api.letsencrypt.org/directory"
     azureDNS:
-      subscriptionID: "<PREENCHER>"
-      tenantID: "<PREENCHER>"
-      resourceGroupName: "<PREENCHER>"   # RG da Azure DNS Zone PÚBLICA
-      hostedZoneName: "cgibs.gov.br"     # zona pública: atende os dois wildcards
+      subscriptionID: "<AZURE_SUBSCRIPTION_ID>"   # az account show --query id -o tsv
+      tenantID: "<AZURE_TENANT_ID>"               # az account show --query tenantId -o tsv
+      resourceGroupName: "<DNS_RESOURCE_GROUP>"   # RG da zona PUBLICA. ex: rg-dns
+      hostedZoneName: "<PUBLIC_DOMAIN>"           # zona publica. ex: example.com
       environment: AzurePublicCloud
-      clientID: "<PREENCHER>"            # appId do Service Principal
-      # O clientSecret NUNCA vai para o Git. Ele vem do Secret abaixo, criado
-      # no namespace cert-manager por docs/cliente/scripts/criar-secrets-day2.sh
+      clientID: "<AZURE_SP_CLIENT_ID>"            # appId do Service Principal
+      # O clientSecret NUNCA vai para o Git: vem do Secret abaixo, criado no
+      # namespace cert-manager por docs/cliente/scripts/criar-secrets-day2.sh
       clientSecretRef:
         name: azuredns-config
         key: client-secret
 
-  # CA interna -- NÃO utilizada nesta arquitetura.
-  # Os dois ingress usam certificados ACME confiáveis, então nada precisa ser
-  # distribuído aos clients. Mantida desligada para o caso de um ambiente
-  # futuro sem domínio delegado publicamente.
+  # CA interna -- desligada nesta arquitetura (os dois ingress usam ACME).
   internalCA:
     enabled: false
     selfSigned: true
     caSecretName: internal-ca-key-pair
-    commonName: "CGIBS Internal CA"
+    commonName: "<ORG> Internal CA"  # ex: ACME Corp Internal CA
     durationHours: 87600
 
-  # Certificados de aplicação.
-  # Os wildcards acima já cobrem qualquer host de um nível sob os dois domínios,
-  # então só declare aqui aplicações que precisem de certificado PRÓPRIO
-  # (host fora do wildcard, chave separada, ou exigência de auditoria).
+  # Certificados de aplicacao. Os wildcards ja cobrem qualquer host de um nivel
+  # sob os dois dominios -- declare aqui so quem precisa de certificado PROPRIO.
   appCertificates: []
     # - name: checkout-tls
     #   namespace: pagamentos
     #   issuer: letsencrypt-prod
     #   secretName: checkout-tls
     #   dnsNames:
-    #     - "checkout.pri.cgibs.gov.br"
+    #     - "checkout.<PRIVATE_DOMAIN>"
 
 # =============================================================================
-#  4. INGRESS CONTROLLERS -- um privado e um público, além do default
+#  4. INGRESS CONTROLLERS -- um privado e um publico, alem do default
 # =============================================================================
-#  A separação é feita pela label "ingress-type" na Route:
-#
-#    ingress-type: private   -> IC private  -> LB interno  -> Private DNS Zone
-#    ingress-type: public    -> IC public   -> LB público  -> Azure DNS Zone
-#    qualquer outro valor    -> IC default  -> aplicações internas do OpenShift
-#    sem a label             -> IC default  (console, oauth, ...)
-# =============================================================================
+#  Separacao pela label "ingress-type" na Route:
+#    ingress-type: private   -> IC private-<cluster>  -> LB interno -> Private DNS
+#    ingress-type: public    -> IC public-<cluster>   -> LB publico -> Azure DNS
+#    outro valor / sem label -> IC default (console, oauth, plataforma)
 ingress:
-  enabled: false
+  enabled: false                    # <-- INTERRUPTOR MESTRE do bloco
 
   default:
-    # O IngressController default fica RESERVADO às aplicações internas do
-    # OpenShift. Com isolateByLabel=true ele passa a admitir apenas Routes cuja
-    # label "ingress-type" seja DIFERENTE de public e private (ou que não
-    # tenham a label -- é assim que o seletor NotIn do Kubernetes funciona).
+    # O default passa a admitir apenas Routes cuja label ingress-type seja
+    # DIFERENTE de public e private (NotIn casa tambem com Routes SEM a label,
+    # entao console e oauth continuam aqui).
     isolateByLabel: true
 
-    # Escopo do Load Balancer do router DEFAULT (console, OAuth, plataforma).
-    # CLUSTER PRIVADO = Internal. NUNCA External aqui: o LB do default seria
-    # recriado como público, com IP novo, e o acesso interno à console cairia.
-    # Confira o valor atual ANTES de sincronizar:
-    #   oc get ingresscontroller default -n openshift-ingress-operator \
-    #     -o jsonpath='{.spec.endpointPublishingStrategy.loadBalancer.scope}{"\n"}'
+    # ESCOPO DO LB DO ROUTER DEFAULT. Cluster privado = Internal.
+    # NUNCA External num cluster privado: o LB seria recriado como publico,
+    # com IP novo, e o acesso interno a console cairia.
     scope: Internal
+
     labelKey: ingress-type
     reservedValues:
       - public
       - private
 
-  # ---- IngressController PRIVADO: Load Balancer interno da Azure ----
+  # ---- PRIVADO: Load Balancer interno da Azure ----
+  # Nome final do IngressController: private-<clusterName>
   private:
     enabled: true
     name: private
-    domain: "pri.cgibs.gov.br"      # domínio da Azure PRIVATE DNS Zone
+    domain: "<PRIVATE_DOMAIN>"      # dominio da Private DNS Zone. ex: pri.example.com
     replicas: 2
-    scope: Internal                 # Azure Internal Load Balancer
-    # LABEL DE ADMISSÃO: só Routes com ingress-type=private entram aqui.
+    scope: Internal
     routeSelector:
       key: ingress-type
       value: private
-    # Opcional: restringe também por namespace. Ex:
-    #   namespaceSelector: { environment: producao }
     namespaceSelector: {}
-    # Opcional: fixa os routers em nós específicos. Ex:
-    #   nodePlacement: { node-role.kubernetes.io/infra: "" }
     nodePlacement: {}
     certificate:
       enabled: true
-      issuer: letsencrypt-prod      # wildcard *.pri.cgibs.gov.br
+      issuer: letsencrypt-prod
       secretName: private-ingress-tls
 
-  # ---- IngressController PÚBLICO: Load Balancer público da Azure ----
+  # ---- PUBLICO: Load Balancer publico da Azure ----
+  # Nome final do IngressController: public-<clusterName>
   public:
     enabled: true
     name: public
-    domain: "cgibs.gov.br"          # domínio da Azure DNS Zone pública
+    domain: "<PUBLIC_DOMAIN>"       # dominio da zona publica. ex: example.com
     replicas: 2
-    scope: External                 # Azure Public Load Balancer ("publish external")
+    scope: External
     routeSelector:
       key: ingress-type
       value: public
@@ -390,23 +291,23 @@ ingress:
     nodePlacement: {}
     certificate:
       enabled: true
-      issuer: letsencrypt-prod      # wildcard *.cgibs.gov.br
+      issuer: letsencrypt-prod
       secretName: public-ingress-tls
 
 # =============================================================================
-#  5. EXTERNAL DNS -- uma instância por zona / por IngressController
+#  5. EXTERNAL DNS -- uma instancia por zona / por IngressController
 # =============================================================================
+#  routerName recebe o sufixo -<clusterName> automaticamente, para casar com o
+#  nome do IngressController. NAO acrescente o sufixo aqui.
 externalDNS:
-  enabled: false
+  enabled: false                    # <-- INTERRUPTOR MESTRE do bloco
 
   azure:
-    subscriptionId: "<PREENCHER>"
-    tenantId: "<PREENCHER>"
-    aadClientId: "<PREENCHER>"      # appId do Service Principal
-    # DEIXE SEMPRE VAZIO NO GIT.
-    # Os Secrets azure.json (um por zona) são criados fora do repositório por
-    # docs/cliente/scripts/criar-secrets-day2.sh, que lê exatamente os valores
-    # acima e pede o client secret interativamente.
+    subscriptionId: "<AZURE_SUBSCRIPTION_ID>"
+    tenantId: "<AZURE_TENANT_ID>"
+    aadClientId: "<AZURE_SP_CLIENT_ID>"
+    # DEIXE SEMPRE VAZIO NO GIT. Os Secrets azure.json (um por zona) sao
+    # criados por docs/cliente/scripts/criar-secrets-day2.sh.
     aadClientSecret: ""
 
   # ---- Azure PRIVATE DNS Zone <- rotas com ingress-type=private ----
@@ -414,10 +315,10 @@ externalDNS:
     enabled: true
     name: private
     routerName: private             # DEVE casar com ingress.private.name
-    domain: "pri.cgibs.gov.br"      # DEVE casar com ingress.private.domain
-    resourceGroup: "<PREENCHER>"    # RG da Private DNS Zone
-    # az network private-dns zone show -n pri.cgibs.gov.br -g <rg> --query id -o tsv
-    zoneId: "<PREENCHER>"           # .../providers/Microsoft.Network/privateDnsZones/pri.cgibs.gov.br
+    domain: "<PRIVATE_DOMAIN>"      # DEVE casar com ingress.private.domain
+    resourceGroup: "<PRIVATE_DNS_RESOURCE_GROUP>"   # RG da Private DNS Zone
+    # az network private-dns zone show -n <PRIVATE_DOMAIN> -g <rg> --query id -o tsv
+    zoneId: "<PRIVATE_DNS_ZONE_ID>"
     excludeDomains: []
     configSecretName: azure-config-file-private
 
@@ -426,143 +327,141 @@ externalDNS:
     enabled: true
     name: public
     routerName: public              # DEVE casar com ingress.public.name
-    domain: "cgibs.gov.br"          # DEVE casar com ingress.public.domain
-    resourceGroup: "<PREENCHER>"    # RG da Azure DNS Zone pública
-    # az network dns zone show -n cgibs.gov.br -g <rg> --query id -o tsv
-    zoneId: "<PREENCHER>"           # .../providers/Microsoft.Network/dnszones/cgibs.gov.br
-    # pri.cgibs.gov.br é SUBDOMÍNIO de cgibs.gov.br: sem esta exclusão o filtro
-    # da instância pública também casaria com os hosts privados.
+    domain: "<PUBLIC_DOMAIN>"       # DEVE casar com ingress.public.domain
+    resourceGroup: "<DNS_RESOURCE_GROUP>"
+    # az network dns zone show -n <PUBLIC_DOMAIN> -g <rg> --query id -o tsv
+    zoneId: "<PUBLIC_DNS_ZONE_ID>"
+    # Se o dominio privado for SUBDOMINIO do publico, exclua-o aqui -- senao o
+    # filtro da instancia publica tambem casaria com os hosts privados.
     excludeDomains:
-      - "pri.cgibs.gov.br"
+      - "<PRIVATE_DOMAIN>"
     configSecretName: azure-config-file-public
 
 # =============================================================================
-#  6. NSG RULE -- sincroniza a regra inbound do NSG com o IP do LB do ingress
+#  6. NSG RULE -- regra de entrada para o ingress publico (opcional)
 # =============================================================================
-#  Apos a criacao do IngressController (wave 30), o Load Balancer publico da
-#  Azure recebe um IP dinamico. Para o trafego chegar, o NSG da subnet precisa
-#  de uma inbound rule permitindo TCP 80/443 do Internet para esse IP.
+#  Um CronJob le o IP do LB do IngressController publico e faz upsert de uma
+#  inbound rule (TCP 80/443 da Internet) no NSG, alem de associar o NSG a
+#  subnet dos workers -- cluster IPI privado nasce SEM NSG na subnet, e sem a
+#  associacao a regra nao surte efeito nenhum.
 #
-#  Este bloco liga um CronJob (wave 50) que:
-#    1. espera o Service router-<nome> ter IP (ate ~25 min);
-#    2. autentica na Azure com o Service Principal (Secret azure-spn, criado
-#       pelo docs/cliente/scripts/criar-secrets-day2.sh -- nunca vai pro Git);
-#    3. cria/atualiza a regra Allow_HTTP_HTTPS_Ingress no NSG, idempotente.
-#
-#  O CronJob roda a cada 10 min e se auto-cura se o LB for recriado com outro IP.
+#  ANTES DE LIGAR:
+#   1. o Service Principal precisa de "Network Contributor" no RG do NSG E no
+#      RG da VNet
+#   2. ligue enabled: true NESTE arquivo e rode, logado no spoke:
+#        ./docs/cliente/scripts/criar-secrets-day2.sh clusters/<cluster>/values.yaml
+#      (o script pula esta etapa se enabled estiver false)
+#   3. so entao commite
 nsgRule:
-  enabled: false                    # <-- vire para true SÓ depois de preencher tudo abaixo
+  enabled: false
 
-  # Service do IngressController cujo IP publico vai para a regra do NSG.
-  # SEM o clusterName: o template acrescenta o sufixo sozinho.
-  #   aqui         : router-public          (o mesmo nome de ingress.public.name)
+  # Service do router. SEM o clusterName: o template acrescenta o sufixo.
+  #   aqui         : router-public
   #   Service real : router-public-<clusterName>
   serviceName: router-public
   serviceNamespace: openshift-ingress
 
-  # NSG alvo na Azure.
-  nsgName: "<PREENCHER>"            # ex: azr-cliente-dev-01-nsg
-  nsgResourceGroup: "<PREENCHER>"   # RG onde vive o NSG
-  subscriptionId: "<PREENCHER>"
+  nsgName: "<NSG_NAME>"                       # az network nsg list -g <rg> -o table
+  nsgResourceGroup: "<NSG_RESOURCE_GROUP>"
+  subscriptionId: "<AZURE_SUBSCRIPTION_ID>"
   ruleName: Allow_HTTP_HTTPS_Ingress
   priority: 1000
   schedule: "*/10 * * * *"
-  waitSeconds: 180                  # espera pelo IP do LB; < intervalo do schedule
+
+  # Espera pelo IP do LB. MENOR que o intervalo do schedule, senao uma execucao
+  # ainda estaria rodando quando a proxima dispara.
+  waitSeconds: 180
   timeoutSeconds: 600               # corte duro do Job; > waitSeconds
 
-  # Associação do NSG à subnet dos WORKERS. Sem ela a regra não surte efeito:
-  # cluster IPI privado nasce sem NSG na subnet. Vazio = usa provision.azure.
+  # Associacao do NSG a subnet dos WORKERS.
+  # Vazio = reaproveita o que provision.azure ja declara.
   subnet:
     associate: true
     name: ""
     vnet: ""
     resourceGroup: ""
+    # Se a subnet ja tiver OUTRO NSG, o script avisa e para -- trocar
+    # substituiria todas as regras que valem para a subnet inteira.
     force: false
 
   image: mcr.microsoft.com/azure-cli
   imageTag: latest
-
-  # Secret com clientId/clientSecret/tenantId do Service Principal (fora do Git).
   secretName: azure-spn
   namespace: nsg-rule
 
 # =============================================================================
-#  7. AUTOSCALING DE CLUSTER -- ClusterAutoscaler + MachineAutoscaler
+#  7. AUTOSCALING
 # =============================================================================
-#  Liga o autoscaling de máquinas do pool worker: o cluster-autoscaler-operator
-#  escala os MachineSets entre min e max conforme a demanda das pods.
+#  Em cluster gerenciado pelo ACM o autoscaling NAO se configura criando
+#  MachineAutoscaler no spoke: quem manda nos MachineSets e o MachinePool do
+#  Hive, no hub. O Hive cria os MachineAutoscaler; o ClusterAutoscaler global
+#  vem por esta esteira.
 #
-#  Requisito: o cluster JÁ PRECISA ESTAR PROVISIONADO (provision.enabled=true e
-#  o cluster de pé) para descobrir os nomes reais dos MachineSets:
+#  min e max sao TOTAIS do pool worker, e o Hive reparte entre as zonas.
+#  Com 3 zonas e minReplicas 3, cada MachineSet fica com min 1 -- e um
+#  MachineSet no proprio piso nao pode encolher (motivo comum de "nao fez
+#  scale-down").
 #
-#      oc get machineset -n openshift-machine-api
-#
-#  Exemplo de saída (IPI Azure, zona brazilsouth):
-#      azr-cliente-dev-01-worker-brazilsouth1
-#      azr-cliente-dev-01-worker-brazilsouth2
-#      azr-cliente-dev-01-worker-brazilsouth3
-#
-#  Copie os nomes para machineSets[].name, defina min/max e vire enabled: true.
-#  O ClusterAutoscaler global (scale-down etc.) nasce com defaults seguros.
+#  spec.replicas e spec.autoscaling sao mutuamente exclusivos no Hive: com
+#  enabled: true, provision.compute.replicas deixa de valer.
 autoscaling:
-  enabled: false                    # <-- vire para true para ligar
+  enabled: false
 
-  # machinePool = cluster provisionado pelo ACM/Hive (o caso desta esteira):
-  #   o autoscaling vai em spec.autoscaling do MachinePool, no hub, e o Hive
-  #   cria ClusterAutoscaler e MachineAutoscaler no cluster gerenciado.
-  # spoke = cluster sem Hive: os CRs vao direto, via charts/cluster-autoscaling.
-  mode: machinePool
+  mode: machinePool                 # machinePool = ACM/Hive | spoke = cluster sem Hive
 
-  # Totais do pool worker. O Hive reparte entre as zonas.
-  # minReplicas >= numero de zonas em provision.compute.zones (ou 0).
-  minReplicas: 3
+  minReplicas: 3                    # >= numero de zonas, ou 0
   maxReplicas: 9
 
-  # ---- Usado SOMENTE com mode: spoke ----
+  # CR global ClusterAutoscaler -- vale nos DOIS modos. Sem ele o autoscaler
+  # nao e ligado e nada escala.
   clusterAutoscaler:
     maxNodesTotal: 20
     scaleDown:
       enabled: true
-      unneededTime: 10m
+      unneededTime: 10m             # tempo ocioso antes de virar candidato
       delayAfterAdd: 10m
       delayAfterDelete: 10m
       delayAfterFailure: 10m
+
+  # Usado SOMENTE com mode: spoke.
+  #   oc get machineset -n openshift-machine-api
   machineSets: []
-# ═══════════════ 8. IDENTITY PROVIDER (OAuth do cluster) ═══════════════
+    # - name: <infraID>-worker-<zona>
+    #   minReplicas: 2
+    #   maxReplicas: 6
+
 # =============================================================================
-#  Configura os identity providers do OAuth do cluster (objeto OAuth/cluster).
-#
-#  ATENÇÃO -- a lista abaixo SUBSTITUI o spec.identityProviders do cluster.
-#  É uma lista atômica: provider adicionado pela console é removido no próximo
-#  sync (selfHeal). Todo provider tem que estar declarado aqui.
-#
-#  O CLIENT SECRET NÃO VAI PARA O GIT. Ele vive no Secret referenciado em
-#  openID.clientSecret.name, no namespace openshift-config, criado por:
-#      ./docs/cliente/scripts/criar-secrets-day2.sh clusters/<cluster>/values.yaml
-#
-#  Registro da aplicação no Entra ID (uma vez, pelo time de identidade):
-#    - Redirect URI (Web):
-#        https://oauth-openshift.apps.<cluster>.cgibs.gov.br/oauth2callback/<name>
-#      onde <name> é EXATAMENTE o campo name do provider abaixo.
-#    - Token configuration: adicione o claim opcional "groups" (senão o claim
-#      groups vem vazio e nenhum RoleBinding por grupo funciona).
-#    - Anote Application (client) ID e Directory (tenant) ID.
-#
-#  Depois do sync o authentication-operator reinicia o oauth-server: o login
-#  fica fora por ~1 minuto. Valide ANTES de mexer no kubeadmin.
+#  8. IDENTITY PROVIDER (OAuth do cluster)
 # =============================================================================
+#  ANTES DE LIGAR:
+#   1. REGISTRO DE APLICACAO no provedor (ex: Microsoft Entra ID)
+#      Redirect URI (tipo Web), terminando com o "name" do provider abaixo:
+#        https://oauth-openshift.apps.<cluster>.<baseDomain>/oauth2callback/<PROVIDER_NAME>
+#      Confirme o host real (a rota oauth fica no IngressController DEFAULT):
+#        oc get route oauth-openshift -n openshift-authentication \
+#          -o jsonpath='{.spec.host}{"\n"}'
+#      Adicione o claim opcional "groups" -- sem ele nenhum RoleBinding por
+#      grupo funciona.
+#   2. SECRET NO CLUSTER, em openshift-config, chave obrigatoriamente
+#      chamada clientSecret:
+#        oc create secret generic openid-client-secret -n openshift-config \
+#          --from-literal=clientSecret='<segredo>'
+#   3. A lista abaixo SUBSTITUI spec.identityProviders do cluster -- e atomica.
+#      Ao sincronizar, o login fica indisponivel por ~1 minuto.
+#      NAO remova o kubeadmin antes de validar o login novo.
 identityProvider:
-  enabled: false                    # <-- vire para true só depois de preencher
+  enabled: false
 
   providers:
-    - name: RTC_EntraID             # entra na URL de callback -- não mude depois
+    - name: "<PROVIDER_NAME>"       # entra na URL de callback. ex: CorpEntraID
       type: OpenID
       mappingMethod: claim
       openID:
-        clientID: "<PREENCHER>"     # Application (client) ID do registro no Entra ID
+        clientID: "<OIDC_CLIENT_ID>"          # Application (client) ID
         clientSecret:
-          name: openid-client-secret        # Secret em openshift-config (fora do Git)
-        issuer: "https://login.microsoftonline.com/<PREENCHER>/v2.0"   # <tenant-id>
+          name: openid-client-secret
+        # ex: https://login.microsoftonline.com/<AZURE_TENANT_ID>/v2.0
+        issuer: "<OIDC_ISSUER_URL>"
         extraScopes:
           - profile
           - openid

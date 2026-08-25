@@ -25,7 +25,7 @@
 #      senao a delecao cascateia e o Hive destroi o cluster na Azure)
 #
 #  2. Gere o arquivo para o seu cluster e aplique:
-#         sed 's/<CLUSTER>/kildes9002/g' argocd/provision-standalone.yaml | oc apply -f -
+#         sed 's/<CLUSTER>/meu-cluster/g' argocd/provision-standalone.yaml | oc apply -f -
 #
 #  3. Sincronize MANUALMENTE, pela console ou por:
 #         oc patch applications.argoproj.io provision-standalone-<CLUSTER> \

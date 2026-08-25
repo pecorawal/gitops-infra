@@ -93,33 +93,33 @@ oc rollout status deploy/cert-manager -n cert-manager
 ### Um único issuer para os dois wildcards
 
 O `ClusterIssuer` **`letsencrypt-prod`** usa desafio **DNS01 na Azure DNS Zone
-pública** (`cgibs.gov.br`) e emite:
+pública** (`example.com`) e emite:
 
 | Certificado | Namespace | Usado por |
 |---|---|---|
-| `*.cgibs.gov.br` (`public-ingress-tls`) | `openshift-ingress` | `defaultCertificate` do IC público |
-| `*.pri.cgibs.gov.br` (`private-ingress-tls`) | `openshift-ingress` | `defaultCertificate` do IC privado |
+| `*.example.com` (`public-ingress-tls`) | `openshift-ingress` | `defaultCertificate` do IC público |
+| `*.pri.example.com` (`private-ingress-tls`) | `openshift-ingress` | `defaultCertificate` do IC privado |
 
 O wildcard **privado também sai do Let's Encrypt**, e isso funciona porque o
 desafio DNS01 não precisa que o nome final seja resolvível na internet — ele só
 precisa do registro TXT:
 
 ```
-_acme-challenge.pri.cgibs.gov.br   TXT   <token>      ← gravado na zona PÚBLICA
+_acme-challenge.pri.example.com   TXT   <token>      ← gravado na zona PÚBLICA
 ```
 
-O Let's Encrypt consulta esse TXT na zona pública `cgibs.gov.br`, valida, e emite
-o certificado. O nome `app.pri.cgibs.gov.br` continua existindo **apenas** na
+O Let's Encrypt consulta esse TXT na zona pública `example.com`, valida, e emite
+o certificado. O nome `app.pri.example.com` continua existindo **apenas** na
 Azure Private DNS Zone, alcançável só de dentro da VNet.
 
 > **Requisito para isso funcionar**
 >
 > ```bash
-> dig +short NS pri.cgibs.gov.br
+> dig +short NS pri.example.com
 > ```
 >
-> Não pode retornar nada. Se `pri.cgibs.gov.br` estiver delegado publicamente a
-> outro servidor de nomes, o TXT gravado em `cgibs.gov.br` não será encontrado e a
+> Não pode retornar nada. Se `pri.example.com` estiver delegado publicamente a
+> outro servidor de nomes, o TXT gravado em `example.com` não será encontrado e a
 > emissão falha. Nesse caso, delegue a validação com `cnameStrategy` ou ligue a
 > CA interna (abaixo).
 
@@ -157,10 +157,10 @@ ingress:
 
 | | `private` | `public` | `default` |
 |---|---|---|---|
-| Domínio | `pri.cgibs.gov.br` | `cgibs.gov.br` | `apps.<cluster>.cgibs.gov.br` |
+| Domínio | `pri.example.com` | `example.com` | `apps.<cluster>.example.com` |
 | `scope` | `Internal` (Azure Internal LB) | `External` (Azure Public LB) | conforme `publish` |
 | Admite | `ingress-type: private` | `ingress-type: public` | o resto |
-| Certificado | `*.pri.cgibs.gov.br` | `*.cgibs.gov.br` | do cluster |
+| Certificado | `*.pri.example.com` | `*.example.com` | do cluster |
 | DNS | Azure Private DNS Zone | Azure DNS Zone | — |
 
 Ambos com `dnsManagementPolicy: Unmanaged`: quem cria os registros é o ExternalDNS,
@@ -239,26 +239,26 @@ O que separa a zona privada da pública **não** é o provider (é `Azure` nos d
 casos) e sim o resource ID em `spec.zones`:
 
 ```
-/subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Network/privateDnsZones/pri.cgibs.gov.br
-/subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Network/dnszones/cgibs.gov.br
+/subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Network/privateDnsZones/pri.example.com
+/subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Network/dnszones/example.com
 ```
 
 ```bash
-az network private-dns zone show -n pri.cgibs.gov.br -g <rg> --query id -o tsv
-az network dns         zone show -n cgibs.gov.br     -g <rg> --query id -o tsv
+az network private-dns zone show -n pri.example.com -g <rg> --query id -o tsv
+az network dns         zone show -n example.com     -g <rg> --query id -o tsv
 ```
 
 ### A exclusão do subdomínio privado
 
-`pri.cgibs.gov.br` é **subdomínio** de `cgibs.gov.br`. O filtro da instância
-pública (`.*\.cgibs\.gov\.br`) casaria também com `app.pri.cgibs.gov.br`. Por
+`pri.example.com` é **subdomínio** de `example.com`. O filtro da instância
+pública (`.*\.example\.com`) casaria também com `app.pri.example.com`. Por
 isso o values traz:
 
 ```yaml
 externalDNS:
   public:
     excludeDomains:
-      - "pri.cgibs.gov.br"
+      - "pri.example.com"
 ```
 
 que gera um `filterType: Exclude` no CR. Na prática as duas instâncias já estão
@@ -288,7 +288,7 @@ metadata:
   labels:
     ingress-type: private          # ou: ingress-type: public
 spec:
-  host: checkout.pri.cgibs.gov.br  # um nível sob o domínio -> coberto pelo wildcard
+  host: checkout.pri.example.com  # um nível sob o domínio -> coberto pelo wildcard
   to:
     kind: Service
     name: checkout
@@ -302,9 +302,9 @@ spec:
 A partir daí, sem mais nenhuma ação:
 
 1. o IngressController `private-<cluster>` admite a rota (label bate com o `routeSelector`);
-2. o ExternalDNS cria `checkout.pri.cgibs.gov.br` na Azure Private DNS Zone
+2. o ExternalDNS cria `checkout.pri.example.com` na Azure Private DNS Zone
    apontando para o LB interno;
-3. o wildcard `*.pri.cgibs.gov.br` já serve o TLS.
+3. o wildcard `*.pri.example.com` já serve o TLS.
 
 Conferir qual router admitiu:
 
@@ -336,10 +336,10 @@ spec:
   ingressClassName: openshift-default
   tls:
     - hosts:
-        - checkout.pri.cgibs.gov.br
+        - checkout.pri.example.com
       secretName: checkout-tls
   rules:
-    - host: checkout.pri.cgibs.gov.br
+    - host: checkout.pri.example.com
       http:
         paths:
           - path: /
@@ -374,8 +374,8 @@ certManager:
       issuer: letsencrypt-prod
       secretName: portal-tls
       dnsNames:
-        - "portal.cgibs.gov.br"
-        - "www.portal.cgibs.gov.br"    # dois níveis: fora do wildcard
+        - "portal.example.com"
+        - "www.portal.example.com"    # dois níveis: fora do wildcard
 ```
 
 O namespace precisa existir — quem o cria são os ApplicationSets de `workloads/`,

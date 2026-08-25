@@ -15,7 +15,7 @@ Operator.
 |---|---|---|
 | Provisionamento | `ClusterDeployment` (Hive) + `install-config` + `MachinePool` + `ManagedCluster` | Hub |
 | Operators | cert-manager Operator, ExternalDNS Operator | Cluster novo |
-| Certificados | `ClusterIssuer` ACME/Azure DNS, wildcards `*.cgibs.gov.br` e `*.pri.cgibs.gov.br` | Cluster novo |
+| Certificados | `ClusterIssuer` ACME/Azure DNS, wildcards `*.example.com` e `*.pri.example.com` | Cluster novo |
 | Ingress | IngressController **privado** (LB interno) e **público** (LB externo), separados pela label `ingress-type` | Cluster novo |
 | DNS | ExternalDNS → **Azure Private DNS Zone** e → **Azure DNS Zone** pública | Cluster novo |
 | Autoscaling | `ClusterAutoscaler` global + `MachineAutoscaler` por MachineSet (pool worker, min..max) | Cluster novo |
@@ -89,10 +89,10 @@ A separação entre os três IngressControllers é feita por **uma label na Rout
 
 | Label na Route | IngressController | Load Balancer | Domínio | Zona DNS | Certificado |
 |---|---|---|---|---|---|
-| `ingress-type: private` | `private` | Azure Internal LB | `pri.cgibs.gov.br` | Azure **Private** DNS Zone | `*.pri.cgibs.gov.br` |
-| `ingress-type: public` | `public` | Azure Public LB | `cgibs.gov.br` | Azure DNS Zone (pública) | `*.cgibs.gov.br` |
-| qualquer outro valor | `default` | conforme `publish` | `apps.<cluster>.cgibs.gov.br` | — | do cluster |
-| _(sem a label)_ | `default` | conforme `publish` | `apps.<cluster>.cgibs.gov.br` | — | do cluster |
+| `ingress-type: private` | `private` | Azure Internal LB | `pri.example.com` | Azure **Private** DNS Zone | `*.pri.example.com` |
+| `ingress-type: public` | `public` | Azure Public LB | `example.com` | Azure DNS Zone (pública) | `*.example.com` |
+| qualquer outro valor | `default` | conforme `publish` | `apps.<cluster>.example.com` | — | do cluster |
+| _(sem a label)_ | `default` | conforme `publish` | `apps.<cluster>.example.com` | — | do cluster |
 
 O **`default` fica reservado às aplicações internas do OpenShift**. Ele recebe o
 seletor:
@@ -118,16 +118,16 @@ A chave da label e os valores reservados são parâmetros
 Não há CA interna nesta arquitetura. O `ClusterIssuer` **`letsencrypt-prod`**
 emite os dois wildcards por desafio **DNS01 na Azure DNS Zone pública**:
 
-- `*.cgibs.gov.br` → certificado padrão do IngressController público
-- `*.pri.cgibs.gov.br` → certificado padrão do IngressController privado
+- `*.example.com` → certificado padrão do IngressController público
+- `*.pri.example.com` → certificado padrão do IngressController privado
 
 O wildcard privado também sai daí: o desafio grava o TXT
-`_acme-challenge.pri.cgibs.gov.br` na zona **pública** `cgibs.gov.br`, e é só esse
+`_acme-challenge.pri.example.com` na zona **pública** `example.com`, e é só esse
 registro que o Let's Encrypt consulta. O nome final continua resolvendo apenas na
 Private DNS Zone, dentro da VNet.
 
-> **Requisito:** `pri.cgibs.gov.br` não pode estar delegado publicamente para
-> outro servidor de nomes. Confirme com `dig +short NS pri.cgibs.gov.br` — não
+> **Requisito:** `pri.example.com` não pode estar delegado publicamente para
+> outro servidor de nomes. Confirme com `dig +short NS pri.example.com` — não
 > deve retornar nada.
 
 Como os dois wildcards já cobrem qualquer host de um nível sob os dois domínios,
@@ -144,3 +144,4 @@ chave separada ou exigência de auditoria — ver
 4. [Troubleshooting](04-troubleshooting.md)
 5. [Estender: novos operadores, manifestos e camadas](05-estender.md)
 6. [Identity Provider (OAuth do cluster)](06-identity-provider.md)
+7. [Replicar a esteira em outro cliente](07-replicar.md)
