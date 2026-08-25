@@ -387,6 +387,22 @@ autoscaling:
   minReplicas: 3                    # >= numero de zonas (3), ou 0
   maxReplicas: 9
 
+  # CR global ClusterAutoscaler -- vale nos DOIS modos.
+  # O Hive cria os MachineAutoscaler a partir do MachinePool, mas NAO cria este
+  # CR; sem ele o autoscaler nao e ligado e nada escala.
+  #
+  # O piso de cada zona sai de minReplicas repartido entre elas: com 3 zonas e
+  # minReplicas 3, cada MachineSet fica com min 1. Um MachineSet no proprio
+  # piso nao pode encolher -- e o motivo mais comum de "nao fez scale-down".
+  clusterAutoscaler:
+    maxNodesTotal: 20
+    scaleDown:
+      enabled: true
+      unneededTime: 10m       # tempo ocioso antes de virar candidato
+      delayAfterAdd: 10m
+      delayAfterDelete: 10m
+      delayAfterFailure: 10m
+
 # =============================================================================
 #  8. IDENTITY PROVIDER -- desligado
 # =============================================================================
