@@ -1,4 +1,4 @@
-{{- if .Values.autoscaling.enabled }}
+{{- if and .Values.autoscaling.enabled (eq (default "machinePool" .Values.autoscaling.mode) "spoke") }}
 {{- range .Values.autoscaling.machineSets }}
 # MachineAutoscaler por MachineSet do worker: e ele que decide escalar para
 # cima/baixo (min..max) conforme a demanda das pods. O nome do objeto e o

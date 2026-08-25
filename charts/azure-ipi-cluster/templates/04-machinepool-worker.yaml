@@ -1,6 +1,41 @@
 {{- if .Values.provision.enabled }}
-# Pool de workers gerenciado pelo Hive depois da instalacao. E por aqui que se
-# escala o cluster: mude provision.compute.replicas e commite.
+{{- $as := .Values.autoscaling | default dict }}
+{{- $porPool := and $as.enabled (eq (default "machinePool" $as.mode) "machinePool") }}
+{{- if $porPool }}
+{{- /*
+  AUTOSCALING EM CLUSTER GERENCIADO PELO ACM/HIVE
+  ---------------------------------------------------------------------------
+  Num cluster provisionado pelo Hive, quem manda nos MachineSets do spoke e o
+  MachinePool daqui do hub. O Hive reconcilia os MachineSets a partir dele.
+
+  Por isso o autoscaling NAO se configura criando MachineAutoscaler no spoke:
+  declara-se spec.autoscaling no MachinePool, e o proprio Hive cria, no cluster
+  gerenciado, o ClusterAutoscaler e um MachineAutoscaler por MachineSet.
+  Criar esses objetos por fora significa disputar com o Hive.
+
+  spec.replicas e spec.autoscaling sao MUTUAMENTE EXCLUSIVOS -- o webhook do
+  Hive recusa o MachinePool com os dois. Por isso o replicas some quando o
+  autoscaling entra.
+
+  min/max sao TOTAIS do pool: o Hive distribui entre os MachineSets (um por
+  zona).
+*/}}
+{{- if gt (int $as.minReplicas) (int $as.maxReplicas) }}
+  {{- fail (printf "\n\nautoscaling.minReplicas (%d) maior que maxReplicas (%d).\n" (int $as.minReplicas) (int $as.maxReplicas)) }}
+{{- end }}
+{{- $zonas := len (.Values.provision.compute.zones | default list) }}
+{{- if and (gt (int $as.minReplicas) 0) (gt $zonas 0) (lt (int $as.minReplicas) $zonas) }}
+  {{- fail (printf "\n\nautoscaling.minReplicas = %d, mas o pool esta espalhado por %d zonas.\nO Hive cria um MachineSet por zona e reparte o minimo entre eles: com menos\nde %d, alguma zona ficaria sem instrucao valida.\nUse minReplicas >= %d (ou 0, para permitir escalar ate zero).\n" (int $as.minReplicas) $zonas $zonas $zonas) }}
+{{- end }}
+{{- end }}
+# Pool de workers gerenciado pelo Hive depois da instalacao.
+{{- if $porPool }}
+# AUTOSCALING LIGADO: o tamanho do pool passa a ser decidido pelo autoscaler,
+# entre min e max. O Hive cria o ClusterAutoscaler e os MachineAutoscaler no
+# cluster gerenciado -- nao ha nada a aplicar la por fora.
+{{- else }}
+# Escala manual: mude provision.compute.replicas e commite.
+{{- end }}
 apiVersion: hive.openshift.io/v1
 kind: MachinePool
 metadata:
@@ -13,7 +48,13 @@ spec:
   clusterDeploymentRef:
     name: {{ .Values.clusterName }}
   name: worker
+  {{- if $porPool }}
+  autoscaling:
+    minReplicas: {{ $as.minReplicas }}
+    maxReplicas: {{ $as.maxReplicas }}
+  {{- else }}
   replicas: {{ .Values.provision.compute.replicas }}
+  {{- end }}
   platform:
     azure:
       type: {{ .Values.provision.compute.type }}

@@ -1,4 +1,11 @@
-{{- if .Values.autoscaling.enabled }}
+{{- if and .Values.autoscaling.enabled (eq (default "machinePool" .Values.autoscaling.mode) "spoke") }}
+{{- /*
+  SO no modo "spoke". Em cluster gerenciado pelo ACM (mode: machinePool, o
+  padrao), quem manda nos MachineSets e o MachinePool do Hive, no hub: o
+  autoscaling entra em spec.autoscaling daquele objeto e e o proprio Hive que
+  cria ClusterAutoscaler e MachineAutoscaler no cluster gerenciado.
+  Aplicar esses CRs por fora seria disputar com o Hive.
+*/}}
 # WAVE 60 -- SPOKE. Autoscaling de máquinas: ClusterAutoscaler global +
 # MachineAutoscaler por MachineSet do pool worker.
 # Roda DEPOIS do provisionamento (wave 0): os MachineSets só existem depois

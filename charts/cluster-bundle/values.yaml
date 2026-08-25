@@ -41,5 +41,6 @@ nsgRule:
   enabled: false
 autoscaling:
   enabled: false
+  mode: machinePool
 identityProvider:
   enabled: false

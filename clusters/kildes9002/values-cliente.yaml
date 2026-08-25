@@ -358,40 +358,27 @@ nsgRule:
 # =============================================================================
 #  7. AUTOSCALING -- desligado (exige os nomes reais dos MachineSets)
 # =============================================================================
-#  O ClusterAutoscaler global apenas LIGA o autoscaler. Quem escala e o
-#  MachineAutoscaler, UM POR MachineSet -- por isso machineSets nao pode ficar
-#  vazio (o chart falha o render se ficar).
+#  ATENCAO -- em cluster gerenciado pelo ACM o autoscaling NAO se configura
+#  criando MachineAutoscaler no cluster. Quem manda nos MachineSets do spoke e
+#  o MachinePool do Hive, no hub. Declara-se spec.autoscaling nele, e o proprio
+#  Hive cria, no cluster gerenciado, o ClusterAutoscaler e um MachineAutoscaler
+#  por MachineSet -- sem nada a aplicar la por fora.
 #
-#  Os MachineSets so existem DEPOIS do cluster provisionado. Descubra os nomes
-#  reais no spoke:
-#      oc get machineset -n openshift-machine-api
-#  Saida tipica (IPI Azure, brazilsouth):
-#      kildes9002-<hash>-worker-brazilsouth1
-#      kildes9002-<hash>-worker-brazilsouth2
-#      kildes9002-<hash>-worker-brazilsouth3
-#  O <hash> e gerado na instalacao -- copie os nomes exatos.
+#  E por isso que nao ha lista de MachineSets aqui: nao e preciso descobrir
+#  nome nenhum. min e max sao TOTAIS do pool worker, e o Hive reparte entre as
+#  zonas (3 zonas neste cluster).
+#
+#  spec.replicas e spec.autoscaling sao mutuamente exclusivos no Hive: com
+#  enabled: true, provision.compute.replicas deixa de valer e o tamanho do pool
+#  passa a ser decidido pelo autoscaler.
 autoscaling:
-  enabled: false                    # <-- vire para true so depois de preencher machineSets
+  enabled: false                    # <-- vire para true para ligar
 
-  clusterAutoscaler:
-    maxNodesTotal: 20
-    scaleDown:
-      enabled: true
-      unneededTime: 10m
-      delayAfterAdd: 10m
-      delayAfterDelete: 10m
-      delayAfterFailure: 10m
+  # machinePool = ACM/Hive (este cluster). spoke = cluster sem Hive.
+  mode: machinePool
 
-  machineSets:
-    - name: "<PREENCHER>"           # ex: kildes9002-abcde-worker-brazilsouth1
-      minReplicas: 2
-      maxReplicas: 6
-    - name: "<PREENCHER>"           # ex: kildes9002-abcde-worker-brazilsouth2
-      minReplicas: 2
-      maxReplicas: 6
-    - name: "<PREENCHER>"           # ex: kildes9002-abcde-worker-brazilsouth3
-      minReplicas: 2
-      maxReplicas: 6
+  minReplicas: 3                    # >= numero de zonas (3), ou 0
+  maxReplicas: 9
 
 # =============================================================================
 #  8. IDENTITY PROVIDER -- desligado

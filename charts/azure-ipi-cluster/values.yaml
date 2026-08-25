@@ -71,3 +71,13 @@ provision:
       diskSizeGB: 512
       diskType: Premium_LRS
     zones: ["1", "2", "3"]
+
+# Autoscaling. Lido aqui apenas para decidir a forma do MachinePool.
+#   mode: machinePool -> spec.autoscaling no MachinePool (ACM/Hive). O Hive cria
+#                        ClusterAutoscaler e MachineAutoscaler no spoke.
+#   mode: spoke       -> nada aqui; os CRs vao pelo chart cluster-autoscaling.
+autoscaling:
+  enabled: false
+  mode: machinePool
+  minReplicas: 3
+  maxReplicas: 9
