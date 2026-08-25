@@ -66,6 +66,13 @@ provision:
     existingPullSecret: "azure-rtc"
     existingSshPrivateKeySecret: "azure-rtc"
 
+  # Nome do pool de workers. Define o MachinePool (kildes9002-<nome>) e os
+  # MachineSets (<infraID>-<nome>-<zona>).
+  # Trocar aqui e o unico jeito de corrigir spec.platform, que e IMUTAVEL:
+  # cria-se o pool novo com nome novo e drena-se o antigo.
+  machinePool:
+    name: worker-v2
+
   publish: Internal
   fips: false
   preserveOnDelete: false

@@ -34,6 +34,12 @@ provision:
     existingCredentialsSecret: ""
     existingPullSecret: ""
     existingSshPrivateKeySecret: ""
+  # Nome do pool de workers. Muda o nome do MachinePool (<cluster>-<nome>) e
+  # dos MachineSets gerados (<infraID>-<nome>-<zona>).
+  # Trocar aqui e o caminho para recriar o pool quando spec.platform precisa
+  # mudar -- ele e imutavel.
+  machinePool:
+    name: worker
   publish: Internal
   fips: false
   preserveOnDelete: false
