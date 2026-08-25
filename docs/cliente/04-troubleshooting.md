@@ -1157,6 +1157,22 @@ platform:
     outboundType: Loadbalancer
 ```
 
+> **`spec.platform` é IMUTÁVEL.** Um MachinePool já existente não aceita patch
+> nesses campos — o webhook responde `field is immutable`. Corrigir exige
+> **recriar** o objeto, e o Hive tem finalizer nele: deletar sem cuidado remove
+> os MachineSets do cluster gerenciado e, com eles, os nós. O procedimento
+> seguro é remover o finalizer primeiro, deletar, confirmar que os MachineSets
+> continuam de pé, e só então deixar o ArgoCD recriar:
+>
+> ```bash
+> oc patch machinepools.hive.openshift.io <cluster>-worker -n <cluster> \
+>   --type=merge -p '{"metadata":{"finalizers":null}}'
+> oc delete machinepools.hive.openshift.io <cluster>-worker -n <cluster>
+> # confira no spoke que os MachineSets sobreviveram, ANTES de sincronizar
+> ```
+>
+> Para clusters novos isso não ocorre: o chart já emite a rede no primeiro apply.
+
 > **O nome do campo muda conforme o objeto**: o install-config usa
 > `computeSubnet`, o `providerSpec` do MachineSet usa `subnet`, e o CRD do
 > MachinePool usa `computeSubnet`. Errar não gera erro — o Kubernetes descarta
