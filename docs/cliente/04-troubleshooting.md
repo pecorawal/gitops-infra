@@ -1123,6 +1123,51 @@ oc logs -n cert-manager deploy/cert-manager -f
 - **Cota do Let's Encrypt** — 50 certificados por domínio por semana. Use o
   servidor de staging enquanto testa.
 
+## Máquina nova falha com `ResourceNotFound: virtualNetworks/<infraID>-vnet`
+
+```
+failed to create nic ...: subnet kildes9002-92s7h-worker-subnet not found:
+The Resource 'Microsoft.Network/virtualNetworks/kildes9002-92s7h-vnet'
+under resource group 'kildes9002-92s7h-rg' was not found
+```
+
+Os nomes citados (`<infraID>-vnet`, `<infraID>-worker-subnet`, `<infraID>-rg`)
+são os que o **instalador criaria** se o cluster tivesse VNet própria. Num
+cluster com **VNet pré-existente** eles não existem.
+
+**Causa:** o `install-config` só vale na **instalação**. Depois dela, quem gera
+os MachineSets do cluster gerenciado é o **MachinePool**, e o Hive monta o
+`providerSpec` a partir do que está declarado **nele** — não do install-config.
+Sem os campos de rede no MachinePool, ele assume a nomenclatura padrão.
+
+O sintoma só aparece quando um MachineSet é **regenerado** (autoscaling, recriação
+do pool). Enquanto os MachineSets originais do instalador estiverem intactos,
+eles carregam a rede correta e nada falha — o que torna o problema tardio e
+confuso.
+
+**Correção** — o chart declara os três campos quando `provision.azure.virtualNetwork`
+está preenchido:
+
+```yaml
+platform:
+  azure:
+    networkResourceGroupName: rg-des-rt
+    virtualNetwork: vnet-des-rt
+    subnet: rrtdocw1.azu1-10.219.23.0_24
+```
+
+Confirme no hub, depois do sync:
+
+```bash
+oc get machinepools.hive.openshift.io <cluster>-worker -n <cluster> \
+  -o jsonpath='{.spec.platform.azure}{"\n"}'
+```
+
+> Se os campos não aparecerem depois de aplicados, verifique se o CRD do Hive
+> os aceita — o Kubernetes **descarta silenciosamente** campos que o CRD não
+> conhece:
+> `oc explain machinepool.spec.platform.azure`
+
 ## O autoscaling não cria nada (Application existe, cluster não escala)
 
 **Primeiro, confirme o modo.** Em cluster provisionado pelo ACM/Hive — o caso
