@@ -1,4 +1,22 @@
-{{- if .Values.autoscaling.enabled }}
+{{- /*
+  ALGUM POOL ADICIONAL ESCALA?
+  O autoscaling de um pool adicional (machinePools.pools[].autoscaling) depende
+  do MESMO ClusterAutoscaler global do worker. Ele tem que sair mesmo com
+  autoscaling.enabled=false -- que continua valendo so para o pool worker.
+
+  NOTA: bloco IDENTICO ao de charts/cluster-bundle/templates/60-autoscaling-app.yaml.
+  Ao mudar um, mude o outro.
+*/}}
+{{- $poolsEscalam := false }}
+{{- $mp := .Values.machinePools | default dict }}
+{{- if $mp.enabled }}
+  {{- range ($mp.pools | default list) }}
+    {{- if and (kindIs "map" .) (kindIs "map" .autoscaling) .autoscaling.enabled }}
+      {{- $poolsEscalam = true }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- if or .Values.autoscaling.enabled $poolsEscalam }}
 {{- /*
   GUARDA -- machineSets vazio nao escala nada.
   O ClusterAutoscaler "default" apenas LIGA o autoscaler no cluster; quem
@@ -6,10 +24,10 @@
   o chart criava so o CR global e nada acontecia: nenhum erro, nenhum evento,
   nenhum no a mais. E o modo de falha mais confuso possivel.
 */ -}}
-{{- if and (eq (default "machinePool" .Values.autoscaling.mode) "spoke") (not .Values.autoscaling.machineSets) }}
+{{- if and .Values.autoscaling.enabled (eq (default "machinePool" .Values.autoscaling.mode) "spoke") (not .Values.autoscaling.machineSets) }}
   {{- fail "\n\nautoscaling.enabled=true mas autoscaling.machineSets esta vazio.\nO ClusterAutoscaler sozinho nao escala nada -- quem escala e o\nMachineAutoscaler, um por MachineSet.\n\nDescubra os nomes reais NO CLUSTER (eles so existem depois do provisionamento):\n  oc get machineset -n openshift-machine-api\n\nE preencha:\n  autoscaling:\n    machineSets:\n      - name: <cluster>-worker-<zona>\n        minReplicas: 2\n        maxReplicas: 6\n" }}
 {{- end }}
-{{- range (eq (default "machinePool" .Values.autoscaling.mode) "spoke" | ternary .Values.autoscaling.machineSets list) }}
+{{- range (and .Values.autoscaling.enabled (eq (default "machinePool" .Values.autoscaling.mode) "spoke") | ternary .Values.autoscaling.machineSets list) }}
   {{- if or (not .name) (regexMatch "<[A-Z_]{2,}>" (.name | toString)) }}
     {{- fail (printf "\n\nautoscaling.machineSets tem entrada com name=%q (placeholder).\nO name TEM que ser o nome exato do MachineSet:\n  oc get machineset -n openshift-machine-api\n" (.name | toString)) }}
   {{- end }}

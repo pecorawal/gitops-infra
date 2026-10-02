@@ -266,6 +266,7 @@ backup:
 | Wave | Camada |
 |---|---|
 | 0 | provisionamento (hub) |
+| 5 | machine pools adicionais (hub) — capacidade antes das camadas de spoke |
 | 10 | operators |
 | 20 | cert-manager (issuers e certificados) |
 | 30 | ingress controllers |

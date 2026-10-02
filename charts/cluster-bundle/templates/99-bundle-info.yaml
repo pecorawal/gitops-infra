@@ -30,6 +30,9 @@ data:
   # Estado dos interruptores de TOPO -- e so este nivel que decide se a
   # Application filha e criada.
   enabled.provision: {{ .Values.provision.enabled | quote }}
+  enabled.machinePools: {{ .Values.machinePools.enabled | quote }}
+  # Quantos pools adicionais o bundle leu (0 = lista vazia ou nao carregada).
+  machinePools.count: {{ len (.Values.machinePools.pools | default list) | quote }}
   enabled.operators: {{ .Values.operators.enabled | quote }}
   enabled.certManager: {{ .Values.certManager.enabled | quote }}
   enabled.ingress: {{ .Values.ingress.enabled | quote }}

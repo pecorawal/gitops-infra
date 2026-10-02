@@ -1,0 +1,5 @@
+apiVersion: v2
+name: machine-pools
+description: MachinePools adicionais do Hive (novos tipos de MachineSet no cluster gerenciado, com autoscaling opcional) -- roda no hub
+type: application
+version: 0.1.0

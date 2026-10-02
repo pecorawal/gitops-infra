@@ -23,3 +23,10 @@ autoscaling:
   #  - name: <cluster>-worker-<region>-<zone>   # ex: azr-cliente-dev-01-worker-brazilsouth1
   #    minReplicas: 2
   #    maxReplicas: 6
+
+# Lido apenas para decidir se o ClusterAutoscaler global sai: basta um pool
+# adicional com autoscaling.enabled. Os MachinePools em si sao do chart
+# machine-pools, no hub.
+machinePools:
+  enabled: false
+  pools: []

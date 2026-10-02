@@ -19,7 +19,7 @@
 #
 #  ORDEM DE ATIVACAO -- ligue um bloco por vez, confirmando cada camada:
 #    provision -> operators -> certManager -> ingress -> externalDNS
-#              -> nsgRule -> autoscaling -> identityProvider
+#              -> nsgRule -> autoscaling -> identityProvider -> machinePools
 # =============================================================================
 
 # ---- IDENTIDADE -------------------------------------------------------------
@@ -414,7 +414,11 @@ autoscaling:
 
   # CR global ClusterAutoscaler -- vale nos DOIS modos. Sem ele o autoscaler
   # nao e ligado e nada escala.
+  # Tambem sai com enabled: false, se algum pool do bloco 9 tiver autoscaling
+  # -- e os valores abaixo valem para ele.
   clusterAutoscaler:
+    # Conta TODOS os nos do cluster: masters, worker e os pools do bloco 9.
+    # Atingido o teto, nenhum pool escala mais.
     maxNodesTotal: 20
     scaleDown:
       enabled: true
@@ -474,3 +478,67 @@ identityProvider:
             - email
           groups:
             - groups
+
+# =============================================================================
+#  9. MACHINE POOLS ADICIONAIS -- novos tipos de maquina no cluster
+# =============================================================================
+#  Para grupos de nos DIFERENTES do worker: infra, memoria, GPU, cargas
+#  isoladas por taint. O pool worker continua em provision.compute.
+#
+#  Cada entrada vira um MachinePool do Hive NO HUB, e o Hive gera no cluster
+#  gerenciado um MachineSet por zona:
+#    hub    MachinePool  <cluster>-<name>                 (namespace <cluster>)
+#    spoke  MachineSet   <infraID>-<name>-<regiao><zona>  (openshift-machine-api)
+#  NAO crie MachineSet direto no spoke: num cluster do ACM quem manda nos
+#  MachineSets e o MachinePool.
+#
+#  HERDADO, sem repetir aqui:
+#    rede (BYO VNet) e outboundType  <- provision.azure
+#    zones e osDisk, quando omitidos <- provision.compute
+#
+#  IMUTAVEL depois de criado: type, osDisk e zones. Para mudar, crie um pool
+#  com nome NOVO (infra-v2), migre as cargas e remova o antigo.
+#  MUTAVEL: replicas, autoscaling, labels e taints.
+#
+#  REMOVER da lista NAO apaga as maquinas: o MachinePool fica no hub ate um
+#  "oc delete" explicito -- e so entao o Hive drena e remove os nos.
+#
+#  AUTOSCALING POR POOL: basta autoscaling.enabled: true no pool. O
+#  ClusterAutoscaler global (bloco 7) sai sozinho, sem ligar o autoscaling do
+#  worker. min/max sao TOTAIS do pool; minReplicas 0 ou >= numero de zonas.
+#
+#  ANTES DE LIGAR: cota de vCPU da familia da VM na regiao
+#    az vm list-usage -l <AZURE_REGION> -o table
+#  Guia completo: docs/cliente/08-machine-pools.md
+machinePools:
+  enabled: false
+
+  pools: []
+    # ---- nos de infraestrutura (router, registry, monitoring) ----
+    # - name: infra                     # minusculas, numeros e "-"
+    #   type: Standard_D8s_v3
+    #   osDisk:                         # omitido = o mesmo do worker
+    #     diskSizeGB: 256
+    #     diskType: Premium_LRS
+    #   zones: ["1", "2", "3"]          # omitido = as mesmas do worker
+    #   replicas: 3                     # IGNORADO com autoscaling.enabled: true
+    #   labels:                         # labels dos NOS
+    #     node-role.kubernetes.io/infra: ""
+    #   taints:                         # so pods com toleration caem aqui
+    #     - key: node-role.kubernetes.io/infra
+    #       value: reserved
+    #       effect: NoSchedule
+    #
+    # ---- nos de memoria, sob demanda (escala a partir de zero) ----
+    # - name: highmem
+    #   type: Standard_E16s_v5
+    #   autoscaling:
+    #     enabled: true
+    #     minReplicas: 0
+    #     maxReplicas: 4
+    #   labels:
+    #     workload-type: highmem
+    #   taints:
+    #     - key: workload-type
+    #       value: highmem
+    #       effect: NoSchedule

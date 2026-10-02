@@ -19,6 +19,7 @@ Operator.
 | Ingress | IngressController **privado** (LB interno) e **público** (LB externo), separados pela label `ingress-type` | Cluster novo |
 | DNS | ExternalDNS → **Azure Private DNS Zone** e → **Azure DNS Zone** pública | Cluster novo |
 | Autoscaling | `ClusterAutoscaler` global + `MachineAutoscaler` por MachineSet (pool worker, min..max) | Cluster novo |
+| Machine pools adicionais | `MachinePool` do Hive por grupo novo de máquinas (infra, memória, GPU), replicas fixas ou autoscaling | Hub |
 
 ## Como o fluxo se encadeia
 
@@ -34,6 +35,7 @@ argocd/root-cliente.yaml            (aplicado UMA vez, na mão)
                           (o APP DOS APPS — só emite Applications)
                           │
                           ├─ wave  0  provision-<cluster>  → charts/azure-ipi-cluster   [HUB]
+                          ├─ wave  5  machinepools-<cluster> → charts/machine-pools     [HUB]
                           ├─ wave 10  operators-<cluster>  → charts/cluster-operators   [SPOKE]
                           ├─ wave 20  certs-<cluster>      → charts/cert-manager-config [SPOKE]
                           ├─ wave 30  ingress-<cluster>    → charts/ingress-controllers [SPOKE]
@@ -42,7 +44,7 @@ argocd/root-cliente.yaml            (aplicado UMA vez, na mão)
                           └─ wave 60  autoscale-<cluster>  → charts/cluster-autoscaling [SPOKE]
 ```
 
-As sete Applications filhas leem **o mesmo** `clusters/<cluster>/values.yaml`.
+Todas as Applications filhas leem **o mesmo** `clusters/<cluster>/values.yaml`.
 
 ## Agrupamento por ambiente
 
@@ -77,6 +79,7 @@ ingress.enabled      →  cria os IngressControllers
 externalDNS.enabled  →  publica os registros de DNS
 nsgRule.enabled      →  sincroniza a inbound rule do NSG com o IP do LB do ingress
 autoscaling.enabled  →  liga o autoscaling do pool worker (min..max por MachineSet)
+machinePools.enabled →  cria os pools adicionais de machinePools.pools (cada um pode escalar)
 ```
 
 Você pode virar todos de uma vez ou avançar camada por camada — as sync-waves
@@ -145,3 +148,4 @@ chave separada ou exigência de auditoria — ver
 5. [Estender: novos operadores, manifestos e camadas](05-estender.md)
 6. [Identity Provider (OAuth do cluster)](06-identity-provider.md)
 7. [Replicar a esteira em outro cliente](07-replicar.md)
+8. [Machine pools adicionais (novos tipos de máquina)](08-machine-pools.md)

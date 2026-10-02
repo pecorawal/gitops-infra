@@ -1,0 +1,26 @@
+# Valores injetados pelo ApplicationSet (bootstrap/02-appset-cliente.yaml).
+# Nao edite aqui -- o arquivo do cliente e clusters/<cluster>/values.yaml.
+clusterName: ""
+
+# Lido do bloco provision do cluster, nao repetido nos pools:
+#   machinePool.name  nome do pool worker -- um pool adicional nao pode repeti-lo
+#   azure.*           rede (BYO VNet) e outboundType, iguais aos do worker
+#   compute.*         zones e osDisk, quando o pool nao declara os seus
+provision:
+  machinePool:
+    name: worker
+  azure:
+    region: ""
+    networkResourceGroupName: ""
+    virtualNetwork: ""
+    computeSubnet: ""
+    outboundType: ""
+  compute:
+    osDisk: {}
+    zones: []
+
+machinePools:
+  enabled: false
+  # Um MachinePool por entrada. Formato completo em
+  # clusters/azr-cliente-dev-01/values.yaml (bloco 9).
+  pools: []

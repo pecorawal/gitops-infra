@@ -1,4 +1,22 @@
-{{- if .Values.autoscaling.enabled }}
+{{- /*
+  ALGUM POOL ADICIONAL ESCALA?
+  O autoscaling de um pool adicional (machinePools.pools[].autoscaling) depende
+  do MESMO ClusterAutoscaler global do worker. Ele tem que sair mesmo com
+  autoscaling.enabled=false -- que continua valendo so para o pool worker.
+
+  NOTA: bloco IDENTICO ao de charts/cluster-autoscaling/templates/10-clusterautoscaler.yaml.
+  Ao mudar um, mude o outro.
+*/}}
+{{- $poolsEscalam := false }}
+{{- $mp := .Values.machinePools | default dict }}
+{{- if $mp.enabled }}
+  {{- range ($mp.pools | default list) }}
+    {{- if and (kindIs "map" .) (kindIs "map" .autoscaling) .autoscaling.enabled }}
+      {{- $poolsEscalam = true }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- if or .Values.autoscaling.enabled $poolsEscalam }}
 {{- /*
   Vale nos DOIS modos, mas com conteudo diferente:
 
@@ -9,6 +27,9 @@
 
     spoke       -> ClusterAutoscaler + um MachineAutoscaler por MachineSet
                    declarado em autoscaling.machineSets.
+
+  So pools adicionais escalando (autoscaling.enabled=false) -> so o
+  ClusterAutoscaler global; os MachineAutoscaler vem do Hive.
 */}}
 # WAVE 60 -- SPOKE. Autoscaling de máquinas: ClusterAutoscaler global +
 # MachineAutoscaler por MachineSet do pool worker.

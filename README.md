@@ -39,6 +39,7 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 | `charts/external-dns-config/` | instâncias do ExternalDNS por zona |
 | `charts/nsg-rule/` | CronJob que sincroniza a inbound rule do NSG com o IP do LB do ingress |
 | `charts/cluster-autoscaling/` | ClusterAutoscaler + MachineAutoscaler (autoscaling do pool worker) |
+| `charts/machine-pools/` | MachinePools adicionais do Hive: novos tipos de MachineSet no cluster, com autoscaling opcional (roda no hub) |
 
 <!-- readme-tree start -->
 ```

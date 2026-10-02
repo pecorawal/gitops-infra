@@ -74,6 +74,7 @@ pré-requisito fora do Git:
 | 6 | `nsgRule` | SPN com `Network Contributor` no RG do NSG **e** no da VNet |
 | 7 | `autoscaling` | cluster de pé |
 | 8 | `identityProvider` | registro de aplicação no IdP + Secret em `openshift-config` |
+| 9 | `machinePools` | cluster de pé + cota de vCPU da família da VM na região ([08](08-machine-pools.md)) |
 
 ## 7.4 O que nunca vai para o Git
 

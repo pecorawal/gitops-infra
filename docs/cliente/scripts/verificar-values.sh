@@ -17,7 +17,7 @@ CLUSTER="${1:?uso: $0 <cluster>}"
 VALUES="clusters/${CLUSTER}/values.yaml"
 [[ -f "$VALUES" ]] || { echo "arquivo nao encontrado: $VALUES" >&2; exit 1; }
 
-BLOCOS="provision operators certManager ingress externalDNS nsgRule autoscaling identityProvider"
+BLOCOS="provision operators certManager ingress externalDNS nsgRule autoscaling identityProvider machinePools"
 
 echo "=== 1. ARQUIVO EM DISCO: $VALUES"
 
@@ -67,7 +67,7 @@ print(f"  clusterName: {d.get('clusterName')!r}")
 if d.get('clusterName') != caminho.split('/')[1]:
     print(f"  !! clusterName difere do nome do diretorio ({caminho.split('/')[1]})")
 
-for b in "provision operators certManager ingress externalDNS nsgRule autoscaling identityProvider".split():
+for b in "provision operators certManager ingress externalDNS nsgRule autoscaling identityProvider machinePools".split():
     bl = d.get(b)
     if bl is None:
         print(f"  {b:18} AUSENTE no arquivo")

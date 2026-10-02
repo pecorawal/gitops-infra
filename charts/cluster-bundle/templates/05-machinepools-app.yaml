@@ -1,0 +1,29 @@
+{{- if .Values.machinePools.enabled }}
+# WAVE 5 -- HUB. MachinePools ADICIONAIS do Hive: novos tipos de maquina (infra,
+# memoria, GPU...) ao lado do pool worker padrao, cada um com replicas fixas ou
+# autoscaling. O Hive gera os MachineSets correspondentes no cluster gerenciado.
+#
+# Roda no HUB, como o provisionamento: num cluster do ACM quem manda nos
+# MachineSets do spoke e o MachinePool. Fica logo depois dele (wave 0) e antes
+# das camadas de spoke, porque capacidade vem antes de carga -- um
+# IngressController com nodePlacement nos nos de infra precisa do pool de pe.
+#
+# Sem resources-finalizer, pelo mesmo motivo de provision-<cluster>: se o bundle
+# deixar de emitir esta Application, ela vira orfa em vez de cascatear a
+# delecao. Os MachinePools ainda levam Prune=false,Delete=false.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: machinepools-{{ .Values.clusterName }}
+  namespace: {{ .Values.global.argoNamespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  project: {{ .Values.global.project }}
+  source:
+    {{- include "bundle.source" (dict "root" . "chart" "machine-pools") | nindent 4 }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.clusterName }}
+  {{- include "bundle.syncPolicy" . | nindent 2 }}
+{{- end }}
