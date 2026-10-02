@@ -53,8 +53,8 @@ cp -r clusters/azr-main-dev-01 clusters/<seu-cluster>
 │   ├── 00-rbac-acm.yaml
 │   ├── provision-standalone.yaml
 │   ├── root-apps.yaml
-│   ├── root-main.yaml
-│   └── root-clusters.yaml
+│   ├── root-clusters.yaml
+│   └── root-main.yaml
 ├── bootstrap
 │   ├── 00-namespaces.yaml
 │   ├── 01-gitops-cluster.yaml
