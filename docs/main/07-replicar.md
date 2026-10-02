@@ -1,13 +1,13 @@
-# 7. Replicar a esteira em outro cliente
+# 7. Replicar a esteira em outro main
 
-O que muda de um cliente para outro são **três coisas**: a URL do repositório,
+O que muda de um main para outro são **três coisas**: a URL do repositório,
 o `values.yaml` de cada cluster e os Secrets (que nunca ficam no Git). Os charts
 não mudam.
 
 ## 7.1 O que trocar no repositório
 
 Todas as ocorrências abaixo apontam para o repositório de origem. Troque para o
-repositório do cliente:
+repositório do main:
 
 ```bash
 grep -rn "github.com/pecorawal/gitops-infra" --exclude-dir=.git .
@@ -15,18 +15,18 @@ grep -rn "github.com/pecorawal/gitops-infra" --exclude-dir=.git .
 
 | Arquivo | Campo |
 |---|---|
-| `bootstrap/02-appset-cliente.yaml` | `generators[].git.repoURL` e `template.spec.source.repoURL` |
-| `argocd/root-cliente.yaml` | `spec.source.repoURL` |
+| `bootstrap/02-appset-main.yaml` | `generators[].git.repoURL` e `template.spec.source.repoURL` |
+| `argocd/root-main.yaml` | `spec.source.repoURL` |
 | `charts/cluster-bundle/values.yaml` | `global.repoURL` (só o default; o ApplicationSet sobrescreve) |
 | `bootstrap/app-set-import.yaml`, `argocd/root-*.yaml` | idem, se usar o fluxo de importação |
 
-A `targetRevision` (`cliente`) também é sua escolha — pode ser `main` no repo do
-cliente.
+A `targetRevision` (`main`) também é sua escolha — pode ser `main` no repo do
+main.
 
 ## 7.2 Criar o primeiro cluster
 
 ```bash
-cp -r clusters/azr-cliente-dev-01 clusters/<nome-do-cluster>
+cp -r clusters/azr-main-dev-01 clusters/<nome-do-cluster>
 ```
 
 O diretório-modelo já vem com **todos** os blocos e placeholders. Duas regras:
@@ -46,13 +46,13 @@ valor ou um exemplo:
 | `<PUBLIC_DOMAIN>` / `<PRIVATE_DOMAIN>` | zonas DNS na Azure |
 | `<PUBLIC_DNS_ZONE_ID>` | `az network dns zone show -n <dom> -g <rg> --query id -o tsv` |
 | `<PRIVATE_DNS_ZONE_ID>` | `az network private-dns zone show -n <dom> -g <rg> --query id -o tsv` |
-| `<VNET_*>`, `<*_SUBNET>` | rede pré-existente do cliente |
+| `<VNET_*>`, `<*_SUBNET>` | rede pré-existente do main |
 | `<CLUSTER_SET>` | `oc get managedclusterset` (no hub) |
 
 Confira antes de commitar:
 
 ```bash
-./docs/cliente/scripts/verificar-values.sh <nome-do-cluster>
+./docs/main/scripts/verificar-values.sh <nome-do-cluster>
 ```
 
 > Os charts **falham o render** se sobrar qualquer `<MAIUSCULAS>` num bloco
@@ -91,12 +91,12 @@ pré-requisito fora do Git:
 ## 7.5 Antes de entregar
 
 ```bash
-# nenhum dado real de outro cliente
-grep -rniE "<seu-cliente-anterior>|subscription-id-antigo" --exclude-dir=.git .
+# nenhum dado real de outro main
+grep -rniE "<seu-main-anterior>|subscription-id-antigo" --exclude-dir=.git .
 
 # todos os charts renderizam com o modelo
 for c in charts/*/; do
-  helm template t "$c" -f clusters/azr-cliente-dev-01/values.yaml >/dev/null \
+  helm template t "$c" -f clusters/azr-main-dev-01/values.yaml >/dev/null \
     && echo "OK  $(basename $c)" || echo "FALHOU $(basename $c)"
 done
 ```

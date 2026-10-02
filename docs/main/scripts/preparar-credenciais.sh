@@ -14,7 +14,7 @@
 #          mode: existing
 #
 #  Uso (no HUB, como cluster-admin):
-#    ./docs/cliente/scripts/preparar-credenciais.sh <cluster> [<ns-origem>/<credential>]
+#    ./docs/main/scripts/preparar-credenciais.sh <cluster> [<ns-origem>/<credential>]
 #
 #  Sem o segundo argumento, o script localiza sozinho a Credential do ACM
 #  (label cluster.open-cluster-management.io/type=azr).

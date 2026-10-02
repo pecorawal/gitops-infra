@@ -24,7 +24,7 @@
 #    --dns01-recursive-nameservers-only  ignora o /etc/resolv.conf do pod
 #    --dns01-recursive-nameservers=...   os servidores a usar
 #
-#  Se a rede do cliente bloquear saida para 53/udp na internet, troque a lista
+#  Se a rede do main bloquear saida para 53/udp na internet, troque a lista
 #  por um resolver interno que enxergue a zona PUBLICA.
 #
 #  Conferir depois do sync:

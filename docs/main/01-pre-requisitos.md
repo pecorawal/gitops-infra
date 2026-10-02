@@ -35,7 +35,7 @@ oc new-project acm-credentials
 
 No console do ACM: **Credentials → Add credential → Microsoft Azure**
 
-- *Credential name*: `azure-cliente`
+- *Credential name*: `azure-main`
 - *Namespace*: **`acm-credentials`**
 - Base DNS domain, Service Principal (clientId/clientSecret/tenantId/subscriptionId),
   Base domain resource group name, pull secret e chave SSH.
@@ -58,7 +58,7 @@ materializada em cada namespace. Há dois caminhos.
 Um comando por cluster, antes de commitar:
 
 ```bash
-./docs/cliente/scripts/preparar-credenciais.sh azr-cliente-dev-01
+./docs/main/scripts/preparar-credenciais.sh azr-main-dev-01
 ```
 
 O script localiza sozinho a Credential do ACM (pela label
@@ -78,7 +78,7 @@ O script localiza sozinho a Credential do ACM (pela label
 Se houver mais de uma Credential Azure, ele lista e pede que você escolha:
 
 ```bash
-./docs/cliente/scripts/preparar-credenciais.sh azr-cliente-dev-01 acm-credentials/azure-cliente
+./docs/main/scripts/preparar-credenciais.sh azr-main-dev-01 acm-credentials/azure-main
 ```
 
 Os nomes gerados são exatamente os que o chart procura, então no `values.yaml`
@@ -125,7 +125,7 @@ provision:
   credentials:
     mode: externalSecret
     sourceNamespace: acm-credentials
-    sourceSecret: azure-cliente
+    sourceSecret: azure-main
 ```
 
 Os dois `ExternalSecret` gerados produzem exatamente os mesmos Secrets do
@@ -195,7 +195,7 @@ ServiceAccounts `openshift-gitops-argocd-application-controller` (escrita) e
 Confirme antes de seguir:
 
 ```bash
-./docs/cliente/scripts/verificar-rbac-acm.sh
+./docs/main/scripts/verificar-rbac-acm.sh
 ```
 
 Todas as linhas precisam sair `OK`.
@@ -255,24 +255,24 @@ reinício do controlador.
 ## 1.7 Aplicar o root — uma única vez
 
 ```bash
-oc apply -f argocd/root-cliente.yaml
+oc apply -f argocd/root-main.yaml
 ```
 
 Isso instala, a partir de `bootstrap/`:
 
 - `GitOpsCluster` — registra os clusters do ACM como destino de deploy no ArgoCD;
 - `ManagedClusterSet` / `Placement` / `ManagedClusterSetBinding`;
-- o `ApplicationSet` **`cliente-clusters`**, que passa a reagir a cada commit em `clusters/`.
+- o `ApplicationSet` **`main-clusters`**, que passa a reagir a cada commit em `clusters/`.
 
 Verifique:
 
 ```bash
-oc get applications.argoproj.io  cliente-bootstrap  -n openshift-gitops
-oc get applicationsets.argoproj.io cliente-clusters  -n openshift-gitops
+oc get applications.argoproj.io  main-bootstrap  -n openshift-gitops
+oc get applicationsets.argoproj.io main-clusters  -n openshift-gitops
 oc get gitopscluster -n openshift-gitops
 ```
 
-> **Atenção:** no hub, use **ou** `argocd/root-cliente.yaml` (branch `cliente`) **ou**
+> **Atenção:** no hub, use **ou** `argocd/root-main.yaml` (branch `main`) **ou**
 > `argocd/root-clusters.yaml` (branch `main`) — os dois sincronizam a pasta `bootstrap/`
 > e brigariam pelos mesmos objetos.
 

@@ -21,7 +21,7 @@
 #  do OCM montam (pkg/registration/webhook/...).
 #
 #  Uso (como cluster-admin, no HUB):
-#    ./docs/cliente/scripts/verificar-rbac-acm.sh
+#    ./docs/main/scripts/verificar-rbac-acm.sh
 # =============================================================================
 set -uo pipefail
 

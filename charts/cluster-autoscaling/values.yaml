@@ -1,5 +1,5 @@
-# Valores injetados pelo ApplicationSet (bootstrap/02-appset-cliente.yaml).
-# Nao edite aqui -- o arquivo do cliente e clusters/<cluster>/values.yaml.
+# Valores injetados pelo ApplicationSet (bootstrap/02-appset-main.yaml).
+# Nao edite aqui -- o arquivo do main e clusters/<cluster>/values.yaml.
 autoscaling:
   enabled: false
   # machinePool (padrao) -> ACM/Hive: o autoscaling vai no MachinePool, no hub,
@@ -20,7 +20,7 @@ autoscaling:
   # Um MachineAutoscaler por MachineSet do pool worker.
   # Descubra os nomes reais com: oc get machineset -n openshift-machine-api
   machineSets: []
-  #  - name: <cluster>-worker-<region>-<zone>   # ex: azr-cliente-dev-01-worker-brazilsouth1
+  #  - name: <cluster>-worker-<region>-<zone>   # ex: azr-main-dev-01-worker-brazilsouth1
   #    minReplicas: 2
   #    maxReplicas: 6
 

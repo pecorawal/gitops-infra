@@ -7,8 +7,8 @@
 #  caiu.
 #
 #  Uso (logado no CLUSTER GERENCIADO, nao no hub):
-#    ./docs/cliente/scripts/restaurar-ingress-default.sh            # so diagnostica
-#    ./docs/cliente/scripts/restaurar-ingress-default.sh --confirmar
+#    ./docs/main/scripts/restaurar-ingress-default.sh            # so diagnostica
+#    ./docs/main/scripts/restaurar-ingress-default.sh --confirmar
 # =============================================================================
 set -euo pipefail
 

@@ -1,10 +1,10 @@
 # ---------------------------------------------------------------------------
 #  RBAC DO ARGOCD SOBRE AS APIs DO ACM E DO HIVE
 # ---------------------------------------------------------------------------
-#  APLICAR ANTES de argocd/root-cliente.yaml, como cluster-admin:
+#  APLICAR ANTES de argocd/root-main.yaml, como cluster-admin:
 #
 #    oc apply -f argocd/00-rbac-acm.yaml
-#    oc apply -f argocd/root-cliente.yaml
+#    oc apply -f argocd/root-main.yaml
 #
 #  POR QUE ISTO NAO PODE ESTAR EM bootstrap/
 #  O Kubernetes impede escalonamento de privilegio: uma ServiceAccount nao pode
@@ -60,7 +60,7 @@ rules:
   #  --subresource o restmapper resolve managedclusters para o grupo real
   #  cluster.open-cluster-management.io, nunca para register... (que e sintetico).
   #  Um "no" ali NAO significa que a permissao esta faltando.
-  #  Use: ./docs/cliente/scripts/verificar-rbac-acm.sh
+  #  Use: ./docs/main/scripts/verificar-rbac-acm.sh
   # ------------------------------------------------------------------------
 
   # 'bind': exigido para criar um ManagedClusterSetBinding.

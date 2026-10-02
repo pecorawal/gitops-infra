@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-#  MOTOR DO FLUXO CLIENTE
+#  MOTOR DO FLUXO MAIN
 # ---------------------------------------------------------------------------
 #  Varre clusters/*/values.yaml e, para cada arquivo encontrado, cria uma
 #  Application "bundle-<cluster>" que renderiza charts/cluster-bundle -- o
@@ -8,20 +8,20 @@
 #
 #  Adicionar um cluster novo = criar clusters/<nome>/values.yaml e commitar.
 #
-#  AO REPLICAR EM OUTRO CLIENTE: TROQUE PARA O REPO DELE os dois repoURL abaixo
-#  (o do generator e o do template) e a revision. Ver docs/cliente/07-replicar.md
+#  AO REPLICAR EM OUTRO MAIN: TROQUE PARA O REPO DELE os dois repoURL abaixo
+#  (o do generator e o do template) e a revision. Ver docs/main/07-replicar.md
 # ---------------------------------------------------------------------------
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: cliente-clusters
+  name: main-clusters
   namespace: openshift-gitops
 spec:
   goTemplate: false
   generators:
     - git:
         repoURL: 'https://github.com/pecorawal/gitops-infra.git'
-        revision: cliente
+        revision: main
         files:
           - path: "clusters/*/values.yaml"
   template:
@@ -31,7 +31,7 @@ spec:
       project: default
       source:
         repoURL: 'https://github.com/pecorawal/gitops-infra.git'
-        targetRevision: cliente
+        targetRevision: main
         path: charts/cluster-bundle
         helm:
           releaseName: '{{path.basename}}'
@@ -44,7 +44,7 @@ spec:
             - name: global.repoURL
               value: 'https://github.com/pecorawal/gitops-infra.git'
             - name: global.targetRevision
-              value: 'cliente'
+              value: 'main'
             - name: global.valuesPath
               value: '{{path}}/values.yaml'
       destination:

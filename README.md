@@ -2,7 +2,7 @@
 
 Neste repositório está a definição de um OpenShift GitOps para importação e orquestração de clusters no Red Hat Advanced Cluster Management for Kubernetes.
 
-## Branch `cliente` — provisionamento de OpenShift IPI na Azure
+## Branch `main` — provisionamento de OpenShift IPI na Azure
 
 Esta branch entrega o fluxo completo, dirigido por **um único `values.yaml` por cluster**:
 
@@ -14,18 +14,18 @@ Esta branch entrega o fluxo completo, dirigido por **um único `values.yaml` por
 
 ```bash
 oc apply -f argocd/00-rbac-acm.yaml       # RBAC do ArgoCD sobre ACM/Hive (cluster-admin)
-oc apply -f argocd/root-cliente.yaml      # uma única vez
+oc apply -f argocd/root-main.yaml      # uma única vez
 
-cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
-./docs/cliente/scripts/preparar-credenciais.sh <seu-cluster>   # namespace + credenciais
+cp -r clusters/azr-main-dev-01 clusters/<seu-cluster>
+./docs/main/scripts/preparar-credenciais.sh <seu-cluster>   # namespace + credenciais
 # preencher os <PREENCHER>, virar os enabled: true, commitar
 
-./docs/cliente/scripts/diagnosticar.sh <seu-cluster>           # se algo não andar
-./docs/cliente/scripts/limpar-argocd.sh                        # zerar o ArgoCD (dry-run)
+./docs/main/scripts/diagnosticar.sh <seu-cluster>           # se algo não andar
+./docs/main/scripts/limpar-argocd.sh                        # zerar o ArgoCD (dry-run)
 ```
 
-📖 **Guia completo: [`docs/cliente/`](docs/cliente/00-visao-geral.md)** — inclui
-[como adicionar novos operadores, manifestos e camadas](docs/cliente/05-estender.md).
+📖 **Guia completo: [`docs/main/`](docs/main/00-visao-geral.md)** — inclui
+[como adicionar novos operadores, manifestos e camadas](docs/main/05-estender.md).
 
 | Diretório | Papel |
 |---|---|
@@ -53,12 +53,12 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 │   ├── 00-rbac-acm.yaml
 │   ├── provision-standalone.yaml
 │   ├── root-apps.yaml
-│   ├── root-cliente.yaml
+│   ├── root-main.yaml
 │   └── root-clusters.yaml
 ├── bootstrap
 │   ├── 00-namespaces.yaml
 │   ├── 01-gitops-cluster.yaml
-│   ├── 02-appset-cliente.yaml
+│   ├── 02-appset-main.yaml
 │   ├── 03-cluster-set-bindings.yaml
 │   ├── 04-placements-por-clusterset.yaml
 │   ├── 05-acm-credentials-store.yaml
@@ -166,10 +166,10 @@ cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
 │       │   └── _validate.tpl
 │       └── values.yaml
 ├── clusters
-│   └── azr-cliente-dev-01
+│   └── azr-main-dev-01
 │       └── values.yaml
 ├── docs
-│   └── cliente
+│   └── main
 │       ├── 00-visao-geral.md
 │       ├── 01-pre-requisitos.md
 │       ├── 02-provisionar-cluster.md

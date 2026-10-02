@@ -68,7 +68,7 @@ obrigatoriamente chamada `clientSecret`:
 
 ```bash
 oc login <api-do-spoke>
-./docs/cliente/scripts/criar-secrets-day2.sh clusters/<cluster>/values.yaml
+./docs/main/scripts/criar-secrets-day2.sh clusters/<cluster>/values.yaml
 ```
 
 O script pede o secret na etapa 4. Manualmente seria:

@@ -6,7 +6,7 @@
 #      -> ExternalSecrets -> ClusterDeployment -> ManagedCluster -> ArgoCD
 #
 #  Uso (no HUB, a partir da raiz do repositorio):
-#    ./docs/cliente/scripts/diagnosticar.sh <nome-do-cluster>
+#    ./docs/main/scripts/diagnosticar.sh <nome-do-cluster>
 # =============================================================================
 set -uo pipefail
 
@@ -101,7 +101,7 @@ if [[ "$MODE" == "externalSecret" ]]; then
     echo "              credentials:"
     echo "                mode: existing"
     echo "        e rode uma vez:"
-    echo "            ./docs/cliente/scripts/preparar-credenciais.sh $CLUSTER"
+    echo "            ./docs/main/scripts/preparar-credenciais.sh $CLUSTER"
     exit 1
   fi
 else
@@ -110,23 +110,23 @@ else
       ok "secret/$sec existe"
     else
       bad "secret/$sec NAO existe em $CLUSTER"
-      echo "        Rode:  ./docs/cliente/scripts/preparar-credenciais.sh $CLUSTER"
+      echo "        Rode:  ./docs/main/scripts/preparar-credenciais.sh $CLUSTER"
       echo "        (o Hive so le Secrets do namespace do ClusterDeployment)"
     fi
   done
 fi
 
 hdr "4. ApplicationSet"
-if oc get applicationsets.argoproj.io cliente-clusters -n "$NS_ARGO" >/dev/null 2>&1; then
-  ok "applicationset/cliente-clusters existe"
-  REV=$(oc get applicationsets.argoproj.io cliente-clusters -n "$NS_ARGO" -o jsonpath='{.spec.generators[0].git.revision}')
+if oc get applicationsets.argoproj.io main-clusters -n "$NS_ARGO" >/dev/null 2>&1; then
+  ok "applicationset/main-clusters existe"
+  REV=$(oc get applicationsets.argoproj.io main-clusters -n "$NS_ARGO" -o jsonpath='{.spec.generators[0].git.revision}')
   echo "        revision do generator: $REV   (a branch precisa ter o commit)"
-  oc get applicationsets.argoproj.io cliente-clusters -n "$NS_ARGO" \
+  oc get applicationsets.argoproj.io main-clusters -n "$NS_ARGO" \
     -o jsonpath='{range .status.conditions[*]}        {.type}={.status} {.message}{"\n"}{end}' 2>/dev/null
 else
-  bad "applicationset/cliente-clusters NAO existe"
-  echo "        Aplique o root:  oc apply -f argocd/root-cliente.yaml"
-  echo "        E confira:       oc get applications.argoproj.io cliente-bootstrap -n $NS_ARGO"
+  bad "applicationset/main-clusters NAO existe"
+  echo "        Aplique o root:  oc apply -f argocd/root-main.yaml"
+  echo "        E confira:       oc get applications.argoproj.io main-bootstrap -n $NS_ARGO"
   exit 1
 fi
 
@@ -208,7 +208,7 @@ if [[ "$(oc auth can-i create namespaces --as="$SA" 2>/dev/null)" == "yes" ]]; t
 else
   bad "o ArgoCD NAO pode criar namespaces"
   echo "        oc apply -f argocd/00-rbac-acm.yaml"
-  echo "        ./docs/cliente/scripts/verificar-rbac-acm.sh"
+  echo "        ./docs/main/scripts/verificar-rbac-acm.sh"
 fi
 
 echo

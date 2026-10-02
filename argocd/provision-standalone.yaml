@@ -2,7 +2,7 @@
 #  APPLICATION DE PROVISIONAMENTO AVULSA -- PARA DIAGNOSTICO
 # ---------------------------------------------------------------------------
 #  Substitui, so para este cluster, a cadeia
-#      ApplicationSet cliente-clusters -> bundle-<cluster> -> provision-<cluster>
+#      ApplicationSet main-clusters -> bundle-<cluster> -> provision-<cluster>
 #  por UMA Application aplicada a mao. Serve para responder a pergunta
 #  "quem esta apagando o namespace?" eliminando duas camadas.
 #
@@ -18,7 +18,7 @@
 #  COMO USAR
 #  ---------
 #  1. Desligue a esteira normal para este cluster, para as duas nao brigarem:
-#         oc delete applicationsets.argoproj.io cliente-clusters -n openshift-gitops
+#         oc delete applicationsets.argoproj.io main-clusters -n openshift-gitops
 #         oc delete applications.argoproj.io bundle-<CLUSTER> provision-<CLUSTER> \
 #            -n openshift-gitops
 #     (confira antes se alguma tem resources-finalizer -- se tiver, remova primeiro,
@@ -30,7 +30,7 @@
 #  3. Sincronize MANUALMENTE, pela console ou por:
 #         oc patch applications.argoproj.io provision-standalone-<CLUSTER> \
 #           -n openshift-gitops --type=merge \
-#           -p '{"operation":{"sync":{"revision":"cliente"}}}'
+#           -p '{"operation":{"sync":{"revision":"main"}}}'
 #
 #  4. Acompanhe:
 #         oc get applications.argoproj.io provision-standalone-<CLUSTER> -n openshift-gitops \
@@ -39,7 +39,7 @@
 #
 #  Quando terminar o diagnostico, apague esta Application e volte ao root:
 #         oc delete applications.argoproj.io provision-standalone-<CLUSTER> -n openshift-gitops
-#         oc apply -f argocd/root-cliente.yaml
+#         oc apply -f argocd/root-main.yaml
 # ---------------------------------------------------------------------------
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -50,7 +50,7 @@ spec:
   project: default
   source:
     repoURL: 'https://github.com/pecorawal/gitops-infra.git'
-    targetRevision: cliente
+    targetRevision: main
     path: charts/azure-ipi-cluster
     helm:
       releaseName: <CLUSTER>

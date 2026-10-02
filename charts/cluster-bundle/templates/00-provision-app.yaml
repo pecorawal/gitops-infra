@@ -22,7 +22,7 @@ metadata:
 # Sem o finalizer o pior caso vira apenas orfandade -- a Application some, o
 # cluster continua de pe -- o que e recuperavel reaplicando o values.
 #
-# Para descomissionar de verdade, veja docs/cliente/02-provisionar-cluster.md.
+# Para descomissionar de verdade, veja docs/main/02-provisionar-cluster.md.
 spec:
   project: {{ .Values.global.project }}
   source:

@@ -5,8 +5,8 @@
 O nome do diretório **precisa** ser igual ao valor de `clusterName`.
 
 ```bash
-cp -r clusters/azr-cliente-dev-01 clusters/azr-cliente-prod-01
-$EDITOR clusters/azr-cliente-prod-01/values.yaml
+cp -r clusters/azr-main-dev-01 clusters/azr-main-prod-01
+$EDITOR clusters/azr-main-prod-01/values.yaml
 ```
 
 ## 2.2 Preencher o bloco `provision`
@@ -118,15 +118,15 @@ provision:
 ```
 
 ```bash
-git add clusters/azr-cliente-prod-01/values.yaml
-git commit -m "novo cluster azr-cliente-prod-01"
-git push origin cliente
+git add clusters/azr-main-prod-01/values.yaml
+git commit -m "novo cluster azr-main-prod-01"
+git push origin main
 ```
 
 Antes de commitar, prepare as credenciais do cluster (um comando, uma vez):
 
 ```bash
-./docs/cliente/scripts/preparar-credenciais.sh azr-cliente-prod-01
+./docs/main/scripts/preparar-credenciais.sh azr-main-prod-01
 ```
 
 Ele cria o namespace e os dois Secrets a partir da Credential compartilhada do
@@ -142,13 +142,13 @@ Vale rodar **antes** de commitar — pega os dois erros mais comuns sem envolver
 cluster:
 
 ```bash
-./docs/cliente/scripts/diagnosticar.sh <nome-do-cluster>
+./docs/main/scripts/diagnosticar.sh <nome-do-cluster>
 ```
 
 ## 2.5 O que acontece
 
-1. O `ApplicationSet` detecta o novo `values.yaml` e cria `bundle-azr-cliente-prod-01`.
-2. O bundle emite `provision-azr-cliente-prod-01`.
+1. O `ApplicationSet` detecta o novo `values.yaml` e cria `bundle-azr-main-prod-01`.
+2. O bundle emite `provision-azr-main-prod-01`.
 3. Essa Application aplica no hub, em ordem de wave:
    - o Namespace do cluster (`-5`);
    - no modo `externalSecret`, os dois `ExternalSecret` que copiam a Credential (`-3`);
@@ -165,7 +165,7 @@ cluster:
 ## 2.6 Acompanhar
 
 ```bash
-export CLUSTER=azr-cliente-prod-01
+export CLUSTER=azr-main-prod-01
 
 # as credenciais foram materializadas?
 oc get externalsecret,secret -n "$CLUSTER"
@@ -207,7 +207,7 @@ deprovision e remove a infraestrutura na Azure:
 
 ```bash
 # 1. tire o cluster do Git, para o ArgoCD não recriá-lo
-git rm -r clusters/<cluster> && git commit -m "descomissiona <cluster>" && git push origin cliente
+git rm -r clusters/<cluster> && git commit -m "descomissiona <cluster>" && git push origin main
 
 # 2. destrua a infraestrutura
 oc delete clusterdeployment <cluster> -n <cluster>

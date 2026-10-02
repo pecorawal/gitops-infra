@@ -8,7 +8,7 @@
    MachinePool, daqui do hub. Por isso um grupo novo de maquinas NAO se cria
    aplicando MachineSet no spoke: declara-se mais um MachinePool, e o Hive gera
    la um MachineSet por zona,
-     <infraID>-<pool>-<regiao><zona>     ex: azr-cliente-dev-01-ab12c-infra-brazilsouth1
+     <infraID>-<pool>-<regiao><zona>     ex: azr-main-dev-01-ab12c-infra-brazilsouth1
    e continua reconciliando replicas, labels e taints a partir daqui.
 
    O pool worker padrao NAO passa por aqui: continua em
@@ -37,7 +37,7 @@ metadata:
     # Delete=false -> apagar a Application NAO apaga o MachinePool
     # Apagar um MachinePool faz o Hive remover os MachineSets do spoke e drenar
     # os nos. Isso tem que ser um ato explicito (oc delete, no hub), nunca o
-    # efeito colateral de uma edicao no values. Ver docs/cliente/08-machine-pools.md
+    # efeito colateral de uma edicao no values. Ver docs/main/08-machine-pools.md
     argocd.argoproj.io/sync-options: Prune=false,Delete=false
 spec:
   clusterDeploymentRef:

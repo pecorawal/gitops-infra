@@ -15,7 +15,7 @@
 #
 #  O CLIENT SECRET NAO VAI PARA O GIT. Cada provider OpenID referencia um
 #  Secret no namespace openshift-config (campo openID.clientSecret.name),
-#  criado fora do Git por docs/cliente/scripts/criar-secrets-day2.sh.
+#  criado fora do Git por docs/main/scripts/criar-secrets-day2.sh.
 #
 #  Depois do sync, o authentication-operator reescreve a config e reinicia os
 #  pods do oauth-server -- o login fica indisponivel por ~1 minuto:
@@ -23,7 +23,7 @@
 #    oc get pods -n openshift-authentication
 #
 #  NAO remova o kubeadmin antes de validar o login pelo IdP novo e de garantir
-#  que alguem tem cluster-admin (veja docs/cliente/06-identity-provider.md).
+#  que alguem tem cluster-admin (veja docs/main/06-identity-provider.md).
 # ---------------------------------------------------------------------------
 apiVersion: config.openshift.io/v1
 kind: OAuth

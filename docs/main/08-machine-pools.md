@@ -121,7 +121,7 @@ machinePools:
 
 ```bash
 helm template <cluster> charts/machine-pools -f clusters/<cluster>/values.yaml
-./docs/cliente/scripts/verificar-values.sh <cluster>
+./docs/main/scripts/verificar-values.sh <cluster>
 ```
 
 ### Passo 4 — commitar e acompanhar
@@ -270,7 +270,7 @@ Todos viram erro na Application, antes de qualquer objeto ser aplicado:
 > **Tamanho do nome.** A VM recebe o nome da Machine,
 > `<infraID>-<pool>-<região><zona>-<xxxxx>`, e VM Linux na Azure aceita até 64
 > caracteres. O `infraID` é o `clusterName` truncado em 21 + 6. Para
-> `azr-cliente-dev-01` em `brazilsouth`, sobram **20 caracteres** para o nome do
+> `azr-main-dev-01` em `brazilsouth`, sobram **20 caracteres** para o nome do
 > pool.
 
 ## 8.9 Problemas comuns

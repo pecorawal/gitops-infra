@@ -11,7 +11,7 @@
      <cluster>-pull-secret   dockerconfigjson  .dockerconfigjson
 
    modo "existing" (padrao): os Secrets ja existem no namespace do cluster,
-     criados por docs/cliente/scripts/preparar-credenciais.sh a partir da
+     criados por docs/main/scripts/preparar-credenciais.sh a partir da
      Credential compartilhada do ACM. Seguem a MESMA convencao de nome, entao
      nao e preciso informar nada -- os campos existing* sao apenas para nomes
      fora do padrao.

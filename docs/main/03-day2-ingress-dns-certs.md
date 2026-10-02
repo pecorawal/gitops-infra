@@ -12,8 +12,8 @@ O client secret do Service Principal nunca é versionado. O script abaixo lê os
 valores não-sensíveis do próprio `values.yaml` e pede só o segredo:
 
 ```bash
-export KUBECONFIG=~/.kube/azr-cliente-prod-01     # o cluster NOVO, não o hub
-./docs/cliente/scripts/criar-secrets-day2.sh clusters/azr-cliente-prod-01/values.yaml
+export KUBECONFIG=~/.kube/azr-main-prod-01     # o cluster NOVO, não o hub
+./docs/main/scripts/criar-secrets-day2.sh clusters/azr-main-prod-01/values.yaml
 ```
 
 Ele cria:
@@ -422,7 +422,7 @@ o script, e commite **depois**:
 
 ```bash
 oc login <api-do-spoke>
-./docs/cliente/scripts/criar-secrets-day2.sh clusters/<cluster>/values.yaml
+./docs/main/scripts/criar-secrets-day2.sh clusters/<cluster>/values.yaml
 ```
 
 Ele pede o client secret do SPN uma vez e o reaproveita para cert-manager,

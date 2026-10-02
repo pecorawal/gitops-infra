@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------------
-#  ROOT DO FLUXO CLIENTE -- aplicar UMA unica vez no hub:
-#    oc apply -f argocd/root-cliente.yaml
+#  ROOT DO FLUXO MAIN -- aplicar UMA unica vez no hub:
+#    oc apply -f argocd/root-main.yaml
 #
 #  A partir daqui tudo e Git: o ArgoCD le bootstrap/, instala o GitOpsCluster e
 #  o ApplicationSet, e o ApplicationSet passa a reagir a cada commit em
@@ -9,13 +9,13 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: cliente-bootstrap
+  name: main-bootstrap
   namespace: openshift-gitops
 spec:
   project: default
   source:
     repoURL: 'https://github.com/pecorawal/gitops-infra.git'
-    targetRevision: cliente
+    targetRevision: main
     path: bootstrap
     directory:
       recurse: true

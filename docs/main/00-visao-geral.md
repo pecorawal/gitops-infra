@@ -24,11 +24,11 @@ Operator.
 ## Como o fluxo se encadeia
 
 ```
-argocd/root-cliente.yaml            (aplicado UMA vez, na mão)
+argocd/root-main.yaml            (aplicado UMA vez, na mão)
         │
         └─► bootstrap/              GitOpsCluster + ApplicationSet
                 │
-                └─► ApplicationSet "cliente-clusters"
+                └─► ApplicationSet "main-clusters"
                      varre clusters/*/values.yaml
                      │
                      └─► Application "bundle-<cluster>"  →  charts/cluster-bundle
@@ -147,5 +147,5 @@ chave separada ou exigência de auditoria — ver
 4. [Troubleshooting](04-troubleshooting.md)
 5. [Estender: novos operadores, manifestos e camadas](05-estender.md)
 6. [Identity Provider (OAuth do cluster)](06-identity-provider.md)
-7. [Replicar a esteira em outro cliente](07-replicar.md)
+7. [Replicar a esteira em outro main](07-replicar.md)
 8. [Machine pools adicionais (novos tipos de máquina)](08-machine-pools.md)

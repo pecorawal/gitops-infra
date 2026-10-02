@@ -311,15 +311,15 @@ Recursos do hub que valem lembrar: `Policy` do ACM (`policies/`), `Placement`,
 
 Objetos de bootstrap que valem para **todos** os clusters — e não para um só —
 vão em `bootstrap/`, não em um chart: eles são aplicados diretamente pela
-Application `cliente-bootstrap` com `directory.recurse: true`, sem Helm.
+Application `main-bootstrap` com `directory.recurse: true`, sem Helm.
 
 ---
 
 ## 5.5 Fluxo de trabalho para qualquer mudança
 
 ```bash
-# 1. branch a partir de cliente
-git checkout cliente && git pull
+# 1. branch a partir de main
+git checkout main && git pull
 git checkout -b feature/oadp
 
 # 2. editar chart + values
@@ -347,7 +347,7 @@ helm template t charts/cluster-bundle -f clusters/<cluster>/values.yaml | wc -l 
 git push -u origin feature/oadp
 ```
 
-Depois do merge em `cliente`, o ArgoCD sincroniza sozinho. Para forçar:
+Depois do merge em `main`, o ArgoCD sincroniza sozinho. Para forçar:
 
 ```bash
 oc annotate applications.argoproj.io bundle-<cluster> -n openshift-gitops \

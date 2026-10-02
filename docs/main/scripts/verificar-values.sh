@@ -8,7 +8,7 @@
 #    3. o que o ArgoCD leu de fato      (ConfigMap bundle-<cluster>-info)
 #
 #  Uso:
-#    ./docs/cliente/scripts/verificar-values.sh <cluster>
+#    ./docs/main/scripts/verificar-values.sh <cluster>
 #  (o passo 3 e pulado se voce nao estiver logado no hub)
 # =============================================================================
 set -euo pipefail

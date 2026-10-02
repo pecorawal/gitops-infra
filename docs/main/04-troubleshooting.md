@@ -142,7 +142,7 @@ renderiza como string vazia, sem erro.
 ```bash
 oc get applications.argoproj.io <app> -n openshift-gitops \
   -o jsonpath='revision desejada: {.spec.source.targetRevision}{"\n"}revision sincronizada: {.status.sync.revision}{"\n"}'
-git log --oneline -1 origin/cliente
+git log --oneline -1 origin/main
 ```
 
 Se a revisão sincronizada for antiga, force o refresh:
@@ -210,7 +210,7 @@ A causa mais comum de rejeição neste repo é RBAC: sem `update` em
 o webhook recusa `hubAcceptsClient: true`.
 
 ```bash
-./docs/cliente/scripts/verificar-rbac-acm.sh
+./docs/main/scripts/verificar-rbac-acm.sh
 ```
 
 ### Bissecar em um sync
@@ -265,7 +265,7 @@ Quando não se consegue determinar quem está mexendo no namespace, vale elimina
 camadas. `argocd/provision-standalone.yaml` substitui a cadeia
 
 ```
-ApplicationSet cliente-clusters -> bundle-<cluster> -> provision-<cluster>
+ApplicationSet main-clusters -> bundle-<cluster> -> provision-<cluster>
 ```
 
 por **uma** Application aplicada à mão, que por construção **não consegue apagar
@@ -278,19 +278,19 @@ oc get applications.argoproj.io -n openshift-gitops \
   -o custom-columns=NOME:.metadata.name,FINALIZERS:.metadata.finalizers
 #    se alguma provision-* tiver resources-finalizer, remova ANTES de apagar,
 #    senão a deleção cascateia e o Hive destrói o cluster na Azure
-oc delete applicationsets.argoproj.io cliente-clusters -n openshift-gitops --ignore-not-found
+oc delete applicationsets.argoproj.io main-clusters -n openshift-gitops --ignore-not-found
 oc delete applications.argoproj.io bundle-<cluster> provision-<cluster> \
   -n openshift-gitops --ignore-not-found
 
 # 2. recrie as credenciais (o passo 1 pode ter levado o namespace junto)
-./docs/cliente/scripts/preparar-credenciais.sh <cluster>
+./docs/main/scripts/preparar-credenciais.sh <cluster>
 
 # 3. aplique a Application avulsa
 sed 's/<CLUSTER>/<cluster>/g' argocd/provision-standalone.yaml | oc apply -f -
 
 # 4. sincronize MANUALMENTE (pela console, ou:)
 oc patch applications.argoproj.io provision-standalone-<cluster> -n openshift-gitops \
-  --type=merge -p '{"operation":{"sync":{"revision":"cliente"}}}'
+  --type=merge -p '{"operation":{"sync":{"revision":"main"}}}'
 
 # 5. acompanhe
 oc get applications.argoproj.io provision-standalone-<cluster> -n openshift-gitops \
@@ -318,7 +318,7 @@ oc get policies.policy.open-cluster-management.io -A
 
 ```bash
 oc delete applications.argoproj.io provision-standalone-<cluster> -n openshift-gitops
-oc apply -f argocd/root-cliente.yaml
+oc apply -f argocd/root-main.yaml
 ```
 
 ## `oc get application` diz NotFound, mas a console mostra o objeto
@@ -360,25 +360,25 @@ o cluster na Azure.
 Sem o finalizer, apagar uma Application é uma deleção **não-cascata**: some o
 objeto `Application`, ficam todos os recursos que ela gerenciava.
 
-E há um agravante: o **`ApplicationSet cliente-clusters` continua vivo**. Ele é
+E há um agravante: o **`ApplicationSet main-clusters` continua vivo**. Ele é
 quem gera os `bundle-<cluster>`, então recria tudo em segundos. Por isso a ordem
 importa — o gerador tem que morrer primeiro.
 
 ### Limpeza ordenada
 
 ```bash
-./docs/cliente/scripts/limpar-argocd.sh              # só lista (dry-run)
-./docs/cliente/scripts/limpar-argocd.sh --confirmar  # executa
+./docs/main/scripts/limpar-argocd.sh              # só lista (dry-run)
+./docs/main/scripts/limpar-argocd.sh --confirmar  # executa
 ```
 
 A ordem que ele segue:
 
 | # | O quê | Por que nessa ordem |
 |---|---|---|
-| 1 | `ApplicationSet cliente-clusters` | senão ele recria os `bundle-*` |
+| 1 | `ApplicationSet main-clusters` | senão ele recria os `bundle-*` |
 | 2 | `provision-*`, `operators-*`, `certs-*`, `ingress-*`, `dns-*` | filhas antes dos pais |
 | 3 | `bundle-*` | |
-| 4 | `Application cliente-bootstrap` | a raiz |
+| 4 | `Application main-bootstrap` | a raiz |
 | 5 | `GitOpsCluster`, bindings, placements, `Channel`, `ClusterSecretStore` | o que vinha de `bootstrap/` |
 
 **O que o script deliberadamente não toca:** `ClusterDeployment`,
@@ -394,7 +394,7 @@ Para descomissionar de verdade, é o procedimento explícito de
 
 ```bash
 oc apply -f argocd/00-rbac-acm.yaml
-oc apply -f argocd/root-cliente.yaml
+oc apply -f argocd/root-main.yaml
 ```
 
 ### Se uma Application ficar presa
@@ -442,7 +442,7 @@ as causas mais comuns são `mode: externalSecret` sem o ESO, `provision.enabled:
 false` e `<PREENCHER>` restante:
 
 ```bash
-./docs/cliente/scripts/diagnosticar.sh <cluster>
+./docs/main/scripts/diagnosticar.sh <cluster>
 ```
 
 ### Se foi apagado — era este defeito, corrigido agora
@@ -482,7 +482,7 @@ diferentes, e essa é a distinção que faltava:
 Se o namespace já foi destruído, recrie as credenciais e deixe o ArgoCD refazer:
 
 ```bash
-./docs/cliente/scripts/preparar-credenciais.sh <cluster>
+./docs/main/scripts/preparar-credenciais.sh <cluster>
 oc annotate applications.argoproj.io provision-<cluster> -n openshift-gitops \
   argocd.argoproj.io/refresh=hard --overwrite
 ```
@@ -508,7 +508,7 @@ oc logs -n <cluster> -l hive.openshift.io/job-type=deprovision -f
 ## Comecei por aqui: o cluster não sai do lugar
 
 ```bash
-./docs/cliente/scripts/diagnosticar.sh <nome-do-cluster>
+./docs/main/scripts/diagnosticar.sh <nome-do-cluster>
 ```
 
 Percorre a cadeia inteira e diz onde ela parou:
@@ -548,8 +548,8 @@ provision:
 ```
 
 ```bash
-./docs/cliente/scripts/preparar-credenciais.sh <cluster>
-git commit -am "credenciais em modo existing" && git push origin cliente
+./docs/main/scripts/preparar-credenciais.sh <cluster>
+git commit -am "credenciais em modo existing" && git push origin main
 ```
 
 ### 2. `provision.enabled` continua `false`
@@ -616,12 +616,12 @@ grep '^clusterName:' clusters/<cluster>/values.yaml
 ### 5. O commit não está na branch que o generator lê
 
 ```bash
-oc get applicationsets.argoproj.io cliente-clusters -n openshift-gitops \
+oc get applicationsets.argoproj.io main-clusters -n openshift-gitops \
   -o jsonpath='{.spec.generators[0].git.revision}{"\n"}'
-git log --oneline -1 origin/cliente
+git log --oneline -1 origin/main
 ```
 
-O generator lê `clusters/*/values.yaml` da branch `cliente`. Um commit em `main`
+O generator lê `clusters/*/values.yaml` da branch `main`. Um commit em `main`
 não é enxergado.
 
 ### 6. RBAC
@@ -635,7 +635,7 @@ Se der `no`, é a seção abaixo.
 
 ## "one or more synchronization tasks completed unsuccessfully" — `is forbidden`
 
-O sintoma mais comum logo depois de aplicar `root-cliente.yaml`:
+O sintoma mais comum logo depois de aplicar `root-main.yaml`:
 
 ```
 channels.apps.open-cluster-management.io is forbidden: User
@@ -662,7 +662,7 @@ Depois force a re-sincronização (o ArgoCD já está tentando de novo com backo
 mas isso acelera):
 
 ```bash
-oc annotate applications.argoproj.io cliente-bootstrap -n openshift-gitops \
+oc annotate applications.argoproj.io main-bootstrap -n openshift-gitops \
   argocd.argoproj.io/refresh=hard --overwrite
 ```
 
@@ -701,7 +701,7 @@ o `no` é **falso negativo**. Esse comando não checa o que você pensa:
 Use o script, que monta a `SubjectAccessReview` igual ao webhook:
 
 ```bash
-./docs/cliente/scripts/verificar-rbac-acm.sh
+./docs/main/scripts/verificar-rbac-acm.sh
 ```
 
 Ou, na mão:
@@ -785,8 +785,8 @@ oc patch applications.argoproj.io ingress-<cluster> -n openshift-gitops \
 
 # 2. restaurar (roda em dry-run primeiro; --confirmar executa)
 oc login <api-do-spoke>
-./docs/cliente/scripts/restaurar-ingress-default.sh
-./docs/cliente/scripts/restaurar-ingress-default.sh --confirmar
+./docs/main/scripts/restaurar-ingress-default.sh
+./docs/main/scripts/restaurar-ingress-default.sh --confirmar
 ```
 
 O script faz o patch de `scope` para `Internal` e **deleta o Service
@@ -822,7 +822,7 @@ Comece pelo script, que compara o arquivo em disco, o que o Helm lê e o que o
 ArgoCD leu de fato:
 
 ```bash
-./docs/cliente/scripts/verificar-values.sh <cluster>
+./docs/main/scripts/verificar-values.sh <cluster>
 ```
 
 ### Causa 0 — uma linha `---` no meio do `values.yaml`
@@ -902,8 +902,8 @@ oc get applications.argoproj.io bundle-<cluster> -n openshift-gitops \
 
 ### Causa 4 — o commit não está na revisão que o generator lê
 
-O ApplicationSet lê a branch `cliente`. Confirme que o commit chegou lá
-(`git log origin/cliente -1`) e force um refresh:
+O ApplicationSet lê a branch `main`. Confirme que o commit chegou lá
+(`git log origin/main -1`) e force um refresh:
 
 ```bash
 oc annotate applications.argoproj.io bundle-<cluster> -n openshift-gitops \
@@ -950,7 +950,7 @@ vinculados ao seu namespace. Se o binding não existe, o set é invisível para 
 ## O `helm template` falha com "ManagedClusterSet indefinido"
 
 ```
-ManagedClusterSet indefinido para o cluster "azr-cliente-prod-01".
+ManagedClusterSet indefinido para o cluster "azr-main-prod-01".
   labels.env = "sandbox"
   clusterSets.byEnv nao tem essa chave e clusterSets.default esta vazio.
 ```
@@ -972,12 +972,12 @@ clusterSet: "non-pro"      # 3. force o set, ignorando o mapa
 ## O ApplicationSet não gerou nada
 
 ```bash
-oc get applicationsets.argoproj.io cliente-clusters -n openshift-gitops -o yaml | grep -A20 status
+oc get applicationsets.argoproj.io main-clusters -n openshift-gitops -o yaml | grep -A20 status
 oc logs -n openshift-gitops deploy/openshift-gitops-applicationset-controller
 ```
 
 Confira: o arquivo é exatamente `clusters/<nome>/values.yaml`, o `revision` do
-generator é `cliente` e a branch foi empurrada.
+generator é `main` e a branch foi empurrada.
 
 ## Nada é aplicado mesmo com o bundle sincronizado
 
@@ -999,7 +999,7 @@ oc get clusterdeployment <cluster> -n <cluster> -o yaml | grep -A20 conditions
 Se os Secrets não estiverem lá, rode o preparo — é idempotente:
 
 ```bash
-./docs/cliente/scripts/preparar-credenciais.sh <cluster>
+./docs/main/scripts/preparar-credenciais.sh <cluster>
 ```
 
 O Hive só lê Secrets do namespace do `ClusterDeployment`; um Secret na
@@ -1115,7 +1115,7 @@ oc logs -n cert-manager deploy/cert-manager -f
   deployment não, o operator ainda não reconciliou (ele reinicia o deployment;
   aguarde ou `oc rollout status deploy/cert-manager -n cert-manager`).
 
-  Se a rede do cliente bloqueia saída em 53/udp para a internet, os resolvers
+  Se a rede do main bloqueia saída em 53/udp para a internet, os resolvers
   públicos padrão (`1.1.1.1`, `8.8.8.8`) não respondem — troque a lista em
   `certManager.operatorConfig.controller.overrideArgs` por um resolver interno
   que enxergue a zona **pública**.

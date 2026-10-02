@@ -12,10 +12,10 @@
 #  O preco dessa seguranca e que a limpeza precisa ser explicita. E o que este
 #  script faz, na ordem certa:
 #
-#    1. ApplicationSet cliente-clusters   (senao ele recria os bundle-* sozinho)
+#    1. ApplicationSet main-clusters   (senao ele recria os bundle-* sozinho)
 #    2. Applications filhas               provision-/operators-/certs-/ingress-/dns-
 #    3. Applications bundle-*
-#    4. Application raiz cliente-bootstrap
+#    4. Application raiz main-bootstrap
 #    5. Objetos do bootstrap/             GitOpsCluster, bindings, placements, ESO
 #
 #  O QUE ELE NAO TOCA
@@ -24,11 +24,11 @@
 #  Apagar um ClusterDeployment faz o Hive DESTRUIR o cluster na Azure, e isso
 #  nunca deve ser efeito colateral de "resetar o ArgoCD". Os clusters continuam
 #  de pe; ao reaplicar o root, o ArgoCD os readota.
-#  Para descomissionar de verdade: docs/cliente/02-provisionar-cluster.md, 2.8
+#  Para descomissionar de verdade: docs/main/02-provisionar-cluster.md, 2.8
 #
 #  Uso:
-#    ./docs/cliente/scripts/limpar-argocd.sh              # so lista (dry-run)
-#    ./docs/cliente/scripts/limpar-argocd.sh --confirmar  # executa
+#    ./docs/main/scripts/limpar-argocd.sh              # so lista (dry-run)
+#    ./docs/main/scripts/limpar-argocd.sh --confirmar  # executa
 # =============================================================================
 set -uo pipefail
 
@@ -53,8 +53,8 @@ echo "Hub: $(oc whoami --show-server)"
 
 # ------------------------------------------------- 1. o gerador, antes de tudo
 hdr "1. ApplicationSet"
-act "applicationset/cliente-clusters" \
-  oc delete applicationsets.argoproj.io cliente-clusters -n "$NS" --ignore-not-found
+act "applicationset/main-clusters" \
+  oc delete applicationsets.argoproj.io main-clusters -n "$NS" --ignore-not-found
 
 # ------------------------------------------------------- 2 e 3. as Applications
 hdr "2. Applications da esteira"
@@ -71,8 +71,8 @@ else
 fi
 
 hdr "3. Application raiz"
-act "application/cliente-bootstrap" \
-  oc delete applications.argoproj.io cliente-bootstrap -n "$NS" --ignore-not-found
+act "application/main-bootstrap" \
+  oc delete applications.argoproj.io main-bootstrap -n "$NS" --ignore-not-found
 
 # --------------------------------------------------- 4. objetos do bootstrap/
 hdr "4. Objetos do bootstrap/"
@@ -97,7 +97,7 @@ if [[ $GO -eq 1 ]]; then
   hdr "5. Sobrou algo?"
   sleep 3
   REST=$(oc get applications.argoproj.io,applicationsets.argoproj.io -n "$NS" -o name 2>/dev/null \
-    | grep -E '(bundle|provision|operators|certs|ingress|dns|cliente)-' || true)
+    | grep -E '(bundle|provision|operators|certs|ingress|dns|main)-' || true)
   if [[ -z "$REST" ]]; then
     echo "  nada. Estado do ArgoCD limpo."
   else
@@ -117,7 +117,7 @@ if [[ $GO -eq 1 ]]; then
 
 Para recomecar:
     oc apply -f argocd/00-rbac-acm.yaml
-    oc apply -f argocd/root-cliente.yaml
+    oc apply -f argocd/root-main.yaml
 
 Os clusters ja provisionados continuam de pe e serao readotados na primeira
 sincronizacao, desde que clusters/<cluster>/values.yaml continue no Git.

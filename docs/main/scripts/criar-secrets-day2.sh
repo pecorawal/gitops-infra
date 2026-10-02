@@ -7,7 +7,7 @@
 #
 #  Uso:
 #    oc login <api-do-cluster-gerenciado>
-#    ./docs/cliente/scripts/criar-secrets-day2.sh clusters/azr-cliente-dev-01/values.yaml
+#    ./docs/main/scripts/criar-secrets-day2.sh clusters/azr-main-dev-01/values.yaml
 # =============================================================================
 set -euo pipefail
 

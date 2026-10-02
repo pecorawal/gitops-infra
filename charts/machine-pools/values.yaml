@@ -1,5 +1,5 @@
-# Valores injetados pelo ApplicationSet (bootstrap/02-appset-cliente.yaml).
-# Nao edite aqui -- o arquivo do cliente e clusters/<cluster>/values.yaml.
+# Valores injetados pelo ApplicationSet (bootstrap/02-appset-main.yaml).
+# Nao edite aqui -- o arquivo do main e clusters/<cluster>/values.yaml.
 clusterName: ""
 
 # Lido do bloco provision do cluster, nao repetido nos pools:
@@ -22,5 +22,5 @@ provision:
 machinePools:
   enabled: false
   # Um MachinePool por entrada. Formato completo em
-  # clusters/azr-cliente-dev-01/values.yaml (bloco 9).
+  # clusters/azr-main-dev-01/values.yaml (bloco 9).
   pools: []

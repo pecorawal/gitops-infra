@@ -1,9 +1,9 @@
 # =============================================================================
 #  MODELO DE CLUSTER -- copie este diretorio para criar um cluster novo
 # =============================================================================
-#  cp -r clusters/azr-cliente-dev-01 clusters/<seu-cluster>
+#  cp -r clusters/azr-main-dev-01 clusters/<seu-cluster>
 #  # edite clusters/<seu-cluster>/values.yaml
-#  ./docs/cliente/scripts/verificar-values.sh <seu-cluster>
+#  ./docs/main/scripts/verificar-values.sh <seu-cluster>
 #  git add clusters/<seu-cluster> && git commit && git push
 #
 #  CONVENCAO DOS PLACEHOLDERS
@@ -23,7 +23,7 @@
 # =============================================================================
 
 # ---- IDENTIDADE -------------------------------------------------------------
-clusterName: "azr-cliente-dev-01"   # == nome deste diretorio
+clusterName: "azr-main-dev-01"   # == nome deste diretorio
 environment: dev                    # rotulo livre (dev, des, hml, prd...)
 
 # Dominio base do cluster. E dele que saem api.<cluster>.<baseDomain> e
@@ -77,7 +77,7 @@ provision:
     sshPrivateKey: true
     # Secrets JA existentes no namespace do cluster, no hub. Vazio = a
     # convencao <cluster>-azure-creds / <cluster>-pull-secret.
-    # Criados por docs/cliente/scripts/preparar-credenciais.sh
+    # Criados por docs/main/scripts/preparar-credenciais.sh
     existingCredentialsSecret: "<HUB_AZURE_CREDS_SECRET>"    # ex: azure-hub
     existingPullSecret: "<HUB_PULL_SECRET>"                  # ex: azure-hub
     existingSshPrivateKeySecret: "<HUB_SSH_SECRET>"          # ex: azure-hub
@@ -209,7 +209,7 @@ certManager:
       environment: AzurePublicCloud
       clientID: "<AZURE_SP_CLIENT_ID>"            # appId do Service Principal
       # O clientSecret NUNCA vai para o Git: vem do Secret abaixo, criado no
-      # namespace cert-manager por docs/cliente/scripts/criar-secrets-day2.sh
+      # namespace cert-manager por docs/main/scripts/criar-secrets-day2.sh
       clientSecretRef:
         name: azuredns-config
         key: client-secret
@@ -307,7 +307,7 @@ externalDNS:
     tenantId: "<AZURE_TENANT_ID>"
     aadClientId: "<AZURE_SP_CLIENT_ID>"
     # DEIXE SEMPRE VAZIO NO GIT. Os Secrets azure.json (um por zona) sao
-    # criados por docs/cliente/scripts/criar-secrets-day2.sh.
+    # criados por docs/main/scripts/criar-secrets-day2.sh.
     aadClientSecret: ""
 
   # ---- Azure PRIVATE DNS Zone <- rotas com ingress-type=private ----
@@ -349,7 +349,7 @@ externalDNS:
 #   1. o Service Principal precisa de "Network Contributor" no RG do NSG E no
 #      RG da VNet
 #   2. ligue enabled: true NESTE arquivo e rode, logado no spoke:
-#        ./docs/cliente/scripts/criar-secrets-day2.sh clusters/<cluster>/values.yaml
+#        ./docs/main/scripts/criar-secrets-day2.sh clusters/<cluster>/values.yaml
 #      (o script pula esta etapa se enabled estiver false)
 #   3. so entao commite
 nsgRule:
@@ -509,7 +509,7 @@ identityProvider:
 #
 #  ANTES DE LIGAR: cota de vCPU da familia da VM na regiao
 #    az vm list-usage -l <AZURE_REGION> -o table
-#  Guia completo: docs/cliente/08-machine-pools.md
+#  Guia completo: docs/main/08-machine-pools.md
 machinePools:
   enabled: false
 
