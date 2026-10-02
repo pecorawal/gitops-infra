@@ -18,7 +18,7 @@
 #  falha o render se continuarem vazios na hora do sync.
 # ---------------------------------------------------------------------------
 global:
-  # AO REPLICAR EM OUTRO MAIN: troque tambem em bootstrap/02-appset-main.yaml,
+  # AO REPLICAR EM OUTRO <nome-do-projeto/cliente>: troque tambem em bootstrap/02-appset-main.yaml,
   # que e quem realmente injeta este valor. Ver docs/main/07-replicar.md
   repoURL: "https://github.com/pecorawal/gitops-infra.git"
   targetRevision: main

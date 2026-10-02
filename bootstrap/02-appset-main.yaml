@@ -8,7 +8,7 @@
 #
 #  Adicionar um cluster novo = criar clusters/<nome>/values.yaml e commitar.
 #
-#  AO REPLICAR EM OUTRO MAIN: TROQUE PARA O REPO DELE os dois repoURL abaixo
+#  AO REPLICAR EM OUTRO <nome-do-projeto/cliente>: TROQUE PARA O REPO DELE os dois repoURL abaixo
 #  (o do generator e o do template) e a revision. Ver docs/main/07-replicar.md
 # ---------------------------------------------------------------------------
 apiVersion: argoproj.io/v1alpha1

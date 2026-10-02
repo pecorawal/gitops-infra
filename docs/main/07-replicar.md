@@ -1,13 +1,13 @@
-# 7. Replicar a esteira em outro main
+# 7. Replicar a esteira em outro `<nome-do-projeto/cliente>`
 
-O que muda de um main para outro são **três coisas**: a URL do repositório,
+O que muda de um `<nome-do-projeto/cliente>` para outro são **três coisas**: a URL do repositório,
 o `values.yaml` de cada cluster e os Secrets (que nunca ficam no Git). Os charts
 não mudam.
 
 ## 7.1 O que trocar no repositório
 
 Todas as ocorrências abaixo apontam para o repositório de origem. Troque para o
-repositório do main:
+repositório do `<nome-do-projeto/cliente>`:
 
 ```bash
 grep -rn "github.com/pecorawal/gitops-infra" --exclude-dir=.git .
@@ -21,7 +21,7 @@ grep -rn "github.com/pecorawal/gitops-infra" --exclude-dir=.git .
 | `bootstrap/app-set-import.yaml`, `argocd/root-*.yaml` | idem, se usar o fluxo de importação |
 
 A `targetRevision` (`main`) também é sua escolha — pode ser `main` no repo do
-main.
+`<nome-do-projeto/cliente>`.
 
 ## 7.2 Criar o primeiro cluster
 
@@ -46,7 +46,7 @@ valor ou um exemplo:
 | `<PUBLIC_DOMAIN>` / `<PRIVATE_DOMAIN>` | zonas DNS na Azure |
 | `<PUBLIC_DNS_ZONE_ID>` | `az network dns zone show -n <dom> -g <rg> --query id -o tsv` |
 | `<PRIVATE_DNS_ZONE_ID>` | `az network private-dns zone show -n <dom> -g <rg> --query id -o tsv` |
-| `<VNET_*>`, `<*_SUBNET>` | rede pré-existente do main |
+| `<VNET_*>`, `<*_SUBNET>` | rede pré-existente do `<nome-do-projeto/cliente>` |
 | `<CLUSTER_SET>` | `oc get managedclusterset` (no hub) |
 
 Confira antes de commitar:
@@ -91,8 +91,8 @@ pré-requisito fora do Git:
 ## 7.5 Antes de entregar
 
 ```bash
-# nenhum dado real de outro main
-grep -rniE "<seu-main-anterior>|subscription-id-antigo" --exclude-dir=.git .
+# nenhum dado real de outro <nome-do-projeto/cliente>
+grep -rniE "<nome-do-projeto/cliente-anterior>|subscription-id-antigo" --exclude-dir=.git .
 
 # todos os charts renderizam com o modelo
 for c in charts/*/; do

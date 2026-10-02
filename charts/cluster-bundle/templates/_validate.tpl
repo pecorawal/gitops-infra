@@ -4,7 +4,7 @@
   O ApplicationSet injeta clusterName (pelo valueFiles) e global.valuesPath
   (por helm.parameters). Se qualquer um dos dois chegar vazio, o arquivo do
   cluster NAO entrou no merge -- e sem esta checagem o bundle renderizaria os
-  defaults inertes em silencio, ignorando todo enabled que o main ligou.
+  defaults inertes em silencio, ignorando todo enabled que o <nome-do-projeto/cliente> ligou.
 
   Falhar aqui e seguro: sem os valores do cluster o bundle nao emitiria
   Application nenhuma de qualquer forma. A diferenca e que agora aparece o

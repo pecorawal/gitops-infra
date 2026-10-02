@@ -1,5 +1,5 @@
 # Valores injetados pelo ApplicationSet (bootstrap/02-appset-main.yaml).
-# Nao edite aqui -- o arquivo do main e clusters/<cluster>/values.yaml.
+# Nao edite aqui -- o arquivo do <nome-do-projeto/cliente> e clusters/<cluster>/values.yaml.
 autoscaling:
   enabled: false
   # machinePool (padrao) -> ACM/Hive: o autoscaling vai no MachinePool, no hub,

@@ -1115,7 +1115,7 @@ oc logs -n cert-manager deploy/cert-manager -f
   deployment não, o operator ainda não reconciliou (ele reinicia o deployment;
   aguarde ou `oc rollout status deploy/cert-manager -n cert-manager`).
 
-  Se a rede do main bloqueia saída em 53/udp para a internet, os resolvers
+  Se a rede do `<nome-do-projeto/cliente>` bloqueia saída em 53/udp para a internet, os resolvers
   públicos padrão (`1.1.1.1`, `8.8.8.8`) não respondem — troque a lista em
   `certManager.operatorConfig.controller.overrideArgs` por um resolver interno
   que enxergue a zona **pública**.
