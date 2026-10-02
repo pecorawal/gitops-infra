@@ -1,0 +1,64 @@
+{{- if and .Values.ingress.enabled .Values.ingress.public.enabled }}
+{{- $nomeIC := printf "%s-%s" .Values.ingress.public.name .Values.clusterName }}
+{{- if gt (len $nomeIC) 56 }}
+  {{- fail (printf "\n\nNome do IngressController muito longo: %q (%d caracteres).\nO OpenShift cria o Service \"router-%s\", e nome de Service e um label DNS\nlimitado a 63 caracteres -- sobram 56 para o nome do IngressController.\nEncurte ingress.public.name ou clusterName.\n" $nomeIC (len $nomeIC) $nomeIC) }}
+{{- end }}
+# ---------------------------------------------------------------------------
+#  IngressController PUBLICO -- Load Balancer PUBLICO da Azure
+# ---------------------------------------------------------------------------
+#  Publica *.{{ .Values.ingress.public.domain }} na Azure DNS Zone PUBLICA
+#  (via ExternalDNS, wave 40). Fica exposto na internet.
+#
+#  Admite apenas Routes com a label
+#      {{ .Values.ingress.public.routeSelector.key }}={{ .Values.ingress.public.routeSelector.value }}
+# ---------------------------------------------------------------------------
+apiVersion: operator.openshift.io/v1
+kind: IngressController
+metadata:
+  # O nome carrega o clusterName no final (public-<cluster>). Ele NAO e so um
+  # rotulo: define o nome do router (deployment/service "router-<nome>" em
+  # openshift-ingress) e o routerName que aparece no status das Routes.
+  # Por isso precisa casar com:
+  #   externalDNS.public.routerName -> public-<cluster>
+  #   nsgRule.serviceName           -> router-public-<cluster> (so o publico)
+  # Os dois ja sao montados assim nos respectivos charts.
+  name: {{ $nomeIC }}
+  namespace: openshift-ingress-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  domain: {{ .Values.ingress.public.domain | quote }}
+  replicas: {{ .Values.ingress.public.replicas }}
+  endpointPublishingStrategy:
+    type: LoadBalancerService
+    loadBalancer:
+      # External = Azure Public Load Balancer (exposto na internet).
+      scope: {{ .Values.ingress.public.scope }}
+      # Unmanaged e obrigatorio: se o ingress-operator gerenciar o DNS, ele
+      # briga com o ExternalDNS pelos mesmos registros na zona da Azure.
+      dnsManagementPolicy: Unmanaged
+  # ---- ADMISSAO DE ROTA POR LABEL ----
+  # Somente Routes que carreguem esta label entram neste IngressController.
+  routeSelector:
+    matchLabels:
+      {{ .Values.ingress.public.routeSelector.key }}: {{ .Values.ingress.public.routeSelector.value | quote }}
+  {{- with .Values.ingress.public.namespaceSelector }}
+  namespaceSelector:
+    matchLabels:
+      {{- toYaml . | nindent 6 }}
+  {{- end }}
+  {{- if .Values.ingress.public.certificate.enabled }}
+  # Secret gerado pelo cert-manager no namespace openshift-ingress (wave 20).
+  defaultCertificate:
+    name: {{ .Values.ingress.public.certificate.secretName }}
+  {{- end }}
+  routeAdmission:
+    namespaceOwnership: InterNamespaceAllowed
+    wildcardPolicy: WildcardsDisallowed
+  {{- with .Values.ingress.public.nodePlacement }}
+  nodePlacement:
+    nodeSelector:
+      matchLabels:
+        {{- toYaml . | nindent 8 }}
+  {{- end }}
+{{- end }}

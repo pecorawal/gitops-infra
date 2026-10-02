@@ -1,0 +1,37 @@
+{{- if and .Values.certManager.enabled .Values.certManager.acme.enabled }}
+{{- $a := .Values.certManager.acme }}
+# ClusterIssuer "letsencrypt-prod": ACME com desafio DNS01 na Azure DNS Zone.
+#
+# O desafio DNS01 cria um TXT _acme-challenge na zona PUBLICA -- por isso funciona
+# tambem para nomes que so resolvem dentro da VNet, desde que o dominio esteja
+# delegado publicamente.
+#
+# O Service Principal (clientID abaixo) precisa do papel "DNS Zone Contributor"
+# na zona publica. O clientSecret vem do Secret {{ $a.azureDNS.clientSecretRef.name }}
+# no namespace cert-manager, criado fora do Git.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  acme:
+    server: {{ $a.server }}
+    email: {{ $a.email | quote }}
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+      - dns01:
+          azureDNS:
+            clientID: {{ $a.azureDNS.clientID | quote }}
+            clientSecretSecretRef:
+              name: {{ $a.azureDNS.clientSecretRef.name }}
+              key: {{ $a.azureDNS.clientSecretRef.key }}
+            subscriptionID: {{ $a.azureDNS.subscriptionID | quote }}
+            tenantID: {{ $a.azureDNS.tenantID | quote }}
+            resourceGroupName: {{ $a.azureDNS.resourceGroupName | quote }}
+            hostedZoneName: {{ $a.azureDNS.hostedZoneName | quote }}
+            environment: {{ $a.azureDNS.environment }}
+{{- end }}

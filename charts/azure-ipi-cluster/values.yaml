@@ -1,0 +1,89 @@
+# Defaults. Os valores reais vem de clusters/<cluster>/values.yaml.
+clusterName: ""
+environment: dev
+baseDomain: ""
+# Vazio = resolvido a partir de labels.env por clusterSets.byEnv (bloco no topo de 03-clusterdeployment.yaml e 05-managedcluster.yaml).
+# Preencher aqui e o escape hatch para forcar um set especifico.
+clusterSet: ""
+clusterSets:
+  default: ""
+  byEnv: {}
+cloudProvider: Azure
+labels: {}
+addons:
+  policyController: true
+  searchCollector: true
+  applicationManager: true
+  certPolicyController: true
+
+provision:
+  enabled: false
+  imageSetRef: ""
+  credentials:
+    mode: existing                # existing | externalSecret (este exige o ESO)
+    sourceNamespace: acm-credentials
+    sourceSecret: ""
+    clusterSecretStore: acm-credentials-hub
+    refreshInterval: "1h"
+    # SO no modo externalSecret: inclui ssh-privatekey no ExternalSecret gerado.
+    # Ignorado quando mode=existing.
+    copySshKey: true
+    # Vale para os DOIS modos: se false, o ClusterDeployment sai sem o bloco
+    # sshPrivateKeySecretRef (cluster sem acesso SSH aos nos).
+    sshPrivateKey: true
+    existingCredentialsSecret: ""
+    existingPullSecret: ""
+    existingSshPrivateKeySecret: ""
+  # Nome do pool de workers. Muda o nome do MachinePool (<cluster>-<nome>) e
+  # dos MachineSets gerados (<infraID>-<nome>-<zona>).
+  # Trocar aqui e o caminho para recriar o pool quando spec.platform precisa
+  # mudar -- ele e imutavel.
+  machinePool:
+    name: worker
+  publish: Internal
+  fips: false
+  preserveOnDelete: false
+  # Separa os objetos do ACM (ManagedCluster, KlusterletAddonConfig) dos objetos
+  # do Hive (Namespace, install-config, ClusterDeployment, MachinePool).
+  # Util para bissecar: com false, o sync aplica so o Hive.
+  acmImport:
+    enabled: true
+  azure:
+    region: ""
+    cloudName: AzurePublicCloud
+    baseDomainResourceGroupName: ""
+    networkResourceGroupName: ""
+    virtualNetwork: ""
+    controlPlaneSubnet: ""
+    computeSubnet: ""
+    outboundType: UserDefinedRouting
+  networking:
+    networkType: OVNKubernetes
+    clusterNetwork: "10.128.0.0/14"
+    hostPrefix: 23
+    serviceNetwork: "172.30.0.0/16"
+    machineNetwork: ""
+  controlPlane:
+    replicas: 3
+    type: Standard_D8s_v3
+    osDisk:
+      diskSizeGB: 1024
+      diskType: Premium_LRS
+    zones: ["1", "2", "3"]
+  compute:
+    replicas: 3
+    type: Standard_D4s_v3
+    osDisk:
+      diskSizeGB: 512
+      diskType: Premium_LRS
+    zones: ["1", "2", "3"]
+
+# Autoscaling. Lido aqui apenas para decidir a forma do MachinePool.
+#   mode: machinePool -> spec.autoscaling no MachinePool (ACM/Hive). O Hive cria
+#                        ClusterAutoscaler e MachineAutoscaler no spoke.
+#   mode: spoke       -> nada aqui; os CRs vao pelo chart cluster-autoscaling.
+autoscaling:
+  enabled: false
+  mode: machinePool
+  minReplicas: 3
+  maxReplicas: 9

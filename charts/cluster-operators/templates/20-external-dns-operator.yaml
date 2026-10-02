@@ -1,0 +1,34 @@
+{{- if .Values.operators.enabled }}
+# ExternalDNS Operator for Red Hat OpenShift.
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: external-dns-operator
+  namespace: external-dns-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  # OperatorGroup SEM targetNamespaces significa modo AllNamespaces, e o
+  # ExternalDNS Operator NAO suporta esse install mode -- o OLM recusa com
+  # "AllNamespaces InstallModeType not supported".
+  # Ele opera em OwnNamespace: os operandos e os Secrets azure.json ficam todos
+  # em external-dns-operator, e o CR ExternalDNS e cluster-scoped, entao nada se
+  # perde com esse escopo.
+  targetNamespaces:
+    - external-dns-operator
+  upgradeStrategy: Default
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: external-dns-operator
+  namespace: external-dns-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  name: external-dns-operator
+  channel: {{ .Values.operators.externalDNS.channel }}
+  source: {{ .Values.operators.externalDNS.source }}
+  sourceNamespace: {{ .Values.operators.externalDNS.sourceNamespace }}
+  installPlanApproval: {{ .Values.operators.externalDNS.installPlanApproval }}
+{{- end }}

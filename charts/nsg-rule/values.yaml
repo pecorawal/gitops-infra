@@ -1,0 +1,61 @@
+# Defaults. Os valores reais vem de clusters/<cluster>/values.yaml, sob a
+# chave nsgRule: (mesma convencao de provision/ingress/externalDNS).
+nsgRule:
+  enabled: false
+  # Namespace onde roda o CronJob (e a ServiceAccount).
+  namespace: nsg-rule
+
+  # Service do IngressController cujo IP publico vai para a regra do NSG.
+  #
+  # NAO inclua o clusterName aqui: o template acrescenta o sufixo sozinho.
+  #   values     : router-public
+  #   Service real: router-public-<clusterName>   (ex: router-public-meu-cluster)
+  #
+  # O nome do Service e "router-<nome-do-IngressController>", e o nome do IC e
+  # "<ingress.public.name>-<clusterName>". Como o sufixo tem que acompanhar o
+  # cluster, ele e montado no template -- se estivesse escrito aqui, ficaria
+  # desatualizado no dia em que o values fosse copiado para outro cluster.
+  # A checagem em _validate.tpl confere isto contra ingress.public.name.
+  serviceName: router-public
+  serviceNamespace: openshift-ingress
+
+  # NSG alvo na Azure.
+  nsgName: ""
+  nsgResourceGroup: ""
+  subscriptionId: ""
+  ruleName: Allow_HTTP_HTTPS_Ingress
+  priority: 1000
+  schedule: "*/10 * * * *"
+
+  # Quanto o script espera pelo IP do LB antes de desistir.
+  # MANTENHA MENOR que o intervalo do schedule: com 25 min de espera e schedule
+  # de 10 min, cada execucao ainda estaria rodando quando a proxima dispara.
+  # (concurrencyPolicy: Forbid evita o encavalamento, mas o CronJob acumula
+  # execucoes puladas e a regra so sincroniza quando a lenta finalmente sai.)
+  waitSeconds: 180
+  # Corte duro do Job. Deve ser > waitSeconds, com folga para as chamadas az.
+  timeoutSeconds: 600
+
+  # ---- Associacao do NSG a subnet dos workers ----
+  # Cluster IPI privado nasce SEM NSG na subnet. Sem associar, a inbound rule
+  # criada acima nao surte efeito nenhum: o trafego externo nao chega aos
+  # workers e as aplicacoes do ingress publico nao respondem.
+  # Vazio nos tres campos = reaproveita o que provision.azure ja declara.
+  subnet:
+    associate: true
+    name: ""              # default: provision.azure.computeSubnet
+    vnet: ""              # default: provision.azure.virtualNetwork
+    resourceGroup: ""     # default: provision.azure.networkResourceGroupName
+    # Substituir um NSG ja associado troca TODAS as regras que valem para a
+    # subnet. Por isso, com outro NSG presente o script apenas avisa e para.
+    force: false
+
+  # Imagem com az CLI + kubectl (mcr.microsoft.com/azure-cli inclui ambos).
+  # A imagem precisa de: az CLI, curl e python3. A azure-cli oficial traz os
+  # tres. NAO precisa de kubectl -- o script fala com a API do Kubernetes via
+  # curl, justamente porque esta imagem nao inclui kubectl.
+  image: mcr.microsoft.com/azure-cli
+  imageTag: latest
+
+  # Secret (fora do Git) com clientId/clientSecret/tenantId do Service Principal.
+  secretName: azure-spn

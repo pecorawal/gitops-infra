@@ -1,0 +1,28 @@
+{{- if .Values.ingress.enabled }}
+# WAVE 30 -- SPOKE. IngressController privado (LB interno) e publico (LB externo),
+# com admissao de rota por label.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ingress-{{ .Values.clusterName }}
+  namespace: {{ .Values.global.argoNamespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+spec:
+  project: {{ .Values.global.project }}
+  source:
+    {{- include "bundle.source" (dict "root" . "chart" "ingress-controllers") | nindent 4 }}
+  destination:
+    name: {{ .Values.clusterName }}
+    namespace: openshift-ingress-operator
+  ignoreDifferences:
+    # O ingress-operator preenche defaults no spec do IngressController.
+    - group: operator.openshift.io
+      kind: IngressController
+      jsonPointers:
+        - /spec/httpEmptyRequestsPolicy
+        - /spec/httpErrorCodePages
+        - /spec/tuningOptions
+        - /spec/unsupportedConfigOverrides
+  {{- include "bundle.syncPolicy" . | nindent 2 }}
+{{- end }}

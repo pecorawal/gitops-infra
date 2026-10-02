@@ -1,0 +1,75 @@
+{{- if and .Values.provision.enabled .Values.provision.acmImport.enabled }}
+{{- /*
+  ===========================================================================
+   RESOLUCAO DO ManagedClusterSet A PARTIR DE labels.env
+  ---------------------------------------------------------------------------
+   Ordem de decisao:
+     1. clusterSet preenchido no values  -> usa esse valor (escape hatch)
+     2. clusterSets.byEnv[<labels.env>]  -> usa o mapeamento
+     3. clusterSets.default              -> ultimo recurso
+
+   Se nada resolver, a renderizacao FALHA com mensagem explicita. E deliberado:
+   um ManagedCluster sem a label de clusterset nao entra em nenhuma Placement,
+   logo nao e registrado no ArgoCD e todo o day-2 fica sem destino -- um erro
+   silencioso que so apareceria 40 minutos depois, com o cluster provisionado.
+
+   O ManagedClusterSet precisa EXISTIR no hub e estar vinculado ao namespace
+   openshift-gitops por um ManagedClusterSetBinding (bootstrap/03-*.yaml).
+
+   NOTA: bloco IDENTICO ao de 03-clusterdeployment.yaml.
+   Ao mudar um, mude o outro -- os dois objetos precisam cair no mesmo
+   clusterset, senao o ClusterDeployment e o ManagedCluster divergem.
+  ===========================================================================
+*/}}
+{{- $env := .Values.labels.env | default .Values.environment | default "" }}
+{{- $byEnv := (.Values.clusterSets | default dict).byEnv | default dict }}
+{{- $clusterSet := "" }}
+{{- if .Values.clusterSet }}
+  {{- $clusterSet = .Values.clusterSet }}
+{{- else if hasKey $byEnv $env }}
+  {{- $clusterSet = get $byEnv $env }}
+{{- else }}
+  {{- $clusterSet = (.Values.clusterSets | default dict).default | default "" }}
+{{- end }}
+{{- if not $clusterSet }}
+  {{- fail (printf "\n\nManagedClusterSet indefinido para o cluster %q.\n  labels.env = %q\n  clusterSets.byEnv nao tem essa chave e clusterSets.default esta vazio.\nCorrija clusters/%s/values.yaml: defina labels.env com um valor mapeado, ou\nacrescente a chave em clusterSets.byEnv, ou preencha clusterSet explicitamente.\n" .Values.clusterName $env .Values.clusterName) }}
+{{- end }}
+# Registra o cluster no ACM. Clusters provisionados pelo Hive sao importados
+# automaticamente -- nao existe auto-import-secret / kubeconfig aqui, ao
+# contrario de charts/import-cluster.
+#
+# Duas labels sao estruturais:
+#
+#   cluster.open-cluster-management.io/clusterset
+#     define em qual ManagedClusterSet o cluster entra. Resolvida a partir de
+#     labels.env pelo bloco no topo deste arquivo.
+#
+#   apps.open-cluster-management.io/replicate-to-argocd
+#     faz o GitOpsCluster registrar este cluster como destino de deploy no
+#     ArgoCD, o que habilita todas as Applications de day-2.
+apiVersion: cluster.open-cluster-management.io/v1
+kind: ManagedCluster
+metadata:
+  name: {{ .Values.clusterName }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+  {{- /*
+    As labels do values e as estruturais sao MESCLADAS antes de sair, e nao
+    concatenadas. Emitir os dois blocos em sequencia gerava chaves repetidas
+    (cloud, vendor, replicate-to-argocd aparecem nos dois) -- YAML aceita e a
+    ultima vence, mas o objeto fica ilegivel e um parser estrito recusa.
+    As estruturais sao aplicadas POR CIMA: o clusterset nao pode ser
+    sobrescrito por engano a partir de labels.
+  */}}
+  {{- $labels := dict }}
+  {{- range $k, $v := .Values.labels }}{{- $_ := set $labels $k ($v | toString) }}{{- end }}
+  {{- $_ := set $labels "cloud" (.Values.cloudProvider | default "Azure") }}
+  {{- $_ := set $labels "vendor" "OpenShift" }}
+  {{- $_ := set $labels "cluster.open-cluster-management.io/clusterset" $clusterSet }}
+  {{- $_ := set $labels "apps.open-cluster-management.io/replicate-to-argocd" "true" }}
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+spec:
+  hubAcceptsClient: true
+{{- end }}

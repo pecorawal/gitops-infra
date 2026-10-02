@@ -1,0 +1,29 @@
+{{- if .Values.operators.enabled }}
+# cert-manager Operator for Red Hat OpenShift.
+# O operando (controller, webhook, cainjector) sobe no namespace cert-manager,
+# criado pelo proprio operator.
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: cert-manager-operator
+  namespace: cert-manager-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  targetNamespaces:
+    - cert-manager-operator
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: openshift-cert-manager-operator
+  namespace: cert-manager-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  name: openshift-cert-manager-operator
+  channel: {{ .Values.operators.certManager.channel }}
+  source: {{ .Values.operators.certManager.source }}
+  sourceNamespace: {{ .Values.operators.certManager.sourceNamespace }}
+  installPlanApproval: {{ .Values.operators.certManager.installPlanApproval }}
+{{- end }}

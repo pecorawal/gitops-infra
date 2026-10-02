@@ -1,0 +1,112 @@
+{{- if .Values.provision.enabled }}
+{{- $as := .Values.autoscaling | default dict }}
+{{- $porPool := and $as.enabled (eq (default "machinePool" $as.mode) "machinePool") }}
+{{- if $porPool }}
+{{- /*
+  AUTOSCALING EM CLUSTER GERENCIADO PELO ACM/HIVE
+  ---------------------------------------------------------------------------
+  Num cluster provisionado pelo Hive, quem manda nos MachineSets do spoke e o
+  MachinePool daqui do hub. O Hive reconcilia os MachineSets a partir dele.
+
+  Por isso o autoscaling NAO se configura criando MachineAutoscaler no spoke:
+  declara-se spec.autoscaling no MachinePool, e o proprio Hive cria, no cluster
+  gerenciado, o ClusterAutoscaler e um MachineAutoscaler por MachineSet.
+  Criar esses objetos por fora significa disputar com o Hive.
+
+  spec.replicas e spec.autoscaling sao MUTUAMENTE EXCLUSIVOS -- o webhook do
+  Hive recusa o MachinePool com os dois. Por isso o replicas some quando o
+  autoscaling entra.
+
+  min/max sao TOTAIS do pool: o Hive distribui entre os MachineSets (um por
+  zona).
+*/}}
+{{- if gt (int $as.minReplicas) (int $as.maxReplicas) }}
+  {{- fail (printf "\n\nautoscaling.minReplicas (%d) maior que maxReplicas (%d).\n" (int $as.minReplicas) (int $as.maxReplicas)) }}
+{{- end }}
+{{- $zonas := len (.Values.provision.compute.zones | default list) }}
+{{- if and (gt (int $as.minReplicas) 0) (gt $zonas 0) (lt (int $as.minReplicas) $zonas) }}
+  {{- fail (printf "\n\nautoscaling.minReplicas = %d, mas o pool esta espalhado por %d zonas.\nO Hive cria um MachineSet por zona e reparte o minimo entre eles: com menos\nde %d, alguma zona ficaria sem instrucao valida.\nUse minReplicas >= %d (ou 0, para permitir escalar ate zero).\n" (int $as.minReplicas) $zonas $zonas $zonas) }}
+{{- end }}
+{{- end }}
+# Pool de workers gerenciado pelo Hive depois da instalacao.
+{{- if $porPool }}
+# AUTOSCALING LIGADO: o tamanho do pool passa a ser decidido pelo autoscaler,
+# entre min e max. O Hive cria o ClusterAutoscaler e os MachineAutoscaler no
+# cluster gerenciado -- nao ha nada a aplicar la por fora.
+{{- else }}
+# Escala manual: mude provision.compute.replicas e commite.
+{{- end }}
+{{- /*
+  NOME DO POOL -- parametrizavel de proposito.
+  spec.platform do MachinePool e IMUTAVEL: corrigir a rede exige recriar o
+  objeto. Como os MachineSets herdam o nome do pool (<infraID>-<pool>-<zona>),
+  recriar com o MESMO nome colide com os MachineSets que ainda existem. A saida
+  e criar o pool com um nome novo -- "worker-v2", por exemplo -- e drenar o
+  antigo.
+
+  Este campo existe para que o chart passe a gerenciar esse pool novo, em vez
+  de recriar o antigo em paralelo (dois pools = o dobro de nos).
+*/}}
+{{- $pool := .Values.provision.machinePool.name | default "worker" }}
+apiVersion: hive.openshift.io/v1
+kind: MachinePool
+metadata:
+  name: {{ .Values.clusterName }}-{{ $pool }}
+  namespace: {{ .Values.clusterName }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+spec:
+  clusterDeploymentRef:
+    name: {{ .Values.clusterName }}
+  name: {{ $pool }}
+  {{- if $porPool }}
+  autoscaling:
+    minReplicas: {{ $as.minReplicas }}
+    maxReplicas: {{ $as.maxReplicas }}
+  {{- else }}
+  replicas: {{ .Values.provision.compute.replicas }}
+  {{- end }}
+  platform:
+    azure:
+      type: {{ .Values.provision.compute.type }}
+      osDisk:
+        diskSizeGB: {{ .Values.provision.compute.osDisk.diskSizeGB }}
+        diskType: {{ .Values.provision.compute.osDisk.diskType }}
+      {{- if .Values.provision.azure.virtualNetwork }}
+      {{- /*
+        BYO VNet -- OBRIGATORIO aqui, nao basta estar no install-config.
+        O install-config so e usado na INSTALACAO. Depois, quem gera os
+        MachineSets do spoke e este MachinePool, e o Hive monta o providerSpec
+        a partir do que esta DECLARADO NELE. Sem estes tres campos ele assume
+        os nomes que o instalador criaria numa VNet propria:
+          vnet   <infraID>-vnet
+          subnet <infraID>-worker-subnet
+          rg     <infraID>-rg
+        Num cluster com VNet pre-existente esses recursos nao existem, e cada
+        maquina nova falha com
+          ResourceNotFound: virtualNetworks/<infraID>-vnet ... not found
+      */}}
+      {{- /*
+        ATENCAO AO NOME: aqui o campo e computeSubnet, NAO subnet.
+        O install-config usa computeSubnet, o providerSpec do MachineSet usa
+        subnet, e o CRD do MachinePool usa computeSubnet. Errar o nome nao da
+        erro: o Kubernetes descarta em silencio campo que o CRD nao conhece, o
+        MachinePool sai sem a rede e as maquinas novas falham com
+        ResourceNotFound. Confira o que a sua versao aceita com:
+          oc explain machinepool.spec.platform.azure
+      */}}
+      networkResourceGroupName: {{ .Values.provision.azure.networkResourceGroupName }}
+      virtualNetwork: {{ .Values.provision.azure.virtualNetwork }}
+      computeSubnet: {{ .Values.provision.azure.computeSubnet }}
+      {{- end }}
+      {{- with .Values.provision.azure.outboundType }}
+      # Mesmo valor do install-config: define como a maquina sai para a
+      # internet (Loadbalancer | UserDefinedRouting).
+      outboundType: {{ . }}
+      {{- end }}
+      {{- with .Values.provision.compute.zones }}
+      zones:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

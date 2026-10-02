@@ -1,0 +1,56 @@
+clusterName: ""
+certManager:
+  enabled: false
+  operatorConfig:
+    enabled: true
+    managementState: Managed
+    logLevel: Normal
+    operatorLogLevel: Normal
+    controller:
+      overrideArgs:
+        - "--dns01-recursive-nameservers-only"
+        - "--dns01-recursive-nameservers=1.1.1.1:53,8.8.8.8:53"
+      overrideEnv: []
+      overrideResources: {}
+    webhook:
+      overrideArgs: []
+    cainjector:
+      overrideArgs: []
+  acme:
+    enabled: false
+    email: ""
+    server: "https://acme-v02.api.letsencrypt.org/directory"
+    azureDNS:
+      subscriptionID: ""
+      tenantID: ""
+      resourceGroupName: ""
+      hostedZoneName: ""
+      environment: AzurePublicCloud
+      clientID: ""
+      clientSecretRef:
+        name: azuredns-config
+        key: client-secret
+  # Opcional. Desligada por padrao: os dois ingress usam certificados ACME
+  # emitidos pelo letsencrypt-prod via desafio DNS01 na zona publica.
+  internalCA:
+    enabled: false
+    selfSigned: true
+    caSecretName: internal-ca-key-pair
+    commonName: "Internal CA"
+    durationHours: 87600
+  appCertificates: []
+ingress:
+  private:
+    enabled: false
+    domain: ""
+    certificate:
+      enabled: false
+      issuer: letsencrypt-prod
+      secretName: private-ingress-tls
+  public:
+    enabled: false
+    domain: ""
+    certificate:
+      enabled: false
+      issuer: letsencrypt-prod
+      secretName: public-ingress-tls

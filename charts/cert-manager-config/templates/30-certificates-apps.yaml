@@ -1,0 +1,37 @@
+{{- if .Values.certManager.enabled }}
+{{- /*
+  Certificados de aplicacao, um por entrada em certManager.appCertificates.
+  O namespace de destino precisa existir: quem o cria e o ApplicationSet da
+  aplicacao em workloads/ (todos usam CreateNamespace=true).
+*/}}
+{{- range .Values.certManager.appCertificates }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .name }}
+  namespace: {{ .namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  secretName: {{ .secretName | default .name }}
+  {{- with .commonName }}
+  commonName: {{ . | quote }}
+  {{- end }}
+  dnsNames:
+    {{- toYaml .dnsNames | nindent 4 }}
+  privateKey:
+    algorithm: RSA
+    size: 2048
+    rotationPolicy: Always
+  usages:
+    - server auth
+    - digital signature
+    - key encipherment
+  issuerRef:
+    name: {{ .issuer | default "letsencrypt-prod" }}
+    kind: ClusterIssuer
+    group: cert-manager.io
+{{- end }}
+{{- end }}

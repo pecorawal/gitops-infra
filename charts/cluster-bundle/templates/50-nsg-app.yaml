@@ -1,0 +1,21 @@
+{{- if .Values.nsgRule.enabled }}
+# WAVE 50 -- SPOKE. Sincroniza a regra inbound do NSG da Azure com o IP do
+# Load Balancer do IngressController (TCP 80/443 do Internet).
+# Roda DEPOIS do ingress (wave 30): o CronJob espera o Service ter IP e
+# aplica/atualiza a regra de forma idempotente, se auto-curando a cada 10 min.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nsg-{{ .Values.clusterName }}
+  namespace: {{ .Values.global.argoNamespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "50"
+spec:
+  project: {{ .Values.global.project }}
+  source:
+    {{- include "bundle.source" (dict "root" . "chart" "nsg-rule") | nindent 4 }}
+  destination:
+    name: {{ .Values.clusterName }}
+    namespace: nsg-rule
+  {{- include "bundle.syncPolicy" . | nindent 2 }}
+{{- end }}

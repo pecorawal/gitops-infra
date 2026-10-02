@@ -1,0 +1,40 @@
+{{- if and .Values.certManager.enabled .Values.certManager.internalCA.enabled .Values.certManager.internalCA.selfSigned }}
+# Cadeia da CA interna, montada dentro do proprio cluster:
+#   selfsigned-bootstrap (issuer)  ->  Certificate raiz (isCA)  ->  internal-ca (issuer)
+#
+# SkipDryRunOnMissingResource: na primeira sincronizacao o CRD ClusterIssuer
+# ainda pode nao existir (o operator acabou de ser instalado na wave anterior).
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-bootstrap
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  selfSigned: {}
+---
+# Certificado raiz da CA. O Secret gerado alimenta o ClusterIssuer internal-ca.
+# Fica no namespace cert-manager, que e o "cluster resource namespace" onde os
+# ClusterIssuers procuram seus Secrets.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: internal-ca
+  namespace: cert-manager
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  isCA: true
+  commonName: {{ .Values.certManager.internalCA.commonName | quote }}
+  secretName: {{ .Values.certManager.internalCA.caSecretName }}
+  duration: {{ printf "%dh" (int .Values.certManager.internalCA.durationHours) }}
+  privateKey:
+    algorithm: RSA
+    size: 4096
+  issuerRef:
+    name: selfsigned-bootstrap
+    kind: ClusterIssuer
+    group: cert-manager.io
+{{- end }}

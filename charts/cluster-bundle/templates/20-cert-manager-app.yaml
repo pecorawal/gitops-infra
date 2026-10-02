@@ -1,0 +1,25 @@
+{{- if .Values.certManager.enabled }}
+# WAVE 20 -- SPOKE. ClusterIssuers (ACME/Azure DNS e CA interna) e os
+# Certificates dos IngressControllers e das aplicacoes.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: certs-{{ .Values.clusterName }}
+  namespace: {{ .Values.global.argoNamespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  project: {{ .Values.global.project }}
+  source:
+    {{- include "bundle.source" (dict "root" . "chart" "cert-manager-config") | nindent 4 }}
+  destination:
+    name: {{ .Values.clusterName }}
+    namespace: cert-manager
+  ignoreDifferences:
+    # cert-manager reescreve o status e a revisao dos Certificates.
+    - group: cert-manager.io
+      kind: Certificate
+      jsonPointers:
+        - /spec/revisionHistoryLimit
+  {{- include "bundle.syncPolicy" . | nindent 2 }}
+{{- end }}

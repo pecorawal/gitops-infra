@@ -1,0 +1,92 @@
+{{- if .Values.machinePools.enabled }}
+{{- include "machine-pools.validate" . }}
+{{- /*
+  ===========================================================================
+   POOLS ADICIONAIS -- novos tipos de MachineSet num cluster que ja existe
+  ---------------------------------------------------------------------------
+   Num cluster provisionado pelo Hive quem manda nos MachineSets do spoke e o
+   MachinePool, daqui do hub. Por isso um grupo novo de maquinas NAO se cria
+   aplicando MachineSet no spoke: declara-se mais um MachinePool, e o Hive gera
+   la um MachineSet por zona,
+     <infraID>-<pool>-<regiao><zona>     ex: azr-cliente-dev-01-ab12c-infra-brazilsouth1
+   e continua reconciliando replicas, labels e taints a partir daqui.
+
+   O pool worker padrao NAO passa por aqui: continua em
+   charts/azure-ipi-cluster/templates/04-machinepool-worker.yaml.
+
+   AUTOSCALING -- mesmo mecanismo do worker: spec.autoscaling faz o Hive criar
+   um MachineAutoscaler por MachineSet do pool, com min/max repartidos entre as
+   zonas. O ClusterAutoscaler global vem da Application autoscale-<cluster>,
+   que o bundle emite sempre que algum pool escala.
+  ===========================================================================
+*/}}
+{{- range .Values.machinePools.pools }}
+{{- $as := .autoscaling | default dict }}
+{{- $disk := .osDisk | default dict }}
+{{- $diskWorker := $.Values.provision.compute.osDisk | default dict }}
+---
+apiVersion: hive.openshift.io/v1
+kind: MachinePool
+metadata:
+  # O webhook do Hive exige exatamente <clusterDeployment>-<spec.name>.
+  name: {{ $.Values.clusterName }}-{{ .name }}
+  namespace: {{ $.Values.clusterName }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    # Prune=false  -> tirar o pool da lista NAO apaga o MachinePool
+    # Delete=false -> apagar a Application NAO apaga o MachinePool
+    # Apagar um MachinePool faz o Hive remover os MachineSets do spoke e drenar
+    # os nos. Isso tem que ser um ato explicito (oc delete, no hub), nunca o
+    # efeito colateral de uma edicao no values. Ver docs/cliente/08-machine-pools.md
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+spec:
+  clusterDeploymentRef:
+    name: {{ $.Values.clusterName }}
+  name: {{ .name | toString | quote }}
+  {{- if $as.enabled }}
+  # AUTOSCALING: min/max sao TOTAIS do pool; o Hive reparte entre as zonas.
+  autoscaling:
+    minReplicas: {{ int $as.minReplicas }}
+    maxReplicas: {{ int $as.maxReplicas }}
+  {{- else }}
+  replicas: {{ int .replicas }}
+  {{- end }}
+  {{- with .labels }}
+  # Labels dos NOS (nao do MachinePool). O Hive as reaplica continuamente:
+  # remover ou mudar na mao, no no, nao dura.
+  labels:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .taints }}
+  taints:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  # spec.platform e IMUTAVEL: mudar type, disco ou zonas exige um pool com
+  # nome novo. O webhook responde "field is immutable".
+  platform:
+    azure:
+      type: {{ .type }}
+      osDisk:
+        diskSizeGB: {{ int ($disk.diskSizeGB | default $diskWorker.diskSizeGB) }}
+        diskType: {{ $disk.diskType | default $diskWorker.diskType }}
+      {{- if $.Values.provision.azure.virtualNetwork }}
+      # BYO VNet -- a MESMA rede do worker, herdada de provision.azure.
+      # Sem estes campos o Hive assume <infraID>-vnet e cada maquina falha com
+      # ResourceNotFound. O campo e computeSubnet, NAO subnet.
+      networkResourceGroupName: {{ $.Values.provision.azure.networkResourceGroupName }}
+      virtualNetwork: {{ $.Values.provision.azure.virtualNetwork }}
+      computeSubnet: {{ $.Values.provision.azure.computeSubnet }}
+      {{- end }}
+      {{- with $.Values.provision.azure.outboundType }}
+      outboundType: {{ . }}
+      {{- end }}
+      {{- with (.zones | default $.Values.provision.compute.zones) }}
+      # Um MachineSet por zona. Aspas forcadas: o CRD so aceita string, e
+      # zones: [1, 2, 3] sem aspas chegaria como numero.
+      zones:
+        {{- range . }}
+        - {{ . | toString | quote }}
+        {{- end }}
+      {{- end }}
+{{- end }}
+{{- end }}

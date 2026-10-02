@@ -1,0 +1,19 @@
+{{- if .Values.externalDNS.enabled }}
+# WAVE 40 -- SPOKE. Duas instancias do ExternalDNS: uma publicando na
+# Azure Private DNS Zone e outra na Azure (public) DNS Zone.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dns-{{ .Values.clusterName }}
+  namespace: {{ .Values.global.argoNamespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+spec:
+  project: {{ .Values.global.project }}
+  source:
+    {{- include "bundle.source" (dict "root" . "chart" "external-dns-config") | nindent 4 }}
+  destination:
+    name: {{ .Values.clusterName }}
+    namespace: external-dns-operator
+  {{- include "bundle.syncPolicy" . | nindent 2 }}
+{{- end }}

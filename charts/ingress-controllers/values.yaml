@@ -1,0 +1,43 @@
+ingress:
+  enabled: false
+  default:
+    isolateByLabel: false
+    # Escopo do LB do router default. Internal = LB interno (cluster privado).
+    # Declarado explicitamente de proposito: se o objeto for aplicado inteiro,
+    # o operator recriaria o LB com o padrao dele (External) e o cluster
+    # privado perderia o acesso interno a console.
+    scope: Internal
+    labelKey: ingress-type
+    reservedValues:
+      - public
+      - private
+  private:
+    enabled: false
+    name: private
+    domain: ""
+    replicas: 2
+    scope: Internal
+    routeSelector:
+      key: ingress-type
+      value: private
+    namespaceSelector: {}
+    nodePlacement: {}
+    certificate:
+      enabled: false
+      issuer: letsencrypt-prod
+      secretName: private-ingress-tls
+  public:
+    enabled: false
+    name: public
+    domain: ""
+    replicas: 2
+    scope: External
+    routeSelector:
+      key: ingress-type
+      value: public
+    namespaceSelector: {}
+    nodePlacement: {}
+    certificate:
+      enabled: false
+      issuer: letsencrypt-prod
+      secretName: public-ingress-tls

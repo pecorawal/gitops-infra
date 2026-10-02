@@ -1,0 +1,106 @@
+{{- if .Values.nsgRule.enabled }}
+{{- include "nsg-rule.validate" . }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: nsg-rule-{{ .Values.clusterName }}
+  namespace: {{ .Values.nsgRule.namespace }}
+spec:
+  schedule: {{ .Values.nsgRule.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: {{ .Values.nsgRule.timeoutSeconds }}
+      template:
+        spec:
+          serviceAccountName: nsg-rule-sa-{{ .Values.clusterName }}
+          restartPolicy: Never
+          containers:
+            - name: nsg-rule
+              image: "{{ .Values.nsgRule.image }}:{{ .Values.nsgRule.imageTag }}"
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/bash", "/scripts/nsg-rule.sh"]
+              env:
+                # O az CLI grava configuracao e cache de token no HOME. No
+                # OpenShift o pod roda com UID arbitrario e HOME=/ nao e
+                # gravavel -- o az morre com
+                #   PermissionError: [Errno 13] Permission denied: '/.azure'
+                # antes mesmo de executar o comando. Apontamos os dois para o
+                # emptyDir montado abaixo.
+                - name: HOME
+                  value: /tmp/az
+                - name: AZURE_CONFIG_DIR
+                  value: /tmp/az/.azure
+                - name: SVC_NAME
+                  # Service do router: "router-<nome-do-IngressController>", e o
+                  # nome do IC carrega o clusterName no final.
+                  value: {{ printf "%s-%s" .Values.nsgRule.serviceName .Values.clusterName | quote }}
+                - name: SVC_NAMESPACE
+                  value: {{ .Values.nsgRule.serviceNamespace | quote }}
+                - name: NSG_NAME
+                  value: {{ .Values.nsgRule.nsgName | quote }}
+                - name: NSG_RG
+                  value: {{ .Values.nsgRule.nsgResourceGroup | quote }}
+                - name: SUBSCRIPTION
+                  value: {{ .Values.nsgRule.subscriptionId | quote }}
+                - name: RULE_NAME
+                  value: {{ .Values.nsgRule.ruleName | quote }}
+                - name: PRIORITY
+                  value: {{ .Values.nsgRule.priority | quote }}
+                # Espera pelo IP do LB. Tem que ser MENOR que o intervalo do
+                # schedule, senao uma execucao ainda estaria correndo quando a
+                # proxima e disparada (o concurrencyPolicy: Forbid pula a nova,
+                # mas ai o CronJob acumula execucoes puladas sem sincronizar).
+                - name: WAIT_SECONDS
+                  value: {{ .Values.nsgRule.waitSeconds | quote }}
+                # ---- associacao do NSG a subnet dos workers ----
+                - name: ASSOCIATE_SUBNET
+                  value: {{ .Values.nsgRule.subnet.associate | quote }}
+                - name: ASSOCIATE_FORCE
+                  value: {{ .Values.nsgRule.subnet.force | quote }}
+                - name: SUBNET_NAME
+                  value: {{ .Values.nsgRule.subnet.name | default .Values.provision.azure.computeSubnet | quote }}
+                - name: VNET_NAME
+                  value: {{ .Values.nsgRule.subnet.vnet | default .Values.provision.azure.virtualNetwork | quote }}
+                - name: VNET_RG
+                  value: {{ .Values.nsgRule.subnet.resourceGroup | default .Values.provision.azure.networkResourceGroupName | quote }}
+                - name: AZURE_CLIENT_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.nsgRule.secretName }}
+                      key: clientId
+                - name: AZURE_CLIENT_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.nsgRule.secretName }}
+                      key: clientSecret
+                - name: AZURE_TENANT_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.nsgRule.secretName }}
+                      key: tenantId
+              volumeMounts:
+                - name: script
+                  mountPath: /scripts
+                - name: az-home
+                  mountPath: /tmp/az
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                capabilities:
+                  drop: ["ALL"]
+                seccompProfile:
+                  type: RuntimeDefault
+          volumes:
+            # HOME gravavel para o az CLI. emptyDir: some com o Job, e nada
+            # aqui precisa sobreviver -- o login e refeito a cada execucao.
+            - name: az-home
+              emptyDir: {}
+            - name: script
+              configMap:
+                name: nsg-rule-script-{{ .Values.clusterName }}
+                defaultMode: 0555
+{{- end }}
