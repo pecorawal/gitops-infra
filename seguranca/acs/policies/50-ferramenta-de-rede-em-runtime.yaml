@@ -1,0 +1,31 @@
+# ---------------------------------------------------------------------------
+#  Demo C (complemento) · processo anômalo em runtime  (C06 · RSK-09)
+#  curl/wget/nc dentro de um pod de pagamentos: padrão típico de exfiltração
+#  ou de download de ferramenta após exploração. Só alerta (sem kill) para a
+#  demo não depender do timing do enforcement.
+# ---------------------------------------------------------------------------
+apiVersion: config.stackrox.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: demo-ferramenta-de-rede-em-runtime
+  namespace: stackrox
+spec:
+  policyName: "DEMO - Ferramenta de rede executada em pod de pagamentos"
+  description: "Processo curl, wget, nc ou ncat executado dentro de um container."
+  rationale: "Aplicação de pagamentos não precisa baixar nada em runtime; o processo indica uso interativo ou pós-exploração."
+  remediation: "Investigue a origem do processo e remova as ferramentas da imagem (use imagem minimal/distroless)."
+  categories:
+    - Anomalous Activity
+  lifecycleStages:
+    - RUNTIME
+  eventSource: DEPLOYMENT_EVENT
+  severity: HIGH_SEVERITY
+  scope:
+    - namespace: "pagamentos-demo"
+  policySections:
+    - sectionName: "Ferramenta de rede"
+      policyGroups:
+        - fieldName: Process Name
+          booleanOperator: OR
+          values:
+            - value: "curl|wget|nc|ncat"

@@ -1,0 +1,86 @@
+# ---------------------------------------------------------------------------
+#  Demo E · Conformidade contínua  (C02 · RSK-01 RSK-11)
+#
+#  Compliance Operator + varredura PCI-DSS agendada em toda a frota.
+#  O resultado aparece em dois lugares, e os dois contam a mesma história:
+#    - ACS > Compliance (visão do time de segurança: controle por controle)
+#    - ACM > Governance  (visão da plataforma: cluster por cluster)
+#
+#  Aplicar no hub:  oc apply -f seguranca/acm/policy-compliance-pci.yaml
+#  Reaproveita o Placement de policy-acs-cobertura.yaml.
+# ---------------------------------------------------------------------------
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: compliance-pci-dss
+  namespace: acm-policies
+  annotations:
+    policy.open-cluster-management.io/standards: PCI-DSS
+    policy.open-cluster-management.io/categories: Compliance
+    policy.open-cluster-management.io/controls: Varredura contínua
+spec:
+  remediationAction: enforce
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1beta1
+        kind: OperatorPolicy
+        metadata:
+          name: compliance-operator
+        spec:
+          remediationAction: enforce
+          severity: high
+          complianceType: musthave
+          upgradeApproval: Automatic
+          operatorGroup:
+            name: compliance-operator
+            namespace: openshift-compliance
+            targetNamespaces:
+              - openshift-compliance
+          subscription:
+            name: compliance-operator
+            namespace: openshift-compliance
+            channel: stable
+            source: redhat-operators
+            sourceNamespace: openshift-marketplace
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: scan-pci-dss
+        spec:
+          remediationAction: enforce
+          severity: high
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: compliance.openshift.io/v1alpha1
+                kind: ScanSettingBinding
+                metadata:
+                  name: pci-dss
+                  namespace: openshift-compliance
+                profiles:
+                  - apiGroup: compliance.openshift.io/v1alpha1
+                    kind: Profile
+                    name: ocp4-pci-dss
+                  - apiGroup: compliance.openshift.io/v1alpha1
+                    kind: Profile
+                    name: ocp4-pci-dss-node
+                settingsRef:
+                  apiGroup: compliance.openshift.io/v1alpha1
+                  kind: ScanSetting
+                  name: default
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: binding-compliance-pci-dss
+  namespace: acm-policies
+placementRef:
+  name: placement-acs-frota
+  apiGroup: cluster.open-cluster-management.io
+  kind: Placement
+subjects:
+  - name: compliance-pci-dss
+    apiGroup: policy.open-cluster-management.io
+    kind: Policy

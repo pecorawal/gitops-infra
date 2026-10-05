@@ -1,0 +1,26 @@
+# ---------------------------------------------------------------------------
+#  Demos A e C · workload de pagamentos entregue pelo Argo CD
+#  Mostra que o ACS barra inclusive o que vem do GitOps: o Argo CD não é
+#  um atalho para fugir da política.
+#
+#    oc apply -f seguranca/argocd/app-pagamentos-demo.yaml
+#
+#  Sem automated sync de propósito: o apresentador clica "Sync" ao vivo.
+# ---------------------------------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pagamentos-demo
+  namespace: openshift-gitops
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/pecorawal/gitops-infra.git'
+    targetRevision: seguranca
+    path: seguranca/demo-apps/pagamentos-demo
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: pagamentos-demo
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true

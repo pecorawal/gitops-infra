@@ -1,0 +1,39 @@
+# ---------------------------------------------------------------------------
+#  Demo A · gate de segurança no CI  (C04 · RSK-03 RSK-04)
+#
+#  roxctl image check avalia a imagem contra as políticas de BUILD do ACS
+#  e falha o job quando alguma com FAIL_BUILD_ENFORCEMENT é violada.
+#  Só roda sob demanda (Actions > ACS image check > Run workflow).
+#
+#  Secrets do repositório:
+#    ROX_ENDPOINT   central-stackrox.apps.<hub>:443
+#    ROX_API_TOKEN  token com papel "Continuous Integration"
+# ---------------------------------------------------------------------------
+name: ACS image check
+
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: Imagem a avaliar
+        required: true
+        default: registry.access.redhat.com/ubi8/ubi:8.0
+
+jobs:
+  roxctl:
+    runs-on: ubuntu-latest
+    env:
+      ROX_ENDPOINT: ${{ secrets.ROX_ENDPOINT }}
+      ROX_API_TOKEN: ${{ secrets.ROX_API_TOKEN }}
+    steps:
+      - name: Baixar roxctl do próprio Central (mesma versão do servidor)
+        run: |
+          curl -fsSk -H "Authorization: Bearer $ROX_API_TOKEN" \
+            "https://$ROX_ENDPOINT/api/cli/download/roxctl-linux" -o roxctl
+          chmod +x roxctl && ./roxctl version
+
+      - name: Scan (relatório de CVEs)
+        run: ./roxctl image scan --insecure-skip-tls-verify --image "${{ inputs.image }}" --output table --severity CRITICAL,IMPORTANT | tail -40
+
+      - name: Check (gate de política)
+        run: ./roxctl image check --insecure-skip-tls-verify --image "${{ inputs.image }}" --output table

@@ -1,0 +1,36 @@
+# ---------------------------------------------------------------------------
+#  Demo C · mudança fora do Git  (C06 · RSK-09)
+#
+#  'oc exec' / 'oc rsh' num pod de pagamentos gera violação de RUNTIME.
+#  Com enforcement, o admission controller recusa o próprio exec
+#  (requer admissionControl com listenOnEvents habilitado no SecuredCluster).
+#  Para só alertar na primeira passada, comente o enforcementActions.
+# ---------------------------------------------------------------------------
+apiVersion: config.stackrox.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: demo-exec-em-pod-pci
+  namespace: stackrox
+spec:
+  policyName: "DEMO - Exec em pod de pagamentos"
+  description: "Alguém executou um comando interativo dentro de um pod do namespace de pagamentos."
+  rationale: "Em ambiente PCI toda mudança passa pelo Git. Exec em produção é mudança sem trilha de revisão."
+  remediation: "Abra PR com a alteração. Para troubleshooting, use o procedimento de break-glass registrado."
+  categories:
+    - Kubernetes Events
+  lifecycleStages:
+    - RUNTIME
+  eventSource: DEPLOYMENT_EVENT
+  severity: HIGH_SEVERITY
+  enforcementActions:
+    - FAIL_KUBE_REQUEST_ENFORCEMENT
+  scope:
+    - namespace: "pagamentos-demo"
+  policySections:
+    - sectionName: "Exec em pod"
+      policyGroups:
+        # Na UI o critério aparece como "Kubernetes action"
+        - fieldName: Kubernetes Resource
+          booleanOperator: OR
+          values:
+            - value: "PODS_EXEC"

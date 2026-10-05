@@ -41,6 +41,14 @@ cp -r clusters/azr-main-dev-01 clusters/<seu-cluster>
 | `charts/cluster-autoscaling/` | ClusterAutoscaler + MachineAutoscaler (autoscaling do pool worker) |
 | `charts/machine-pools/` | MachinePools adicionais do Hive: novos tipos de MachineSet no cluster, com autoscaling opcional (roda no hub) |
 
+## Branch `seguranca` — demo do ACS para o time de segurança
+
+Políticas do ACS como código, admission controller barrando deploys do Argo CD, cobertura do ACS
+garantida pelo ACM e os 8 KPIs de segurança do Scorecard DevSecOps coletados ao vivo.
+
+📖 **[`seguranca/`](seguranca/README.md)** — [roteiro da demo](seguranca/docs/roteiro-demo.md) ·
+[os 8 KPIs](seguranca/docs/kpis-seguranca.md)
+
 <!-- readme-tree start -->
 ```
 .

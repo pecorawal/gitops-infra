@@ -1,0 +1,43 @@
+# ---------------------------------------------------------------------------
+#  pagamentos-api (simulado)
+#
+#  ESTADO INICIAL = VULNERÁVEL. ubi8/ubi:8.0 (2019) carrega dezenas de CVEs
+#  Importantes com correção disponível -> a política
+#  "DEMO - CVE corrigível Importante ou Crítica" barra o deploy.
+#
+#  Correção (Demo C / RSK-06), via PR:
+#    image: registry.access.redhat.com/ubi9/ubi-minimal:9.8
+#  Confira a tag mais recente antes da demo (skopeo list-tags ou catalog.redhat.com).
+# ---------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pagamentos-api
+  namespace: pagamentos-demo
+  labels:
+    app: pagamentos-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pagamentos-api
+  template:
+    metadata:
+      labels:
+        app: pagamentos-api
+    spec:
+      containers:
+        - name: api
+          image: registry.access.redhat.com/ubi8/ubi:8.0
+          command: ["/bin/sh", "-c", "while true; do echo pagamentos-api ok; sleep 30; done"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
