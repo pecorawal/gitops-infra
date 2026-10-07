@@ -3,11 +3,11 @@
 #  Bloqueado no deploy: um container privilegiado num namespace PCI é o
 #  exemplo que todo auditor reconhece.
 # ---------------------------------------------------------------------------
-apiVersion: config.stackrox.io/v1alpha1
+apiVersion: config.rhacs-operator.io/v1alpha1
 kind: SecurityPolicy
 metadata:
   name: demo-container-privilegiado
-  namespace: stackrox
+  namespace: rhacs-operator
 spec:
   policyName: "DEMO - Container privilegiado em namespace PCI"
   description: "Deployment com container em modo privilegiado."

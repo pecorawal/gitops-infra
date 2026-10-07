@@ -2,11 +2,11 @@
 #  Demo A (complemento) · imagem sem versão rastreável  (C04 · RSK-04)
 #  Política simples, que o time de segurança entende em 5 segundos.
 # ---------------------------------------------------------------------------
-apiVersion: config.stackrox.io/v1alpha1
+apiVersion: config.rhacs-operator.io/v1alpha1
 kind: SecurityPolicy
 metadata:
   name: demo-tag-latest-proibida
-  namespace: stackrox
+  namespace: rhacs-operator
 spec:
   policyName: "DEMO - Tag latest proibida"
   description: "Imagem referenciada pela tag 'latest'."

@@ -6,11 +6,11 @@
 #  (requer admissionControl com listenOnEvents habilitado no SecuredCluster).
 #  Para só alertar na primeira passada, comente o enforcementActions.
 # ---------------------------------------------------------------------------
-apiVersion: config.stackrox.io/v1alpha1
+apiVersion: config.rhacs-operator.io/v1alpha1
 kind: SecurityPolicy
 metadata:
   name: demo-exec-em-pod-pci
-  namespace: stackrox
+  namespace: rhacs-operator
 spec:
   policyName: "DEMO - Exec em pod de pagamentos"
   description: "Alguém executou um comando interativo dentro de um pod do namespace de pagamentos."

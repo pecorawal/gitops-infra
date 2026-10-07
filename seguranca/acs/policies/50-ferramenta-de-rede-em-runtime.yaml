@@ -4,11 +4,11 @@
 #  ou de download de ferramenta após exploração. Só alerta (sem kill) para a
 #  demo não depender do timing do enforcement.
 # ---------------------------------------------------------------------------
-apiVersion: config.stackrox.io/v1alpha1
+apiVersion: config.rhacs-operator.io/v1alpha1
 kind: SecurityPolicy
 metadata:
   name: demo-ferramenta-de-rede-em-runtime
-  namespace: stackrox
+  namespace: rhacs-operator
 spec:
   policyName: "DEMO - Ferramenta de rede executada em pod de pagamentos"
   description: "Processo curl, wget, nc ou ncat executado dentro de um container."
