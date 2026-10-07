@@ -63,8 +63,21 @@ mede e gera evidência — em todos os clusters, sem virar gargalo da entrega.*
 6. **GitHub Actions (opcional):** cadastre `ROX_ENDPOINT` e `ROX_API_TOKEN` como secrets e
    `ROX_CLUSTER` como variable do repositório (nome do cluster no ACS).
    O Central precisa ser alcançável pela internet; se não for, use o script local.
-7. **Demo D (opcional, demora ~10 min):** crie a CRS e aplique `seguranca/acm/policy-acs-cobertura.yaml`
-   num hub de laboratório com um cluster **ainda sem ACS** para mostrar a instalação acontecendo.
+7. **Demo D (cobertura):** no hub, siga os pré-requisitos do cabeçalho de
+   `seguranca/acm/policy-acs-cobertura.yaml`: secret `acs-crs` e ConfigMap `acs-central`, ambos em
+   `acm-policies`. Depois aplique o arquivo. Confira:
+   ```bash
+   oc -n acm-policies get placement placement-acs-frota      # SUCCEEDED=True, SELECTEDCLUSTERS >= 1
+   oc -n acm-policies get policy acs-secured-cluster         # Compliant
+   ```
+   - `NoManagedClusterSetBindings` no Placement = falta o `ManagedClusterSetBinding` (já vem no arquivo,
+     ligando o ClusterSet `global` ao namespace `acm-policies`).
+   - Cluster que **já tem ACS** converge sem reinstalar: o CR usa o mesmo nome
+     (`stackrox-secured-cluster`) e o `OperatorPolicy` aceita o OperatorGroup existente. A política
+     aplica, porém, a configuração do admission controller (`enforcement: Enabled`) nesses clusters.
+   - Para mostrar a **instalação acontecendo** é preciso um cluster gerenciado ainda sem ACS
+     (~10 min até o Sensor ficar saudável). Sem ele, a demo mostra a cobertura já `Compliant`.
+   - A CRS vale 30 dias (`roxctl central crs list`); gere outra antes de importar clusters novos depois disso.
 8. **Demo E:** aplique `seguranca/acm/policy-compliance-pci.yaml` na véspera — a primeira varredura
    leva alguns minutos e você quer resultado pronto.
 9. **Linha de base:** rode `./seguranca/kpis/coletar-kpis.sh --csv > antes.csv` antes da demo.
@@ -93,8 +106,14 @@ Mostre o **Scorecard DevSecOps · Segurança**, seção *Resumo executivo* e *Jo
 > do ACM: cluster que entra na frota recebe o operador, a credencial e o agente. E a terceira parte só
 > *informa* se o Sensor está de pé — isso vira o RSK-02, cobertura de segurança."
 
-- Abra `seguranca/acm/policy-acs-cobertura.yaml` no GitHub: 3 templates, Placement com toda a frota.
-- Mostre um cluster `Compliant` e, se houver, um `NonCompliant` (é o ponto cego aparecendo).
+- Abra `seguranca/acm/policy-acs-cobertura.yaml` no GitHub: 3 templates (operador, CRS + `SecuredCluster`,
+  Sensor saudável) e um Placement com toda a frota, exceto o hub.
+- ACM › Governance › `acs-secured-cluster`: aba *Clusters*, com `blackbird-rosa-4gs5p` `Compliant` nos 3 templates.
+- ACS › Platform Configuration › Clusters: o mesmo cluster `Healthy`. São duas ferramentas contando a
+  mesma história.
+- Se houver cluster sem ACS no laboratório: importe-o ao vivo e mostre a política instalando o ACS. É o
+  ponto cego sendo fechado sem ticket.
+  > "Não existe um 'cluster novo esquecido': o ACM instala, o ACS registra, e a política mede."
 - **Gancho:** "Cobertura é o denominador de todos os outros KPIs. 90% de cobertura significa que
   10% do risco nem entra na conta."
 
