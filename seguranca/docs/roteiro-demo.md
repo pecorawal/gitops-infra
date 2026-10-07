@@ -20,7 +20,7 @@ mede e gera evidência — em todos os clusters, sem virar gargalo da entrega.*
 
 > Tudo tem escopo restrito ao namespace `pagamentos-demo`. Nenhuma outra carga é afetada.
 
-1. **Ambiente:** hub com ACM + OpenShift GitOps + ACS Central (namespace `stackrox`) e ao menos
+1. **Ambiente:** hub com ACM + OpenShift GitOps + ACS Central (namespace `rhacs-operator`; o SecuredCluster fica em `stackrox`) e ao menos
    um cluster gerenciado. ACS ≥ 4.6 (SecurityPolicy como CR).
 2. **Admission controller:** no `SecuredCluster` do cluster da demo, confira que o enforcement está
    ligado para create, update e eventos (exec):
@@ -97,7 +97,7 @@ Mostre o **Scorecard DevSecOps · Segurança**, seção *Resumo executivo* e *Jo
    > "Do commit à frota inteira em minutos. Esse é o EST-03: tempo para adotar um novo padrão."
 4. **Prova de drift:** tente apagar a política direto no cluster:
    ```bash
-   oc -n stackrox delete securitypolicy demo-tag-latest-proibida
+   oc -n rhacs-operator delete securitypolicy demo-tag-latest-proibida
    ```
    O Argo CD (`selfHeal`) recria em segundos.
 
@@ -206,5 +206,5 @@ Compare com `antes.csv`. Volte ao Scorecard, seção *Jornada de Fundação*, e 
 ```bash
 oc delete -f seguranca/argocd/app-pagamentos-demo.yaml -f seguranca/argocd/app-acs-policies.yaml
 oc delete ns pagamentos-demo
-oc -n stackrox delete securitypolicy -l app.kubernetes.io/instance=acs-security-policies --ignore-not-found
+oc -n rhacs-operator delete securitypolicy -l app.kubernetes.io/instance=acs-security-policies --ignore-not-found
 ```

@@ -6,7 +6,7 @@
 #  saem do ACS Central e do ACM Governance, sem planilha no meio.
 #
 #  Requisitos: curl, jq, oc logado no HUB (ACM) e, para EST-03, no cluster
-#  do Central com acesso ao namespace stackrox.
+#  do Central com acesso ao namespace do Central (ACS_NS).
 #
 #    export ROX_ENDPOINT=central-stackrox.apps.<hub>:443
 #    export ROX_API_TOKEN=<token somente leitura>
@@ -15,6 +15,7 @@
 #
 #  Variáveis opcionais:
 #    JANELA_DIAS=30            janela para violações e remediação
+#    ACS_NS=rhacs-operator     namespace do Central, onde ficam as SecurityPolicy
 #    NS_PROD='pagamentos-demo' regex dos namespaces considerados "produção" (RSK-05)
 #    BUILD_BLOQUEADOS=0        builds reprovados pelo roxctl no período (vem do CI)
 #    BUILD_VIOLACOES=0         violações de build no período (vem do CI)
@@ -27,6 +28,7 @@ set -uo pipefail
 : "${ROX_ENDPOINT:?defina ROX_ENDPOINT}" "${ROX_API_TOKEN:?defina ROX_API_TOKEN}"
 JANELA_DIAS="${JANELA_DIAS:-30}"
 NS_PROD="${NS_PROD:-pagamentos-demo}"
+ACS_NS="${ACS_NS:-rhacs-operator}"
 BUILD_BLOQUEADOS="${BUILD_BLOQUEADOS:-0}"
 BUILD_VIOLACOES="${BUILD_VIOLACOES:-0}"
 POLICY_DIR="$(cd "$(dirname "$0")/../acs/policies" && pwd)"
@@ -146,7 +148,7 @@ kpi_est03() {
   for f in "$POLICY_DIR"/*.yaml; do
     nome=$(awk '/^  name:/{print $2; exit}' "$f")
     commit=$(git -C "$POLICY_DIR" log -1 --format=%ct -- "$f" 2>/dev/null)
-    cr=$(oc -n stackrox get securitypolicy "$nome" -o json 2>/dev/null) || continue
+    cr=$(oc -n "$ACS_NS" get securitypolicy "$nome" -o json 2>/dev/null) || continue
     [[ "$(jq -r '.status.accepted // false' <<<"$cr")" == "true" && -n "$commit" ]] || continue
     aplicada=$(jq -r '[.metadata.managedFields[].time] | max | fromdateiso8601' <<<"$cr")
     (( aplicada >= commit )) && mins+=("$(( (aplicada - commit) / 60 ))")

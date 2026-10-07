@@ -6,7 +6,7 @@
 #  (requer admissionControl com listenOnEvents habilitado no SecuredCluster).
 #  Para só alertar na primeira passada, comente o enforcementActions.
 # ---------------------------------------------------------------------------
-apiVersion: config.rhacs-operator.io/v1alpha1
+apiVersion: config.stackrox.io/v1alpha1
 kind: SecurityPolicy
 metadata:
   name: demo-exec-em-pod-pci

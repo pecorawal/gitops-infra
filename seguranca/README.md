@@ -27,7 +27,7 @@ export ROX_ENDPOINT=central-stackrox.apps.<hub>:443 ROX_API_TOKEN=<token>
 
 | Diretório | Papel |
 |---|---|
-| `acs/policies/` | `SecurityPolicy` (CR do ACS ≥ 4.6) aplicadas pelo Argo CD no namespace `stackrox` |
+| `acs/policies/` | `SecurityPolicy` (CR do ACS ≥ 4.6) aplicadas pelo Argo CD no namespace do Central (`rhacs-operator`) |
 | `acs/rbac/` | Role/RoleBinding para o application controller do Argo CD |
 | `acm/` | Policies do ACM: cobertura do ACS na frota e varredura PCI-DSS |
 | `argocd/` | Applications apontando para esta branch |

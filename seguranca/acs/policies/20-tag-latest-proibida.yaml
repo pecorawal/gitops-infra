@@ -2,7 +2,7 @@
 #  Demo A (complemento) · imagem sem versão rastreável  (C04 · RSK-04)
 #  Política simples, que o time de segurança entende em 5 segundos.
 # ---------------------------------------------------------------------------
-apiVersion: config.rhacs-operator.io/v1alpha1
+apiVersion: config.stackrox.io/v1alpha1
 kind: SecurityPolicy
 metadata:
   name: demo-tag-latest-proibida
