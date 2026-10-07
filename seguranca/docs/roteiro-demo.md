@@ -35,16 +35,33 @@ mede e gera evidência — em todos os clusters, sem virar gargalo da entrega.*
    ```
 4. **Confira as políticas no Central:** *Platform Configuration › Policy Management*, filtro
    `DEMO -`. Devem aparecer 5 políticas, com o selo de gerenciadas externamente.
-5. **Credenciais para o gate e para os KPIs:** gere um token em *Platform Configuration ›
-   Integrations › API Token* (papel *Continuous Integration* para o CI, *Analyst* para o script de KPIs).
-   ```bash
-   export ROX_ENDPOINT=central-stackrox.apps.<hub>:443 ROX_API_TOKEN=<token>
-   ./seguranca/pipeline/roxctl-check.sh            # tem que REPROVAR (exit ≠ 0)
-   ./seguranca/pipeline/roxctl-check.sh registry.access.redhat.com/ubi9/ubi-minimal:9.8   # tem que APROVAR
-   ```
-   Se a 9.8 também reprovar, há CVE nova corrigível: troque pela tag mais recente
-   (`skopeo list-tags docker://registry.access.redhat.com/ubi9/ubi-minimal`).
-6. **GitHub Actions (opcional):** cadastre `ROX_ENDPOINT` e `ROX_API_TOKEN` como secrets do repo.
+5. **Gate de build (`roxctl-check.sh`):**
+   - **Crie o namespace da demo antes.** As políticas DEMO têm *scope* em `pagamentos-demo`, e o
+     script avalia a imagem *no contexto* desse namespace (`--cluster` + `--namespace`). Sem
+     contexto, o Central ignora políticas com scope e **tudo é aprovado**; com o namespace
+     inexistente, o check falha com `not found: namespace`. O Argo CD adota o namespace no sync.
+     ```bash
+     oc apply -f seguranca/demo-apps/pagamentos-demo/00-namespace.yaml
+     ```
+   - **Credenciais:** token em *Platform Configuration › Integrations › API Token* (papel
+     *Continuous Integration* para o gate, *Analyst* para o script de KPIs). Em laboratório, a senha
+     do admin também serve (`ROX_ADMIN_PASSWORD`, secret `central-htpasswd` em `rhacs-operator`).
+   - **Teste os três resultados possíveis:**
+     ```bash
+     export ROX_ENDPOINT=central-rhacs-operator.apps.<cluster>:443 ROX_API_TOKEN=<token>
+     # ROX_CLUSTER é lido do SecuredCluster via oc; defina se não estiver logado no cluster
+     ./seguranca/pipeline/roxctl-check.sh; echo "exit=$?"                     # BARRADA  (exit 1)
+     ./seguranca/pipeline/roxctl-check.sh registry.access.redhat.com/ubi9/ubi-minimal:9.8; echo "exit=$?"  # APROVADA (exit 0)
+     ./seguranca/pipeline/roxctl-check.sh registry.access.redhat.com/ubi9/ubi-minimal:latest; echo "exit=$?"  # BARRADA pela tag (exit 1)
+     ```
+   - **Critério do script:** a imagem é **BARRADA** quando viola ao menos uma política com
+     enforcement de build (coluna `BLOQ. = SIM`); violações marcadas `-` são só alerta e **não**
+     reprovam. **Exit 2 = ERRO** (conexão, token, namespace): o check não rodou e não conta como barrada.
+   - "Componentes vulneráveis: 0" na 9.8 é esperado: o resumo conta só componentes **com** CVE.
+     Se a 9.8 passar a reprovar, saiu CVE nova corrigível: use a tag mais recente
+     (`skopeo list-tags docker://registry.access.redhat.com/ubi9/ubi-minimal`).
+6. **GitHub Actions (opcional):** cadastre `ROX_ENDPOINT` e `ROX_API_TOKEN` como secrets e
+   `ROX_CLUSTER` como variable do repositório (nome do cluster no ACS).
    O Central precisa ser alcançável pela internet; se não for, use o script local.
 7. **Demo D (opcional, demora ~10 min):** crie a CRS e aplique `seguranca/acm/policy-acs-cobertura.yaml`
    num hub de laboratório com um cluster **ainda sem ACS** para mostrar a instalação acontecendo.
@@ -109,8 +126,20 @@ Mostre o **Scorecard DevSecOps · Segurança**, seção *Resumo executivo* e *Jo
 ```bash
 ./seguranca/pipeline/roxctl-check.sh                      # ubi8:8.0, de 2019
 ```
-Resultado: lista de CVEs Importantes/Críticas **com versão corrigida** e
-`RESULTADO: BARRADA no build`. (Ou rode o workflow *ACS image check* no GitHub Actions.)
+Resultado esperado (exit 1):
+- **Informativo:** ~1.270 CVEs, ~150 Importantes **com versão corrigida**, com amostra
+  `CVE · pacote · versão atual -> versão que corrige`.
+- **Gate:** tabela `BLOQ. / SEVERID. / POLÍTICA`. `SIM` em `DEMO - CVE corrigível Importante ou Crítica`
+  e `RESULTADO: BARRADA no build`.
+
+> "Reparem na coluna BLOQ.: o time de segurança decide quais políticas **param** o build e quais só
+> **avisam**. Imagem antiga com pacote RPM é aviso; CVE Importante com correção disponível é bloqueio."
+
+Em seguida, mostre o contraste com a imagem atual, que passa:
+```bash
+./seguranca/pipeline/roxctl-check.sh registry.access.redhat.com/ubi9/ubi-minimal:9.8   # APROVADA, exit 0
+```
+(Ou rode o workflow *ACS image check* no GitHub Actions, que chama este mesmo script.)
 
 > "O desenvolvedor recebe isso no PR, com a versão que corrige. Segurança não precisou abrir ticket."
 

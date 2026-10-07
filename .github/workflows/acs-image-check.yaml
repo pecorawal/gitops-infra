@@ -1,13 +1,14 @@
 # ---------------------------------------------------------------------------
 #  Demo A · gate de segurança no CI  (C04 · RSK-03 RSK-04)
 #
-#  roxctl image check avalia a imagem contra as políticas de BUILD do ACS
-#  e falha o job quando alguma com FAIL_BUILD_ENFORCEMENT é violada.
+#  Roda seguranca/pipeline/roxctl-check.sh — o mesmo script da demo local,
+#  com o mesmo critério: BARRADA se violar política com enforcement de build;
+#  violações sem enforcement são só alerta; erro de execução falha como ERRO.
 #  Só roda sob demanda (Actions > ACS image check > Run workflow).
 #
-#  Secrets do repositório:
-#    ROX_ENDPOINT   central-stackrox.apps.<hub>:443
-#    ROX_API_TOKEN  token com papel "Continuous Integration"
+#  Secrets:   ROX_ENDPOINT (central-rhacs-operator.apps.<cluster>:443)
+#             ROX_API_TOKEN (papel "Continuous Integration")
+#  Variable:  ROX_CLUSTER  (nome do cluster em Platform Configuration > Clusters)
 # ---------------------------------------------------------------------------
 name: ACS image check
 
@@ -18,6 +19,10 @@ on:
         description: Imagem a avaliar
         required: true
         default: registry.access.redhat.com/ubi8/ubi:8.0
+      namespace:
+        description: Namespace de destino do deploy (contexto das políticas com scope)
+        required: true
+        default: pagamentos-demo
 
 jobs:
   roxctl:
@@ -25,15 +30,10 @@ jobs:
     env:
       ROX_ENDPOINT: ${{ secrets.ROX_ENDPOINT }}
       ROX_API_TOKEN: ${{ secrets.ROX_API_TOKEN }}
+      ROX_CLUSTER: ${{ vars.ROX_CLUSTER }}
+      ROX_NAMESPACE: ${{ inputs.namespace }}
     steps:
-      - name: Baixar roxctl do próprio Central (mesma versão do servidor)
-        run: |
-          curl -fsSk -H "Authorization: Bearer $ROX_API_TOKEN" \
-            "https://$ROX_ENDPOINT/api/cli/download/roxctl-linux" -o roxctl
-          chmod +x roxctl && ./roxctl version
+      - uses: actions/checkout@v4
 
-      - name: Scan (relatório de CVEs)
-        run: ./roxctl image scan --insecure-skip-tls-verify --image "${{ inputs.image }}" --output table --severity CRITICAL,IMPORTANT | tail -40
-
-      - name: Check (gate de política)
-        run: ./roxctl image check --insecure-skip-tls-verify --image "${{ inputs.image }}" --output table
+      - name: Gate do ACS (0 aprovada · 1 barrada · 2 erro)
+        run: ./seguranca/pipeline/roxctl-check.sh "${{ inputs.image }}"
