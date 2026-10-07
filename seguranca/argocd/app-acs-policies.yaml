@@ -19,7 +19,7 @@ spec:
     path: seguranca/acs/policies
   destination:
     server: 'https://kubernetes.default.svc'
-    namespace: stackrox
+    namespace: rhacs-operator
   syncPolicy:
     automated:
       prune: true
