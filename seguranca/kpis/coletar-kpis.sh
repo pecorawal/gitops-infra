@@ -149,7 +149,8 @@ kpi_est03() {
     nome=$(awk '/^  name:/{print $2; exit}' "$f")
     commit=$(git -C "$POLICY_DIR" log -1 --format=%ct -- "$f" 2>/dev/null)
     cr=$(oc -n "$ACS_NS" get securitypolicy "$nome" -o json 2>/dev/null) || continue
-    [[ "$(jq -r '.status.accepted // false' <<<"$cr")" == "true" && -n "$commit" ]] || continue
+    # ACS >= 4.8 reporta o aceite em conditions; versões anteriores em .status.accepted
+    [[ "$(jq -r '(.status.accepted // false) or any(.status.conditions[]?; .type=="AcceptedByCentral" and .status=="True")' <<<"$cr")" == "true" && -n "$commit" ]] || continue
     aplicada=$(jq -r '[.metadata.managedFields[].time] | max | fromdateiso8601' <<<"$cr")
     (( aplicada >= commit )) && mins+=("$(( (aplicada - commit) / 60 ))")
   done
