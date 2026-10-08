@@ -231,6 +231,13 @@ oc apply -f seguranca/demo-apps/variacoes/tag-latest.yaml     # recusado: tag la
 ```
 Saída esperada: `Failed currently enforced policies from RHACS` com o nome da política.
 
+**Onde fica registrado:** ACS › **Violations**, subaba **User Workloads**, aba **Attempted** (a página
+abre em *Active*, onde tentativas bloqueadas **não** aparecem). Filtre `Namespace: pagamentos-demo`.
+Cada tentativa é uma linha com a política, o deployment (`debug-privilegiado`, `frontend-latest`),
+a data e a ação `FAIL_DEPLOYMENT_CREATE_ENFORCEMENT`. Repetir a tentativa gera nova linha.
+> "O objeto nunca existiu no cluster, mas a tentativa existe no ACS: quem tentou subir o quê,
+> quando, e qual regra impediu. É evidência para auditoria e insumo para o RSK-03."
+
 **Gancho:** "Cada recusa dessas soma no RSK-03. E como foram pegas em build ou deploy, e não em
 runtime, elas melhoram o RSK-04, o shift-left."
 
