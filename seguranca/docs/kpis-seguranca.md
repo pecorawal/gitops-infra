@@ -89,9 +89,9 @@ Os oito respondem a quatro perguntas que todo CISO faz:
 ## Como coletar
 
 ```bash
-export ROX_ENDPOINT=central-stackrox.apps.<hub>:443
-export ROX_API_TOKEN=<token somente leitura>
-oc login <hub>                                   # para RSK-01, RSK-02 e EST-03
+export ROX_ENDPOINT=central-rhacs-operator.apps.<hub>:443
+export ROX_API_TOKEN=<API Token do ACS, papel Analyst>   # CI não basta; token do OpenShift não serve
+export OC_CONTEXT=<contexto do hub>              # para RSK-01, RSK-02 e EST-03, se o oc atual não for o hub
 ./seguranca/kpis/coletar-kpis.sh                 # tabela na tela
 ./seguranca/kpis/coletar-kpis.sh --csv > linha-de-base-$(date +%F).csv
 ```

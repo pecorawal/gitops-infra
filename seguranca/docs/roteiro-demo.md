@@ -80,7 +80,23 @@ mede e gera evidência — em todos os clusters, sem virar gargalo da entrega.*
    - A CRS vale 30 dias (`roxctl central crs list`); gere outra antes de importar clusters novos depois disso.
 8. **Demo E:** aplique `seguranca/acm/policy-compliance-pci.yaml` na véspera — a primeira varredura
    leva alguns minutos e você quer resultado pronto.
-9. **Linha de base:** rode `./seguranca/kpis/coletar-kpis.sh --csv > antes.csv` antes da demo.
+9. **Linha de base dos KPIs:**
+   ```bash
+   export ROX_ENDPOINT=central-rhacs-operator.apps.<hub>:443
+   export ROX_API_TOKEN=<API Token do ACS com papel Analyst>
+   export OC_CONTEXT=<contexto do hub no kubeconfig>   # só se o oc atual não for o hub
+   ./seguranca/kpis/coletar-kpis.sh --csv > antes.csv
+   ```
+   - **Token:** precisa ser um *API Token* do ACS com papel **Analyst**. Token com papel
+     *Continuous Integration* recebe 403 em alertas, clusters e políticas. Token do OpenShift
+     (`oc whoami -t`, `sha256~…`) não é aceito pelo Central. O script avisa e para nos dois casos.
+     Em laboratório, `ROX_ADMIN_PASSWORD` também funciona.
+   - **Hub:** RSK-01, RSK-02 e EST-03 leem do ACM. Se o `oc` estiver em outro cluster (ex.: depois de
+     um `oc login` no ROSA), o script avisa e esses três saem `n/d`. Use `OC_CONTEXT`.
+   - **Escopo:** violações em namespaces de plataforma (`openshift-*`, `kube-*`, ACM/MCE, `stackrox`…)
+     ficam fora de RSK-03/04/06/09, senão as políticas padrão dominam a conta. Ajuste com `EXCLUIR_NS`.
+   - Antes da demo é normal RSK-03/04/05/06/09 saírem 0 ou `n/d`: ainda não houve violação nos
+     namespaces de aplicação. É o contraste com o "depois".
 10. **Abas abertas:** Scorecard (Jornada de Fundação), ACS (Violations, Vulnerability Management,
     Compliance, Policy Management), Argo CD (`pagamentos-demo`, `acs-security-policies`),
     ACM (Governance), GitHub (branch `seguranca`), terminal.
@@ -226,9 +242,10 @@ ACS › Compliance (perfil `ocp4-pci-dss`) e ACM › Governance (`compliance-pci
 ## F · Jornada de Fundação ao vivo (3 min)
 
 ```bash
-./seguranca/kpis/coletar-kpis.sh
+./seguranca/kpis/coletar-kpis.sh          # mesmas variáveis do passo 9 da preparação
 ```
-Compare com `antes.csv`. Volte ao Scorecard, seção *Jornada de Fundação*, e proponha:
+Compare com `antes.csv`. Destaque o **EST-03**: do commit da política à política valendo no Central
+leva segundos (medido no laboratório: ~11 s). Volte ao Scorecard, seção *Jornada de Fundação*, e proponha:
 > "Na próxima reunião, preenchemos juntos a linha de base e as metas de 6 e 12 meses para esses
 > oito números. Quem de vocês seria o responsável por cada um?"
 

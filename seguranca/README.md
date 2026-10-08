@@ -20,7 +20,7 @@ oc apply -f seguranca/acs/rbac/argocd-securitypolicies.yaml   # Argo CD pode ger
 oc apply -f seguranca/argocd/app-acs-policies.yaml            # políticas DEMO no Central
 oc apply -f seguranca/argocd/app-pagamentos-demo.yaml         # sync manual, ao vivo
 
-export ROX_ENDPOINT=central-stackrox.apps.<hub>:443 ROX_API_TOKEN=<token>
+export ROX_ENDPOINT=central-rhacs-operator.apps.<hub>:443 ROX_API_TOKEN=<token>   # Analyst para os KPIs
 ./seguranca/pipeline/roxctl-check.sh                          # gate de build
 ./seguranca/kpis/coletar-kpis.sh                              # Jornada de Fundação
 ```
