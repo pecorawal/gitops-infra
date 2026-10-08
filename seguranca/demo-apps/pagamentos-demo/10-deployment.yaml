@@ -1,7 +1,8 @@
 # ---------------------------------------------------------------------------
-#  Etapa 02 · viola "DEMO - Tag latest proibida"
-#  Mesma base da etapa 00, mas referenciada por 'latest': sem rastreabilidade do que roda.
-#  A violação de CVE da etapa 01 vai para Resolved sozinha (a imagem saiu).
+#  Etapa 03 · viola "DEMO - Container privilegiado em namespace PCI"
+#  O Deployment é criado (o ACS avalia a especificação), mas o OpenShift recusa os pods:
+#  a SCC restricted-v2 não permite privileged. Duas camadas: ACS registra e alerta,
+#  a plataforma impede a execução. O Argo CD fica Progressing/Degraded até a próxima etapa.
 # ---------------------------------------------------------------------------
 apiVersion: apps/v1
 kind: Deployment
@@ -11,7 +12,7 @@ metadata:
   labels:
     app: pagamentos-api
   annotations:
-    demo.acs/etapa: '02 - viola: tag latest'
+    demo.acs/etapa: '03 - viola: container privilegiado'
 spec:
   replicas: 1
   selector:
@@ -24,7 +25,7 @@ spec:
     spec:
       containers:
       - name: api
-        image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+        image: registry.access.redhat.com/ubi9/ubi-minimal:9.8
         command:
         - /bin/sh
         - -c
@@ -36,8 +37,4 @@ spec:
           limits:
             memory: 128Mi
         securityContext:
-          allowPrivilegeEscalation: false
-          runAsNonRoot: true
-          capabilities:
-            drop:
-            - ALL
+          privileged: true
