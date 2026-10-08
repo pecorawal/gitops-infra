@@ -97,9 +97,23 @@ mede e gera evidência — em todos os clusters, sem virar gargalo da entrega.*
      ficam fora de RSK-03/04/06/09, senão as políticas padrão dominam a conta. Ajuste com `EXCLUIR_NS`.
    - Antes da demo é normal RSK-03/04/05/06/09 saírem 0 ou `n/d`: ainda não houve violação nos
      namespaces de aplicação. É o contraste com o "depois".
-10. **Abas abertas:** Scorecard (Jornada de Fundação), ACS (Violations, Vulnerability Management,
-    Compliance, Policy Management), Argo CD (`pagamentos-demo`, `acs-security-policies`),
-    ACM (Governance), GitHub (branch `seguranca`), terminal.
+10. **Abas abertas:** Scorecard (Jornada de Fundação); no ACS: *Violations*, *Vulnerability
+    Management › Results*, *Risk*, *Compliance › OpenShift Coverage* e *Platform Configuration ›
+    Policy Management*; Argo CD (`pagamentos-demo`, `acs-security-policies`); ACM (Governance);
+    GitHub (branch `seguranca`); terminal.
+    > Nomes de menu conferidos no ACS 4.11. Em versões ≤ 4.6 a página de CVEs se chamava
+    > *Workload CVEs* e o relatório, *Vulnerability Reporting*.
+11. **Ensaio do momento-chave (obrigatório):** depois de corrigir o scan, o dry-run do deploy
+    vulnerável tem que ser **negado**:
+    ```bash
+    oc apply --dry-run=server -f seguranca/demo-apps/pagamentos-demo/10-deployment.yaml
+    # esperado: Error from server (Failed currently enforced policies from RHACS) ... DEMO - CVE corrigível
+    ```
+    Se ele passar (`created (server dry run)`), confira em *Vulnerability Management › Results ›
+    User Workloads* se a `ubi8/ubi:8.0` tem CVEs. Imagem com **0 CVEs** = o scan do Central não
+    casou vulnerabilidades; ative *Platform Configuration › Clusters › Delegated image scanning*
+    (todos os registries, cluster padrão = o hub) e reescaneie com
+    `roxctl image scan --cluster <cluster> --force --image registry.access.redhat.com/ubi8/ubi:8.0`.
 
 ---
 
@@ -203,11 +217,24 @@ runtime, elas melhoram o RSK-04, o shift-left."
 ## C · Ver, corrigir e detectar (10 min) — RSK-05, RSK-06, RSK-09
 
 ### C.1 · Vulnerabilidades com contexto
-ACS › Vulnerability Management › Workload CVEs, filtro `Namespace: pagamentos-demo`, *Fixable*.
+ACS › **Vulnerability Management › Results**, aba **User Workloads**. Na barra de filtros:
+`Namespace` = `pagamentos-demo`; em *CVE status*, **Fixable**; em *CVE severity*, **Critical** e
+**Important**. Clique na imagem `ubi8/ubi:8.0` para ver CVE por CVE, com a versão que corrige.
 > "Não é uma lista de 300 CVEs. É: quais têm correção, em que imagem, em que deployment de
 > produção, e qual versão resolve. Esse é o RSK-05 — a fila de trabalho real."
 
-Mostre também *Vulnerability Reporting*: relatório agendado por e-mail para o dono da aplicação.
+Mostre também *Vulnerability Management › Reports*: relatório agendado por e-mail para o dono da
+aplicação.
+
+### C.1b · Risco priorizado por contexto
+ACS › **Risk**, aba **User Workloads** (não *All Deployments*), ou filtre `Namespace: pagamentos-demo`.
+A coluna **Priority** é um ranking: **1 = maior risco**. Clique no deployment para ver os fatores
+(*Policy Violations*, *Image Vulnerabilities*, *Components Useful for Attackers*, *Image Freshness*…).
+> "O ACS não conta CVEs, ele ordena o que olhar primeiro: CVE corrigível, violação ativa,
+> ferramentas úteis para um atacante dentro da imagem. O time de segurança começa pelo topo."
+
+Se o `pagamentos-api` aparecer **no fim** do ranking, o ACS não está enxergando as CVEs da imagem
+(ver passo 11 da preparação).
 
 ### C.2 · Corrigir é um PR (RSK-06)
 Em `seguranca/demo-apps/pagamentos-demo/10-deployment.yaml`, troque a imagem para
@@ -233,7 +260,8 @@ oc -n pagamentos-demo exec deploy/pagamentos-worker -- curl -sI https://www.redh
 
 ## E · Evidência para auditoria (4 min) — RSK-01
 
-ACS › Compliance (perfil `ocp4-pci-dss`) e ACM › Governance (`compliance-pci-dss`).
+ACS › **Compliance › OpenShift Coverage** (perfil `ocp4-pci-dss`; as varreduras ficam em
+*Compliance › OpenShift Schedules*) e ACM › Governance (`compliance-pci-dss`).
 > "Dois públicos, a mesma fonte: o time de segurança vê controle por controle; plataforma vê
 > cluster por cluster. Exporta CSV para o auditor. Evidência deixa de ser projeto e vira consulta."
 

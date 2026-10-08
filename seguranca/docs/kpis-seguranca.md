@@ -40,7 +40,7 @@ Os oito respondem a quatro perguntas que todo CISO faz:
 
 ### RSK-05 · CVEs críticas corrigíveis em produção — *"risco aceito sem decisão"*
 - **Fórmula:** nº de CVEs Críticas/Importantes **com correção disponível** em workloads de produção
-- **Categoria:** ACS Vulnerability Management; relatórios agendados
+- **Categoria:** ACS Vulnerability Management (*Results › User Workloads*; *Reports* agendados)
 - **Por que segurança se importa:** separa o que o time **pode** corrigir hoje do ruído de CVEs sem
   correção. É a lista de trabalho, não a lista de pânico.
 - **Leitura:** deve cair mês a mês. Se não cai, falta processo de remediação, não ferramenta.
