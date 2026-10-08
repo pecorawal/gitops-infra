@@ -1,0 +1,160 @@
+# ---------------------------------------------------------------------------
+#  Demo D · Cobertura uniforme de segurança  (C03 C10 · RSK-02)
+#
+#  "Nenhum cluster nasce sem ACS": todo cluster que entra no Placement recebe
+#  o operador do ACS, a Cluster Registration Secret e o SecuredCluster.
+#  A 3ª política só INFORMA se o Sensor está de pé — é ela que vira o KPI.
+#  Em cluster que JÁ tem ACS, a política converge para o que existe (mesmo
+#  nome de CR) e mostra o cluster como Compliant — sem reinstalar nada.
+#
+#  Pré-requisitos no hub (uma vez, valores do ambiente ficam fora do Git):
+#
+#    # 1. Cluster Registration Secret (ACS >= 4.7; em < 4.7 use init bundle).
+#    #    A CRS só é usada no primeiro registro do cluster; depois o Sensor usa
+#    #    certificados próprios. Validade em horas (o parser não aceita "d").
+#    roxctl central crs generate acm-frota --valid-for 720h -o crs.yaml
+#    sed 's/name: cluster-registration-secret/name: acs-crs/' crs.yaml | oc -n acm-policies apply -f -
+#    shred -u crs.yaml
+#
+#    # 2. Endpoint do Central lido da Route (vira o centralEndpoint dos spokes)
+#    oc -n acm-policies create configmap acs-central \
+#      --from-literal=centralEndpoint=$(oc -n rhacs-operator get route central -o jsonpath='{.spec.host}'):443
+#
+#  Aplicar no hub:  oc apply -f seguranca/acm/policy-acs-cobertura.yaml
+# ---------------------------------------------------------------------------
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: acs-secured-cluster
+  namespace: acm-policies
+  annotations:
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+    policy.open-cluster-management.io/categories: SI System and Information Integrity
+    policy.open-cluster-management.io/controls: SI-4 System Monitoring
+spec:
+  remediationAction: enforce
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1beta1
+        kind: OperatorPolicy
+        metadata:
+          name: rhacs-operator
+        spec:
+          remediationAction: enforce
+          severity: high
+          complianceType: musthave
+          upgradeApproval: Automatic
+          # Sem operatorGroup de propósito: aceita o existente (a console cria
+          # um com nome gerado, ex. rhacs-operator-stxsn) e cria um só se faltar.
+          subscription:
+            name: rhacs-operator
+            namespace: rhacs-operator
+            channel: stable
+            source: redhat-operators
+            sourceNamespace: openshift-marketplace
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: acs-secured-cluster-cr
+        spec:
+          remediationAction: enforce
+          severity: high
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: Namespace
+                metadata:
+                  name: stackrox
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: Secret
+                metadata:
+                  name: cluster-registration-secret
+                  namespace: stackrox
+                type: Opaque
+                data: '{{hub copySecretData "acm-policies" "acs-crs" hub}}'
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: platform.stackrox.io/v1alpha1
+                kind: SecuredCluster
+                metadata:
+                  # Mesmo nome do CR criado pela console/operador neste ambiente:
+                  # nome diferente criaria um SEGUNDO SecuredCluster no spoke.
+                  name: stackrox-secured-cluster
+                  namespace: stackrox
+                spec:
+                  clusterName: '{{ fromClusterClaim "name" }}'
+                  centralEndpoint: '{{hub fromConfigMap "acm-policies" "acs-central" "centralEndpoint" hub}}'
+                  admissionControl:
+                    enforcement: Enabled          # ACS >= 4.8 (antes: listenOnCreates/Updates/Events)
+                    bypass: BreakGlassAnnotation
+                    contactImageScanners: ScanIfMissing
+                    timeoutSeconds: 20
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: acs-sensor-saudavel
+        spec:
+          remediationAction: inform      # só mede — é a régua do RSK-02
+          severity: high
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: apps/v1
+                kind: Deployment
+                metadata:
+                  name: sensor
+                  namespace: stackrox
+                status:
+                  availableReplicas: 1
+---
+# O Placement só enxerga clusters de ClusterSets ligados ao SEU namespace.
+# Sem este binding: PlacementSatisfied=False, NoManagedClusterSetBindings.
+# "global" contém todos os ManagedClusters, qualquer que seja o ClusterSet.
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSetBinding
+metadata:
+  name: global
+  namespace: acm-policies
+spec:
+  clusterSet: global
+---
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: placement-acs-frota
+  namespace: acm-policies
+spec:
+  clusterSets:
+    - global
+  # Toda a frota, exceto o hub (que já hospeda o Central e o próprio SecuredCluster)
+  predicates:
+    - requiredClusterSelector:
+        labelSelector:
+          matchExpressions:
+            - key: local-cluster
+              operator: DoesNotExist
+  tolerations:
+    - key: cluster.open-cluster-management.io/unreachable
+      operator: Exists
+    - key: cluster.open-cluster-management.io/unavailable
+      operator: Exists
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: binding-acs-secured-cluster
+  namespace: acm-policies
+placementRef:
+  name: placement-acs-frota
+  apiGroup: cluster.open-cluster-management.io
+  kind: Placement
+subjects:
+  - name: acs-secured-cluster
+    apiGroup: policy.open-cluster-management.io
+    kind: Policy

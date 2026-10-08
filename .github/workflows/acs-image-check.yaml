@@ -1,0 +1,39 @@
+# ---------------------------------------------------------------------------
+#  Demo A · gate de segurança no CI  (C04 · RSK-03 RSK-04)
+#
+#  Roda seguranca/pipeline/roxctl-check.sh — o mesmo script da demo local,
+#  com o mesmo critério: BARRADA se violar política com enforcement de build;
+#  violações sem enforcement são só alerta; erro de execução falha como ERRO.
+#  Só roda sob demanda (Actions > ACS image check > Run workflow).
+#
+#  Secrets:   ROX_ENDPOINT (central-rhacs-operator.apps.<cluster>:443)
+#             ROX_API_TOKEN (papel "Continuous Integration")
+#  Variable:  ROX_CLUSTER  (nome do cluster em Platform Configuration > Clusters)
+# ---------------------------------------------------------------------------
+name: ACS image check
+
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: Imagem a avaliar
+        required: true
+        default: ghcr.io/christophetd/log4shell-vulnerable-app@sha256:6f88430688108e512f7405ac3c73d47f5c370780b94182854ea2cddc6bd59929
+      namespace:
+        description: Namespace de destino do deploy (contexto das políticas com scope)
+        required: true
+        default: pagamentos-demo
+
+jobs:
+  roxctl:
+    runs-on: ubuntu-latest
+    env:
+      ROX_ENDPOINT: ${{ secrets.ROX_ENDPOINT }}
+      ROX_API_TOKEN: ${{ secrets.ROX_API_TOKEN }}
+      ROX_CLUSTER: ${{ vars.ROX_CLUSTER }}
+      ROX_NAMESPACE: ${{ inputs.namespace }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Gate do ACS (0 aprovada · 1 barrada · 2 erro)
+        run: ./seguranca/pipeline/roxctl-check.sh "${{ inputs.image }}"

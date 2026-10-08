@@ -1,0 +1,26 @@
+# ---------------------------------------------------------------------------
+#  Demo B · Policy as Code  (C01 · EST-03 RSK-01)
+#  Toda política do ACS da demo nasce de um PR nesta branch e é aplicada pelo
+#  Argo CD no namespace do Central (rhacs-operator). Política gerenciada por CR fica somente
+#  leitura na UI do ACS: a fonte da verdade é o Git.
+#
+#    oc apply -f seguranca/argocd/app-acs-policies.yaml
+# ---------------------------------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: acs-security-policies
+  namespace: openshift-gitops
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/pecorawal/gitops-infra.git'
+    targetRevision: seguranca
+    path: seguranca/acs/policies
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: rhacs-operator
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

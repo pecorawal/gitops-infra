@@ -1,0 +1,22 @@
+# Demo A · imagem sem versão.
+#   oc apply -f seguranca/demo-apps/variacoes/tag-latest.yaml
+# Esperado: recusado pela política "DEMO - Tag latest proibida".
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-latest
+  namespace: pagamentos-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend-latest
+  template:
+    metadata:
+      labels:
+        app: frontend-latest
+    spec:
+      containers:
+        - name: web
+          image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+          command: ["sleep", "infinity"]

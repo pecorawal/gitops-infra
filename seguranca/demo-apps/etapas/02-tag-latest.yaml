@@ -1,0 +1,43 @@
+# ---------------------------------------------------------------------------
+#  Etapa 02 · viola "DEMO - Tag latest proibida"
+#  Mesma base da etapa 00, mas referenciada por 'latest': sem rastreabilidade do que roda.
+#  A violação de CVE da etapa 01 vai para Resolved sozinha (a imagem saiu).
+# ---------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pagamentos-api
+  namespace: pagamentos-demo
+  labels:
+    app: pagamentos-api
+  annotations:
+    demo.acs/etapa: '02 - viola: tag latest'
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pagamentos-api
+  template:
+    metadata:
+      labels:
+        app: pagamentos-api
+    spec:
+      containers:
+      - name: api
+        image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+        command:
+        - /bin/sh
+        - -c
+        - while true; do echo pagamentos-api ok; sleep 30; done
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL

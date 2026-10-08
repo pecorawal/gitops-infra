@@ -1,0 +1,30 @@
+# ---------------------------------------------------------------------------
+#  Permite ao Argo CD (OpenShift GitOps) gerenciar SecurityPolicy no namespace
+#  do ACS Central (rhacs-operator).
+#  O grupo da API continua config.stackrox.io, qualquer que seja o namespace.
+#  Sem isso o sync falha com "forbidden".
+#  Aplicar uma vez no cluster do Central:  oc apply -f seguranca/acs/rbac/
+# ---------------------------------------------------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argocd-securitypolicies
+  namespace: rhacs-operator
+rules:
+  - apiGroups: ["config.stackrox.io"]
+    resources: ["securitypolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argocd-securitypolicies
+  namespace: rhacs-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: argocd-securitypolicies
+subjects:
+  - kind: ServiceAccount
+    name: openshift-gitops-argocd-application-controller
+    namespace: openshift-gitops

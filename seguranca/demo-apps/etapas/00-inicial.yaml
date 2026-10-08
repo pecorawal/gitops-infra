@@ -1,0 +1,42 @@
+# ---------------------------------------------------------------------------
+#  Etapa 00 · versão em produção antes da demo — nenhuma política DEMO violada.
+#  Imagem atual (UBI 9.8 minimal), tag fixa, sem privilégio, sem ferramentas de rede.
+# ---------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pagamentos-api
+  namespace: pagamentos-demo
+  labels:
+    app: pagamentos-api
+  annotations:
+    demo.acs/etapa: 00 - versão inicial (aceitável)
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pagamentos-api
+  template:
+    metadata:
+      labels:
+        app: pagamentos-api
+    spec:
+      containers:
+      - name: api
+        image: registry.access.redhat.com/ubi9/ubi-minimal:9.8
+        command:
+        - /bin/sh
+        - -c
+        - while true; do echo pagamentos-api ok; sleep 30; done
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL

@@ -1,0 +1,32 @@
+# ---------------------------------------------------------------------------
+#  Demo A (complemento) · imagem sem versão rastreável  (C04 · RSK-04)
+#  Política simples, que o time de segurança entende em 5 segundos.
+# ---------------------------------------------------------------------------
+apiVersion: config.stackrox.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: demo-tag-latest-proibida
+  namespace: rhacs-operator
+spec:
+  policyName: "DEMO - Tag latest proibida"
+  description: "Imagem referenciada pela tag 'latest'."
+  rationale: "Sem versão fixa não há rastreabilidade do que roda em produção nem rollback confiável."
+  remediation: "Use uma tag de versão imutável ou o digest (@sha256:...)."
+  categories:
+    - DevOps Best Practices
+  lifecycleStages:
+    - BUILD
+    - DEPLOY
+  severity: MEDIUM_SEVERITY
+  enforcementActions:
+    - FAIL_BUILD_ENFORCEMENT
+    - SCALE_TO_ZERO_ENFORCEMENT
+  scope:
+    - namespace: "pagamentos-demo"
+  policySections:
+    - sectionName: "Tag latest"
+      policyGroups:
+        - fieldName: Image Tag
+          booleanOperator: OR
+          values:
+            - value: "latest"

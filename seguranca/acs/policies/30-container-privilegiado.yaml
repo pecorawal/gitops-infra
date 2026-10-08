@@ -1,0 +1,32 @@
+# ---------------------------------------------------------------------------
+#  Demo A (complemento) · privilégio excessivo  (C04 · RSK-03)
+#  Bloqueado no deploy: um container privilegiado num namespace PCI é o
+#  exemplo que todo auditor reconhece.
+# ---------------------------------------------------------------------------
+apiVersion: config.stackrox.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: demo-container-privilegiado
+  namespace: rhacs-operator
+spec:
+  policyName: "DEMO - Container privilegiado em namespace PCI"
+  description: "Deployment com container em modo privilegiado."
+  rationale: "Container privilegiado tem acesso total ao nó: uma falha na aplicação vira comprometimento do cluster."
+  remediation: "Remova 'privileged: true' e conceda somente as capabilities necessárias."
+  categories:
+    - Privileges
+  lifecycleStages:
+    - DEPLOY
+  severity: CRITICAL_SEVERITY
+  enforcementActions:
+    - SCALE_TO_ZERO_ENFORCEMENT
+    - UNSATISFIABLE_NODE_CONSTRAINT_ENFORCEMENT
+  scope:
+    - namespace: "pagamentos-demo"
+  policySections:
+    - sectionName: "Privilegiado"
+      policyGroups:
+        - fieldName: Privileged Container
+          booleanOperator: OR
+          values:
+            - value: "true"

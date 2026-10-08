@@ -1,0 +1,25 @@
+# Demo A · tentativa "manual" de subir um container privilegiado.
+#   oc apply -f seguranca/demo-apps/variacoes/privilegiado.yaml
+# Esperado: Error from server (Failed currently enforced policies from StackRox):
+#   - DEMO - Container privilegiado em namespace PCI
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: debug-privilegiado
+  namespace: pagamentos-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: debug-privilegiado
+  template:
+    metadata:
+      labels:
+        app: debug-privilegiado
+    spec:
+      containers:
+        - name: debug
+          image: registry.access.redhat.com/ubi9/ubi-minimal:9.8
+          command: ["sleep", "infinity"]
+          securityContext:
+            privileged: true
