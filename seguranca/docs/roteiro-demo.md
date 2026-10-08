@@ -8,9 +8,8 @@ mede e gera evidência — em todos os clusters, sem virar gargalo da entrega.*
 |---|---|---|---|
 | 0 | Abertura: Scorecard e as 4 perguntas | 5 min | — |
 | D | Nenhum cluster sem cobertura | 5 min | RSK-02 |
-| B | Política de segurança é código | 8 min | EST-03, RSK-01 |
-| A | Barrar antes de rodar | 10 min | RSK-03, RSK-04, RSK-05 |
-| C | Ver, corrigir e detectar | 10 min | RSK-05, RSK-06, RSK-09 |
+| B | Política de segurança é código | 6 min | EST-03, RSK-01 |
+| **A** | **Fase central: do commit à violação** (5 violações e a versão final) | **20 min** | RSK-03, 04, 05, 06, 09 |
 | E | Evidência para auditoria | 4 min | RSK-01 |
 | F | Jornada de Fundação ao vivo | 3 min | os 8 |
 
@@ -31,7 +30,7 @@ mede e gera evidência — em todos os clusters, sem virar gargalo da entrega.*
    ```bash
    oc apply -f seguranca/acs/rbac/argocd-securitypolicies.yaml
    oc apply -f seguranca/argocd/app-acs-policies.yaml
-   oc apply -f seguranca/argocd/app-pagamentos-demo.yaml      # NÃO sincronize ainda
+   oc apply -f seguranca/argocd/app-pagamentos-demo.yaml      # auto-sync + selfHeal
    ```
 4. **Confira as políticas no Central:** *Platform Configuration › Policy Management*, filtro
    `DEMO -`. Devem aparecer 5 políticas, com o selo de gerenciadas externamente.
@@ -106,28 +105,25 @@ mede e gera evidência — em todos os clusters, sem virar gargalo da entrega.*
 11. **Scan delegado:** em *Platform Configuration › Clusters › Delegated image scanning*, deixe
     **All registries** com o hub como cluster padrão. Sem isso, o Central pode guardar imagens com
     **0 CVEs** (visto no laboratório com a `ubi8:8.0`) e o admission controller deixa tudo passar.
-12. **Estado inicial da aplicação (história: "o legado e a versão nova"):**
+12. **Estado inicial da fase central:**
     ```bash
-    oc apply -f seguranca/demo-apps/variacoes/legado-pagamentos-api.yaml
+    ./seguranca/demo-apps/etapa.sh 00
     ```
-    - Cria o `pagamentos-api` **legado** (`ubi8:8.0`, ~1.270 CVEs) com a anotação de **break-glass**,
-      porque o ACS já o bloquearia. O bypass fica registrado como violação. Isso também é argumento
-      para a demo: existe saída de emergência, e ela é auditada.
-    - O Argo CD (`pagamentos-demo`) fica **OutOfSync**, porque o Git já traz a "versão nova" (Log4Shell).
-      **Não sincronize**: o Sync é o momento da Demo A.2.
-13. **Ensaio do momento-chave (obrigatório):**
-    ```bash
-    oc apply --dry-run=server -f seguranca/demo-apps/pagamentos-demo/10-deployment.yaml
-    # esperado: denied ... DEMO - CVE corrigível ... CVE-2021-44228 (CVSS 10) ... log4j 2.14.1 ... 2.15.0
-    ```
-    Se passar (`configured (server dry run)`), a imagem está em cache sem CVEs. **Rescan**: não há
-    botão na console, e o `roxctl image scan --force` mostra o resultado mas **não** substitui o
-    cache. O que funciona é apagar o registro em cache; o próximo uso reescaneia pela delegação:
-    ```bash
-    curl -sk -u admin:$ROX_ADMIN_PASSWORD -G -X DELETE "https://$ROX_ENDPOINT/v1/images" \
-      --data-urlencode "query.query=Image:<imagem>" --data-urlencode confirm=true
-    ```
-    (Em *Vulnerability Management › Results*, a imagem deve aparecer com CVEs logo depois.)
+    Deixa o `pagamentos-api` na versão inicial (aceitável). Em *Violations › User Workloads ›
+    Active*, filtro `Namespace: pagamentos-demo`, não pode haver nenhuma política `DEMO -`.
+    Se houver violação de **runtime** antiga, abra e clique **Mark as resolved**.
+13. **Ensaio completo (obrigatório, ~12 min):** rode `etapa.sh` de `01` a `06` exatamente como na
+    demo e confira cada resultado com a tabela da seção A. Termine com `etapa.sh 00`.
+    - Cada etapa gera um commit `demo(etapa NN): …` na branch `seguranca`. É esperado e serve de
+      histórico. Para ensaiar sem poluir o histórico, use um fork ou uma branch de ensaio e aponte
+      a Application para ela.
+    - **Se a etapa 01 não gerar violação de CVE:** a imagem pode estar em cache sem CVEs. Não há
+      botão de rescan, e o `roxctl image scan --force` não substitui o cache. Apague o registro e o
+      próximo uso reescaneia pela delegação (passo 11):
+      ```bash
+      curl -sk -u admin:$ROX_ADMIN_PASSWORD -G -X DELETE "https://$ROX_ENDPOINT/v1/images" \
+        --data-urlencode "query.query=Image:<imagem>" --data-urlencode confirm=true
+      ```
 
 ---
 
@@ -163,7 +159,7 @@ Mostre o **Scorecard DevSecOps · Segurança**, seção *Resumo executivo* e *Jo
 
 ---
 
-## B · Política de segurança é código (8 min) — EST-03, RSK-01
+## B · Política de segurança é código (6 min) — EST-03, RSK-01
 
 **Mostrar:** GitHub (`seguranca/acs/policies/`) → Argo CD (`acs-security-policies`) → ACS Policy Management.
 
@@ -183,109 +179,127 @@ Mostre o **Scorecard DevSecOps · Segurança**, seção *Resumo executivo* e *Jo
 
 ---
 
-## A · Barrar antes de rodar (10 min) — RSK-03, RSK-04, RSK-05
+## A · Fase central: do commit à violação (20 min) — RSK-03, 04, 05, 06, 09
 
-### A.1 · No pipeline (build)
+**A ideia:** o apresentador faz o papel do time de desenvolvimento. Cada commit muda o Deployment do
+`pagamentos-api`, o Argo CD sincroniza sozinho (auto-sync) e o ACS mostra, em cerca de 1 minuto, o
+que aquela versão violou. São **5 violações, uma por política DEMO**, e depois a **versão final**,
+que deixa tudo limpo. Cada versão nova também **resolve** a violação da anterior, e isso aparece
+na aba *Resolved*.
+
+### Antes de começar: o que fica aberto e como ler
+
+| Janela | O que mostrar |
+|---|---|
+| Terminal | `./seguranca/demo-apps/etapa.sh NN`: mostra a etapa, faz commit/push, espera o sync e diz o que olhar |
+| GitHub | o commit `demo(etapa NN): …` e o diff do `10-deployment.yaml` |
+| Argo CD | app `pagamentos-demo`: revisão nova, `Synced` |
+| ACS › **Violations** | subaba **User Workloads**; abas **Active**, **Resolved** e **Attempted**; filtro `Namespace: pagamentos-demo` |
+
+> **Por que o Argo CD não é barrado (diga isso ao cliente, não esconda):** o admission controller do
+> ACS não bloqueia requests de service accounts de namespaces `openshift-*`, e o Argo CD padrão do
+> OpenShift GitOps roda em `openshift-gitops`. Por isso, nesta fase o ACS **detecta e registra**
+> cada violação (com a ação de enforcement que tomaria), mas o sync acontece. O bloqueio real
+> aparece em três pontos da demo: no **pipeline** (etapa 01), no **`oc apply` humano** (etapa 03) e
+> no **`exec`** (etapa 05). Recomendação para produção: Argo CD padrão só para configuração do
+> cluster e uma **instância dedicada, fora de `openshift-*`**, para as aplicações. Ela é barrada
+> pelo admission como qualquer outro usuário.
+
+### Etapa 00 · ponto de partida (já preparado na D-1)
+Mostre o Argo CD `Synced` e o ACS sem nenhuma `DEMO -` ativa.
+> "Essa é a API de pagamentos em produção, entregue por GitOps e limpa. Agora vou fazer o papel do
+> time de desenvolvimento, e cada commit meu vai introduzir um tipo de problema."
+
+### Etapa 01 · CVE crítica com correção: Log4Shell — RSK-05, RSK-04
 ```bash
-./seguranca/pipeline/roxctl-check.sh        # padrão: a "versão nova" do pagamentos-api (Log4Shell)
+./seguranca/pipeline/roxctl-check.sh        # primeiro: o que o pipeline diria desta imagem
+./seguranca/demo-apps/etapa.sh 01
 ```
-Resultado esperado (exit 1):
-- **Informativo:** 182 CVEs: **11 Críticas** e 29 Importantes, com amostra
-  `CVE · pacote · versão atual -> versão que corrige`.
-- **Gate:** `SIM` em `DEMO - CVE corrigível Importante ou Crítica` → `RESULTADO: BARRADA no build`.
-  Na mesma tabela, como `-` (só alerta), aparecem as políticas nativas
-  **`Log4Shell: log4j Remote Code Execution vulnerability`** e **`Spring4Shell`**, ambas CRITICAL.
+- **Pipeline:** `RESULTADO: BARRADA no build`. Na tabela aparecem a `DEMO - CVE corrigível…`
+  (BLOQ. = SIM) e, como alerta, as nativas **Log4Shell** e **Spring4Shell** (CRITICAL).
+- **ACS › Violations › Active (~1 min):** `DEMO - CVE corrigível Importante ou Crítica`, *Log4Shell:
+  log4j Remote Code Execution vulnerability* e *Spring4Shell*, estágio **Deploy**.
+- **ACS › Vulnerability Management › Results › User Workloads** (`Namespace: pagamentos-demo`, *CVE
+  status* = Fixable, *CVE severity* = Critical): 11 Críticas, entre elas **CVE-2021-44228 (CVSS 10)**
+  em `log4j 2.14.1`, que é corrigida na `2.15.0`.
+- **ACS › Risk › User Workloads:** o `pagamentos-api` sobe no ranking (Priority 1 = maior risco).
+> "Se o pipeline usasse esse gate, essa imagem nem chegaria ao Git. Como chegou, o ACS reconheceu a
+> Log4Shell pelo nome em menos de um minuto, com a versão que corrige. Não é uma lista de CVEs para
+> pânico: é a fila do que tem correção hoje."
 
-> "Essa imagem tem a Log4Shell, CVSS 10, a de dezembro de 2021. O ACS reconhece pelo nome. Reparem
-> na coluna BLOQ.: vocês decidem o que **para** o build e o que só **avisa**. Aqui, a regra 'CVE
-> corrigível Importante ou Crítica' para; a política nativa de Log4Shell, hoje, só avisa. É uma
-> decisão de vocês, por PR."
+*Segurança da demo:* a variação troca o `java` da imagem por `sleep`. A imagem vulnerável está no
+cluster, que é o que o ACS avalia, mas a aplicação explorável não sobe. Não há Service nem Route.
 
-Em seguida, mostre o contraste com a imagem atual, que passa:
+### Etapa 02 · tag `latest` — rastreabilidade
 ```bash
-./seguranca/pipeline/roxctl-check.sh registry.access.redhat.com/ubi9/ubi-minimal:9.8   # APROVADA, exit 0
+./seguranca/demo-apps/etapa.sh 02
 ```
-(Ou rode o workflow *ACS image check* no GitHub Actions, que chama este mesmo script.)
+- **Active:** `DEMO - Tag latest proibida` (e a nativa *Latest tag*).
+- **Resolved:** as três da etapa 01. A imagem com Log4Shell saiu, e o ACS fechou sozinho.
+> "Corrigiram a CVE, mas agora a imagem é 'latest': amanhã ninguém sabe o que está rodando, nem
+> consegue voltar. E vejam a aba Resolved: o ACS fechou as violações da Log4Shell sozinho quando a
+> imagem saiu. Ninguém precisou atualizar planilha."
 
-> "O desenvolvedor recebe isso no PR, com a versão que corrige. Segurança não precisou abrir ticket."
-
-### A.2 · No deploy — mesmo vindo do GitOps
-Contexto: o `pagamentos-api` legado está rodando, e o time de desenvolvimento fez merge da "versão
-nova" no Git. O Argo CD mostra `OutOfSync`.
-1. No Argo CD, clique **Sync** em `pagamentos-demo`.
-2. O Sync **falha**: o admission controller recusa o update, e a mensagem no Argo CD lista as CVEs,
-   incluindo `CVE-2021-44228 (CVSS 10) ... log4j 2.14.1 ... resolved by version 2.15.0`. O legado
-   continua rodando, intacto:
-   ```bash
-   oc -n pagamentos-demo get deploy pagamentos-api -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
-   # registry.access.redhat.com/ubi8/ubi:8.0  (a versão com Log4Shell não entrou)
-   ```
-3. ACS › **Violations**, filtro `Namespace: pagamentos-demo`: `DEMO - CVE corrigível...`, estágio
-   **Deploy**, com a ação de enforcement registrada.
-   > "O GitOps não é um atalho para fugir da política. Ou o Argo entrega algo seguro, ou não entrega."
-
-### A.3 · Tentativas "manuais"
+### Etapa 03 · container privilegiado — RSK-03
 ```bash
-oc apply -f seguranca/demo-apps/variacoes/privilegiado.yaml   # recusado: container privilegiado
-oc apply -f seguranca/demo-apps/variacoes/tag-latest.yaml     # recusado: tag latest
+./seguranca/demo-apps/etapa.sh 03
+oc apply -f seguranca/demo-apps/variacoes/privilegiado.yaml     # contraste: um humano tentando o mesmo
 ```
-Saída esperada: `Failed currently enforced policies from RHACS` com o nome da política.
+- **Active:** `DEMO - Container privilegiado em namespace PCI` (CRITICAL), mais as nativas
+  *Privileged Container* e *Container with privilege escalation allowed*.
+- **Cluster:** `FailedCreate`, porque a SCC `restricted-v2` não permite `privileged`. O rolling update
+  trava e a **versão anterior continua atendendo**. O Argo CD fica `Synced`, mas não `Healthy`.
+- **Contraste humano:** o `oc apply` é **negado** no terminal (`Failed currently enforced policies
+  from RHACS`) e aparece em **Violations › Attempted**, com `FAIL_DEPLOYMENT_CREATE_ENFORCEMENT`.
+> "Duas camadas: o ACS registrou a violação, e a plataforma não deixou o pod rodar. Quando um humano
+> tenta o mesmo com `oc apply`, o ACS recusa na hora, e a tentativa fica registrada mesmo sem o
+> objeto existir. É o RSK-03, deploys inseguros barrados."
 
-**Onde fica registrado:** ACS › **Violations**, subaba **User Workloads**, aba **Attempted** (a página
-abre em *Active*, onde tentativas bloqueadas **não** aparecem). Filtre `Namespace: pagamentos-demo`.
-Cada tentativa é uma linha com a política, o deployment (`debug-privilegiado`, `frontend-latest`),
-a data e a ação `FAIL_DEPLOYMENT_CREATE_ENFORCEMENT`. Repetir a tentativa gera nova linha.
-> "O objeto nunca existiu no cluster, mas a tentativa existe no ACS: quem tentou subir o quê,
-> quando, e qual regra impediu. É evidência para auditoria e insumo para o RSK-03."
-
-**Gancho:** "Cada recusa dessas soma no RSK-03. E como foram pegas em build ou deploy, e não em
-runtime, elas melhoram o RSK-04, o shift-left."
-
----
-
-## C · Ver, corrigir e detectar (10 min) — RSK-05, RSK-06, RSK-09
-
-### C.1 · Vulnerabilidades com contexto
-ACS › **Vulnerability Management › Results**, aba **User Workloads**. Na barra de filtros:
-`Namespace` = `pagamentos-demo`; em *CVE status*, **Fixable**; em *CVE severity*, **Critical** e
-**Important**. Aparece o **legado** (`ubi8/ubi:8.0`): ~1.270 CVEs, ~850 corrigíveis. Clique na imagem
-para ver CVE por CVE, com a versão que corrige.
-> "A versão nova não entrou; mas e o que já estava rodando? Aqui está. Não é uma lista de 1.270
-> CVEs para pânico: é quais têm correção, em que deployment e qual versão resolve. Esse é o RSK-05,
-> a fila de trabalho real."
-
-Mostre também *Vulnerability Management › Reports*: relatório agendado por e-mail para o dono da
-aplicação.
-
-### C.1b · Risco priorizado por contexto
-ACS › **Risk**, aba **User Workloads** (não *All Deployments*), ou filtre `Namespace: pagamentos-demo`.
-A coluna **Priority** é um ranking: **1 = maior risco**. Clique no deployment para ver os fatores
-(*Policy Violations*, *Image Vulnerabilities*, *Components Useful for Attackers*, *Image Freshness*…).
-> "O ACS não conta CVEs, ele ordena o que olhar primeiro: CVE corrigível, violação ativa,
-> ferramentas úteis para um atacante dentro da imagem. O time de segurança começa pelo topo."
-
-Se o `pagamentos-api` aparecer **no fim** do ranking, o ACS não está enxergando as CVEs da imagem
-(ver passos 11 e 13 da preparação).
-
-### C.2 · Corrigir é um PR (RSK-06)
-Em `seguranca/demo-apps/pagamentos-demo/10-deployment.yaml`, troque a imagem para
-`registry.access.redhat.com/ubi9/ubi-minimal:9.8` e o `command` indicado (os dois estão no comentário
-do arquivo), commit, **Sync**. O deploy passa, o Argo CD fica `Synced`, e as violações de CVE do
-legado vão para *Resolved*.
-> "Detecção → correção → deploy, com rastro no Git. O tempo entre essas duas marcas é o RSK-06."
-
-### C.3 · Runtime: alguém entrou no pod (RSK-09)
+### Etapa 04 · runtime: ferramenta de rede em execução — RSK-09
 ```bash
-oc apply -f seguranca/demo-apps/variacoes/runtime-ok.yaml
-oc -n pagamentos-demo rollout status deploy/pagamentos-worker
-oc -n pagamentos-demo exec deploy/pagamentos-worker -- curl -sI https://www.redhat.com
+./seguranca/demo-apps/etapa.sh 04          # aguarde ~1 min depois do sync
 ```
-- Com enforcement de exec ativo: o comando é **recusado**.
-- Sem enforcement (ou em versões sem suporte): o comando roda, e em segundos aparecem as violações
-  `DEMO - Exec em pod de pagamentos` e `DEMO - Ferramenta de rede executada...`, com usuário, pod,
-  processo e linha de comando.
-> "Em ambiente PCI, exec em produção é mudança sem trilha. Agora ela tem nome, hora e alerta — e
-> pode ir para o SIEM ou o Slack de vocês via notifier."
+- **Active:** `DEMO - Ferramenta de rede executada em pod de pagamentos`, estágio **Runtime**. Abra a
+  violação: processo `curl`, argumentos, pod, contêiner e horário.
+- **Resolved:** as de privilégio da etapa 03.
+> "Essa versão é 'limpa' no papel: imagem atual, sem privilégio, tag fixa. O problema é o que ela
+> FAZ: baixa coisas da internet em runtime. Nenhum scanner de imagem pega isso; só quem vê o
+> processo rodando. Para quem procura exfiltração ou pós-exploração, é esse sinal que importa."
+
+### Etapa 05 · runtime: exec no pod, mudança fora do Git — RSK-09
+```bash
+./seguranca/demo-apps/etapa.sh 05          # executa o oc exec ao vivo; não há commit
+```
+- **Terminal:** o `exec` é **recusado** (`admission webhook "k8sevents.stackrox.io" denied the
+  request … DEMO - Exec em pod de pagamentos`).
+- **Violations › Attempted:** a tentativa, com `FAIL_KUBE_REQUEST_ENFORCEMENT`.
+> "Alguém tentou 'consertar rapidinho' em produção. Em ambiente PCI, isso é mudança sem revisão. O
+> ACS recusou e registrou quem, quando e onde. A mudança tem que ir pelo Git, como todas as outras."
+
+### Etapa 06 · versão final: tudo limpo — RSK-06
+```bash
+./seguranca/demo-apps/etapa.sh 06
+```
+- **Resolved:** todas as violações de **Deploy** das etapas anteriores. A versão final ainda
+  endurece a inicial (sem token de service account montado), e com isso a nativa *Pod Service
+  Account Token Automatically Mounted* também resolve.
+- **Ainda Active:** a de **runtime** da etapa 04 (`curl`). Violação de runtime registra um **evento
+  que aconteceu**, e por isso não some com uma versão nova. Abra a violação e clique **Mark as
+  resolved**. **Não** use *Resolve and add to process baseline*, que passaria a considerar o `curl`
+  normal para esse deployment.
+- **Resultado:** nenhuma `DEMO -` ativa. Resta só *Docker CIS 4.1* (LOW, informativo: a imagem
+  base declara usuário root, mas o OpenShift executa com UID aleatório).
+> "Detecção, correção por commit, tudo resolvido e com rastro no Git. O tempo entre a primeira
+> violação e este commit é o RSK-06. E o evento de runtime passou por triagem humana, que é como
+> deve ser."
+
+### Se algo não acontecer como descrito
+| Sintoma | Causa provável | Ação |
+|---|---|---|
+| `etapa.sh` fica esperando o sync | Argo CD sem acesso ao GitHub ou app sem auto-sync | `oc -n openshift-gitops get applications.argoproj.io pagamentos-demo` e reaplicar `seguranca/argocd/app-pagamentos-demo.yaml` |
+| Etapa 01 sem violação de CVE | imagem em cache sem CVEs | apagar o registro (passo 13 da preparação) e repetir `etapa.sh 01` |
+| Etapa 04 sem violação após 2 min | o Collector ainda não viu o `curl` (roda a cada 30 s) | aguardar mais 1 min; conferir o pod `Running` |
+| `exec` não é recusado | admission sem eventos (`k8sevents.stackrox.io` ausente) | `oc get validatingwebhookconfiguration stackrox` e passo 2 da preparação |
 
 ---
 
@@ -317,6 +331,7 @@ leva segundos (medido no laboratório: ~11 s). Volte ao Scorecard, seção *Jorn
 | Objeção | Resposta |
 |---|---|
 | "Já temos scanner de imagem." | Scanner mostra o problema; o ACS **impede** o deploy, detecta em runtime e prova cobertura da frota. Os KPIs RSK-03, RSK-09 e RSK-02 não saem de um scanner. |
+| "Mas o Argo CD passou!" | O Argo CD padrão roda em `openshift-gitops`, isento do admission. O ACS detectou e registrou cada violação. Em produção, entregue as aplicações por uma instância de Argo CD dedicada, fora de `openshift-*`, e ela é barrada como qualquer usuário. O pipeline com `roxctl` barra antes do commit. |
 | "Admission controller vai derrubar produção." | Comece em modo *inform* (sem `enforcementActions`), meça RSK-03/RSK-04 por 30 dias e ative enforcement política a política. Há break-glass por anotação, auditado. |
 | "Muito falso positivo." | Use *Fixable* + severidade como critério: só o que tem correção. Exceções viram *exceptions* com prazo, aprovadas por PR. |
 | "Quem é dono das políticas: segurança ou plataforma?" | Segurança é *code owner* de `acs/policies/` no Git; plataforma revisa o impacto. O PR é o contrato entre os dois. |

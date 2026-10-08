@@ -1,6 +1,7 @@
 # ---------------------------------------------------------------------------
-#  Etapa 00 · versão em produção antes da demo — nenhuma política DEMO violada.
-#  Imagem atual (UBI 9.8 minimal), tag fixa, sem privilégio, sem ferramentas de rede.
+#  Etapa 02 · viola "DEMO - Tag latest proibida"
+#  Mesma base da etapa 00, mas referenciada por 'latest': sem rastreabilidade do que roda.
+#  A violação de CVE da etapa 01 vai para Resolved sozinha (a imagem saiu).
 # ---------------------------------------------------------------------------
 apiVersion: apps/v1
 kind: Deployment
@@ -10,7 +11,7 @@ metadata:
   labels:
     app: pagamentos-api
   annotations:
-    demo.acs/etapa: 00 - versão inicial (aceitável)
+    demo.acs/etapa: '02 - viola: tag latest'
 spec:
   replicas: 1
   selector:
@@ -23,7 +24,7 @@ spec:
     spec:
       containers:
       - name: api
-        image: registry.access.redhat.com/ubi9/ubi-minimal:9.8
+        image: registry.access.redhat.com/ubi9/ubi-minimal:latest
         command:
         - /bin/sh
         - -c

@@ -1,6 +1,8 @@
 # ---------------------------------------------------------------------------
-#  Etapa 00 · versão em produção antes da demo — nenhuma política DEMO violada.
-#  Imagem atual (UBI 9.8 minimal), tag fixa, sem privilégio, sem ferramentas de rede.
+#  Etapa 03 · viola "DEMO - Container privilegiado em namespace PCI"
+#  O Deployment é criado (o ACS avalia a especificação), mas o OpenShift recusa os pods:
+#  a SCC restricted-v2 não permite privileged. Duas camadas: ACS registra e alerta,
+#  a plataforma impede a execução. O Argo CD fica Progressing/Degraded até a próxima etapa.
 # ---------------------------------------------------------------------------
 apiVersion: apps/v1
 kind: Deployment
@@ -10,7 +12,7 @@ metadata:
   labels:
     app: pagamentos-api
   annotations:
-    demo.acs/etapa: 00 - versão inicial (aceitável)
+    demo.acs/etapa: '03 - viola: container privilegiado'
 spec:
   replicas: 1
   selector:
@@ -35,8 +37,4 @@ spec:
           limits:
             memory: 128Mi
         securityContext:
-          allowPrivilegeEscalation: false
-          runAsNonRoot: true
-          capabilities:
-            drop:
-            - ALL
+          privileged: true

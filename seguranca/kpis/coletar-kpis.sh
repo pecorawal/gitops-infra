@@ -121,9 +121,12 @@ kpi_rsk02() {
 # ── RSK-03 · Deploys inseguros barrados ───────────────────────────────────
 kpi_rsk03() {
   local deploy
-  deploy=$(jq '[.[] | select(.lifecycleStage=="DEPLOY" and (.state=="ATTEMPTED" or (.enforcementCount // 0) > 0))] | length' <<<"$ALERTAS")
+  # Só o que foi de fato recusado (ATTEMPTED). Alertas com enforcement apenas
+  # registrado (ex.: SCALE_TO_ZERO em deploy do Argo CD de openshift-gitops, que o
+  # admission não bloqueia) não contam como barrados.
+  deploy=$(jq '[.[] | select(.lifecycleStage=="DEPLOY" and .state=="ATTEMPTED")] | length' <<<"$ALERTAS")
   linha RSK-03 "Deploys inseguros barrados" "$((deploy + BUILD_BLOQUEADOS))" \
-    "$BUILD_BLOQUEADOS no build (CI) + $deploy no deploy (admission/scale-to-zero), ${JANELA_DIAS}d"
+    "$BUILD_BLOQUEADOS no build (CI) + $deploy recusados no admission, ${JANELA_DIAS}d"
 }
 
 # ── RSK-04 · Shift-left de segurança ──────────────────────────────────────

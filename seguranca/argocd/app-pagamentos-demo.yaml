@@ -1,11 +1,17 @@
 # ---------------------------------------------------------------------------
-#  Demos A e C · workload de pagamentos entregue pelo Argo CD
-#  Mostra que o ACS barra inclusive o que vem do GitOps: o Argo CD não é
-#  um atalho para fugir da política.
+#  Fase central da demo · workload de pagamentos entregue pelo Argo CD
+#
+#  Auto-sync de propósito: o apresentador só faz commit (seguranca/demo-apps/
+#  etapa.sh) e o Argo CD aplica; o ACS mostra o que cada versão violou.
+#  selfHeal: mudança manual no cluster volta ao estado do Git.
 #
 #    oc apply -f seguranca/argocd/app-pagamentos-demo.yaml
 #
-#  Sem automated sync de propósito: o apresentador clica "Sync" ao vivo.
+#  ATENÇÃO: esta instância (openshift-gitops) roda em namespace openshift-*, que
+#  o admission controller do ACS não bloqueia. O ACS DETECTA e registra cada
+#  violação, mas não impede o sync. Para bloqueio também no GitOps, entregue as
+#  aplicações por uma instância de Argo CD fora de openshift-* (recomendação
+#  Red Hat: instância padrão para o cluster, instância dedicada para apps).
 # ---------------------------------------------------------------------------
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -22,5 +28,8 @@ spec:
     server: 'https://kubernetes.default.svc'
     namespace: pagamentos-demo
   syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
     syncOptions:
       - CreateNamespace=true

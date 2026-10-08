@@ -1,6 +1,8 @@
 # ---------------------------------------------------------------------------
-#  Etapa 00 · versão em produção antes da demo — nenhuma política DEMO violada.
-#  Imagem atual (UBI 9.8 minimal), tag fixa, sem privilégio, sem ferramentas de rede.
+#  Etapa 06 · versão final — corrige tudo e ainda endurece a etapa 00:
+#  sem token de service account montado (a aplicação não fala com a API do Kubernetes).
+#  Nenhuma política DEMO violada; as violações de deploy das etapas anteriores vão
+#  para Resolved quando esta versão substitui a anterior.
 # ---------------------------------------------------------------------------
 apiVersion: apps/v1
 kind: Deployment
@@ -10,7 +12,7 @@ metadata:
   labels:
     app: pagamentos-api
   annotations:
-    demo.acs/etapa: 00 - versão inicial (aceitável)
+    demo.acs/etapa: 06 - versão final (aceitável e endurecida)
 spec:
   replicas: 1
   selector:
@@ -40,3 +42,4 @@ spec:
           capabilities:
             drop:
             - ALL
+      automountServiceAccountToken: false
