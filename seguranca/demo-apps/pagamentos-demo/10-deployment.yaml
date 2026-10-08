@@ -1,8 +1,7 @@
 # ---------------------------------------------------------------------------
-#  Etapa 03 · viola "DEMO - Container privilegiado em namespace PCI"
-#  O Deployment é criado (o ACS avalia a especificação), mas o OpenShift recusa os pods:
-#  a SCC restricted-v2 não permite privileged. Duas camadas: ACS registra e alerta,
-#  a plataforma impede a execução. O Argo CD fica Progressing/Degraded até a próxima etapa.
+#  Etapa 04 · viola EM RUNTIME "DEMO - Ferramenta de rede executada em pod de pagamentos"
+#  Nada de errado na especificação: imagem atual, sem privilégio. O problema é o
+#  COMPORTAMENTO — o container executa curl. Só o runtime (Collector) enxerga isso.
 # ---------------------------------------------------------------------------
 apiVersion: apps/v1
 kind: Deployment
@@ -12,7 +11,7 @@ metadata:
   labels:
     app: pagamentos-api
   annotations:
-    demo.acs/etapa: '03 - viola: container privilegiado'
+    demo.acs/etapa: '04 - viola em runtime: ferramenta de rede'
 spec:
   replicas: 1
   selector:
@@ -25,11 +24,11 @@ spec:
     spec:
       containers:
       - name: api
-        image: registry.access.redhat.com/ubi9/ubi-minimal:9.8
+        image: registry.access.redhat.com/ubi9/ubi:9.8
         command:
         - /bin/sh
         - -c
-        - while true; do echo pagamentos-api ok; sleep 30; done
+        - while true; do curl -s -o /dev/null https://www.redhat.com; sleep 30; done
         resources:
           requests:
             cpu: 10m
@@ -37,4 +36,8 @@ spec:
           limits:
             memory: 128Mi
         securityContext:
-          privileged: true
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
