@@ -133,7 +133,7 @@ Mostre o **Scorecard DevSecOps · Segurança**, seção *Resumo executivo* e *Jo
 
 > "Não viemos mostrar mais um scanner. Viemos mostrar como a regra que vocês escrevem passa a valer
 > sozinha em todos os clusters — e como vocês provam isso com números. Vou organizar a conversa em
-> quatro perguntas que todo time de segurança faz: **o que eu vejo, o que eu barro, quão rápido eu
+> quatro perguntas que todo time de segurança faz: **o que eu vejo, o que eu bloqueio, quão rápido eu
 > corrijo e como eu provo.** Cada uma tem dois indicadores, e cada demo vai mexer em pelo menos um."
 
 ---

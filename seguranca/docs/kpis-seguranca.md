@@ -14,7 +14,7 @@ Os oito respondem a quatro perguntas que todo CISO faz:
 |---|---|---|---|---|
 | **Visibilidade** — o que eu vejo? | RSK-02 | Cobertura de segurança | ↑ | D |
 | | RSK-05 | CVEs críticas corrigíveis em produção | ↓ | A, C |
-| **Prevenção** — o que eu barro? | RSK-03 | Deploys inseguros barrados | ↑ | A |
+| **Prevenção** — o que eu bloqueio? | RSK-03 | Deploys inseguros barrados | ↑ | A |
 | | RSK-04 | Shift-left de segurança | ↑ | A |
 | **Resposta** — quão rápido eu corrijo? | RSK-06 | Tempo para remediar CVE crítica | ↓ | C |
 | | RSK-09 | Mudanças fora do Git | ↓ | C |
