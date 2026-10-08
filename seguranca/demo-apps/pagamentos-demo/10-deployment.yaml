@@ -1,7 +1,8 @@
 # ---------------------------------------------------------------------------
-#  Etapa 04 · viola EM RUNTIME "DEMO - Ferramenta de rede executada em pod de pagamentos"
-#  Nada de errado na especificação: imagem atual, sem privilégio. O problema é o
-#  COMPORTAMENTO — o container executa curl. Só o runtime (Collector) enxerga isso.
+#  Etapa 06 · versão final — corrige tudo e ainda endurece a etapa 00:
+#  sem token de service account montado (a aplicação não fala com a API do Kubernetes).
+#  Nenhuma política DEMO violada; as violações de deploy das etapas anteriores vão
+#  para Resolved quando esta versão substitui a anterior.
 # ---------------------------------------------------------------------------
 apiVersion: apps/v1
 kind: Deployment
@@ -11,7 +12,7 @@ metadata:
   labels:
     app: pagamentos-api
   annotations:
-    demo.acs/etapa: '04 - viola em runtime: ferramenta de rede'
+    demo.acs/etapa: 06 - versão final (aceitável e endurecida)
 spec:
   replicas: 1
   selector:
@@ -24,11 +25,11 @@ spec:
     spec:
       containers:
       - name: api
-        image: registry.access.redhat.com/ubi9/ubi:9.8
+        image: registry.access.redhat.com/ubi9/ubi-minimal:9.8
         command:
         - /bin/sh
         - -c
-        - while true; do curl -s -o /dev/null https://www.redhat.com; sleep 30; done
+        - while true; do echo pagamentos-api ok; sleep 30; done
         resources:
           requests:
             cpu: 10m
@@ -41,3 +42,4 @@ spec:
           capabilities:
             drop:
             - ALL
+      automountServiceAccountToken: false
