@@ -37,7 +37,10 @@ status() {
   titulo "Cluster ($NS)"
   oc -n "$NS" get deploy pagamentos-api \
     -o jsonpath='  etapa={.metadata.annotations.demo\.acs/etapa}{"\n"}  imagem={.spec.template.spec.containers[0].image}{"\n"}  réplicas={.status.readyReplicas}/{.spec.replicas}{"\n"}'
-  oc -n "$NS" get events --sort-by=.lastTimestamp 2>/dev/null | grep -E 'FailedCreate' | tail -1 | cut -c1-160 || true
+  # só eventos recentes (2 min): FailedCreate de etapas anteriores não confundem
+  oc -n "$NS" get events -o json 2>/dev/null | jq -r --arg d "$(date -u -d '-2 min' +%FT%TZ)" \
+    '[.items[] | select(.reason=="FailedCreate" and ((.lastTimestamp // .eventTime // "") >= $d))]
+     | last | select(.) | "  FailedCreate: \(.message[0:140])"' || true
 }
 
 aguardar_sync() {
