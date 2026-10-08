@@ -148,7 +148,7 @@ Mostre o **Scorecard DevSecOps · Segurança**, seção *Resumo executivo* e *Jo
 
 - Abra `seguranca/acm/policy-acs-cobertura.yaml` no GitHub: 3 templates (operador, CRS + `SecuredCluster`,
   Sensor saudável) e um Placement com toda a frota, exceto o hub.
-- ACM › Governance › `acs-secured-cluster`: aba *Clusters*, com `blackbird-rosa-4gs5p` `Compliant` nos 3 templates.
+- ACM › Governance › `acs-secured-cluster`: aba *Clusters*, com `<cluster-gerenciado>` `Compliant` nos 3 templates.
 - ACS › Platform Configuration › Clusters: o mesmo cluster `Healthy`. São duas ferramentas contando a
   mesma história.
 - Se houver cluster sem ACS no laboratório: importe-o ao vivo e mostre a política instalando o ACS. É o
