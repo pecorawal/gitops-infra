@@ -1,9 +1,7 @@
 # ---------------------------------------------------------------------------
-#  Etapa 01 · viola "DEMO - CVE corrigível Importante ou Crítica"
-#  Imagem com log4j 2.14.1: CVE-2021-44228 (Log4Shell, CVSS 10) e 10 outras Críticas,
-#  todas com correção. Também dispara as políticas nativas Log4Shell e Spring4Shell.
-#  SEGURANÇA DA DEMO: o command troca o java da imagem por 'sleep' — a imagem vulnerável
-#  está no cluster (é o que o ACS avalia), mas a aplicação explorável não sobe.
+#  Etapa 02 · viola "DEMO - Tag latest proibida"
+#  Mesma base da etapa 00, mas referenciada por 'latest': sem rastreabilidade do que roda.
+#  A violação de CVE da etapa 01 vai para Resolved sozinha (a imagem saiu).
 # ---------------------------------------------------------------------------
 apiVersion: apps/v1
 kind: Deployment
@@ -13,7 +11,7 @@ metadata:
   labels:
     app: pagamentos-api
   annotations:
-    demo.acs/etapa: '01 - viola: CVE corrigível (Log4Shell)'
+    demo.acs/etapa: '02 - viola: tag latest'
 spec:
   replicas: 1
   selector:
@@ -26,10 +24,11 @@ spec:
     spec:
       containers:
       - name: api
-        image: ghcr.io/christophetd/log4shell-vulnerable-app@sha256:6f88430688108e512f7405ac3c73d47f5c370780b94182854ea2cddc6bd59929
+        image: registry.access.redhat.com/ubi9/ubi-minimal:latest
         command:
-        - sleep
-        - infinity
+        - /bin/sh
+        - -c
+        - while true; do echo pagamentos-api ok; sleep 30; done
         resources:
           requests:
             cpu: 10m
