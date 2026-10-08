@@ -1,13 +1,18 @@
 # ---------------------------------------------------------------------------
-#  pagamentos-api (simulado)
+#  pagamentos-api (simulado): API Java/Spring Boot com log4j 2.14
 #
-#  ESTADO INICIAL = VULNERÁVEL. ubi8/ubi:8.0 (2019) carrega dezenas de CVEs
-#  Importantes com correção disponível -> a política
-#  "DEMO - CVE corrigível Importante ou Crítica" barra o deploy.
+#  ESTADO INICIAL = VULNERÁVEL A LOG4SHELL (CVE-2021-44228, CVSS 10).
+#  Imagem pública de laboratório (christophetd/log4shell-vulnerable-app),
+#  fixada por digest: a tag é 'latest' e cairia também na política de tag.
+#  Scan delegado no ACS 4.11: 11 Críticas e 29 Importantes, todas com correção.
+#    - "DEMO - CVE corrigível Importante ou Crítica"  -> BLOQUEIA o deploy
+#    - "Log4Shell: log4j Remote Code Execution..."    -> política nativa, alerta
+#  Nunca rode esta imagem fora do namespace da demo nem a exponha com Route.
 #
-#  Correção (Demo C / RSK-06), via PR:
+#  Correção (Demo C / RSK-06), via PR — imagem reconstruída sobre base atual:
 #    image: registry.access.redhat.com/ubi9/ubi-minimal:9.8
-#  Confira a tag mais recente antes da demo (skopeo list-tags ou catalog.redhat.com).
+#    command: ["/bin/sh", "-c", "while true; do echo pagamentos-api ok; sleep 30; done"]
+#  (alternativa só com Importantes, sem Log4Shell: registry.access.redhat.com/ubi8/ubi:8.0)
 # ---------------------------------------------------------------------------
 apiVersion: apps/v1
 kind: Deployment
@@ -28,14 +33,15 @@ spec:
     spec:
       containers:
         - name: api
-          image: registry.access.redhat.com/ubi8/ubi:8.0
-          command: ["/bin/sh", "-c", "while true; do echo pagamentos-api ok; sleep 30; done"]
+          image: ghcr.io/christophetd/log4shell-vulnerable-app@sha256:6f88430688108e512f7405ac3c73d47f5c370780b94182854ea2cddc6bd59929
+          ports:
+            - containerPort: 8080
           resources:
             requests:
-              cpu: 10m
-              memory: 32Mi
+              cpu: 50m
+              memory: 256Mi
             limits:
-              memory: 64Mi
+              memory: 512Mi
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true

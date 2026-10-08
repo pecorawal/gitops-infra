@@ -103,17 +103,31 @@ mede e gera evidência — em todos os clusters, sem virar gargalo da entrega.*
     GitHub (branch `seguranca`); terminal.
     > Nomes de menu conferidos no ACS 4.11. Em versões ≤ 4.6 a página de CVEs se chamava
     > *Workload CVEs* e o relatório, *Vulnerability Reporting*.
-11. **Ensaio do momento-chave (obrigatório):** depois de corrigir o scan, o dry-run do deploy
-    vulnerável tem que ser **negado**:
+11. **Scan delegado:** em *Platform Configuration › Clusters › Delegated image scanning*, deixe
+    **All registries** com o hub como cluster padrão. Sem isso, o Central pode guardar imagens com
+    **0 CVEs** (visto no laboratório com a `ubi8:8.0`) e o admission controller deixa tudo passar.
+12. **Estado inicial da aplicação (história: "o legado e a versão nova"):**
+    ```bash
+    oc apply -f seguranca/demo-apps/variacoes/legado-pagamentos-api.yaml
+    ```
+    - Cria o `pagamentos-api` **legado** (`ubi8:8.0`, ~1.270 CVEs) com a anotação de **break-glass**,
+      porque o ACS já o bloquearia. O bypass fica registrado como violação. Isso também é argumento
+      para a demo: existe saída de emergência, e ela é auditada.
+    - O Argo CD (`pagamentos-demo`) fica **OutOfSync**, porque o Git já traz a "versão nova" (Log4Shell).
+      **Não sincronize**: o Sync é o momento da Demo A.2.
+13. **Ensaio do momento-chave (obrigatório):**
     ```bash
     oc apply --dry-run=server -f seguranca/demo-apps/pagamentos-demo/10-deployment.yaml
-    # esperado: Error from server (Failed currently enforced policies from RHACS) ... DEMO - CVE corrigível
+    # esperado: denied ... DEMO - CVE corrigível ... CVE-2021-44228 (CVSS 10) ... log4j 2.14.1 ... 2.15.0
     ```
-    Se ele passar (`created (server dry run)`), confira em *Vulnerability Management › Results ›
-    User Workloads* se a `ubi8/ubi:8.0` tem CVEs. Imagem com **0 CVEs** = o scan do Central não
-    casou vulnerabilidades; ative *Platform Configuration › Clusters › Delegated image scanning*
-    (todos os registries, cluster padrão = o hub) e reescaneie com
-    `roxctl image scan --cluster <cluster> --force --image registry.access.redhat.com/ubi8/ubi:8.0`.
+    Se passar (`configured (server dry run)`), a imagem está em cache sem CVEs. **Rescan**: não há
+    botão na console, e o `roxctl image scan --force` mostra o resultado mas **não** substitui o
+    cache. O que funciona é apagar o registro em cache; o próximo uso reescaneia pela delegação:
+    ```bash
+    curl -sk -u admin:$ROX_ADMIN_PASSWORD -G -X DELETE "https://$ROX_ENDPOINT/v1/images" \
+      --data-urlencode "query.query=Image:<imagem>" --data-urlencode confirm=true
+    ```
+    (Em *Vulnerability Management › Results*, a imagem deve aparecer com CVEs logo depois.)
 
 ---
 
@@ -173,16 +187,19 @@ Mostre o **Scorecard DevSecOps · Segurança**, seção *Resumo executivo* e *Jo
 
 ### A.1 · No pipeline (build)
 ```bash
-./seguranca/pipeline/roxctl-check.sh                      # ubi8:8.0, de 2019
+./seguranca/pipeline/roxctl-check.sh        # padrão: a "versão nova" do pagamentos-api (Log4Shell)
 ```
 Resultado esperado (exit 1):
-- **Informativo:** ~1.270 CVEs, ~150 Importantes **com versão corrigida**, com amostra
+- **Informativo:** 182 CVEs: **11 Críticas** e 29 Importantes, com amostra
   `CVE · pacote · versão atual -> versão que corrige`.
-- **Gate:** tabela `BLOQ. / SEVERID. / POLÍTICA`. `SIM` em `DEMO - CVE corrigível Importante ou Crítica`
-  e `RESULTADO: BARRADA no build`.
+- **Gate:** `SIM` em `DEMO - CVE corrigível Importante ou Crítica` → `RESULTADO: BARRADA no build`.
+  Na mesma tabela, como `-` (só alerta), aparecem as políticas nativas
+  **`Log4Shell: log4j Remote Code Execution vulnerability`** e **`Spring4Shell`**, ambas CRITICAL.
 
-> "Reparem na coluna BLOQ.: o time de segurança decide quais políticas **param** o build e quais só
-> **avisam**. Imagem antiga com pacote RPM é aviso; CVE Importante com correção disponível é bloqueio."
+> "Essa imagem tem a Log4Shell, CVSS 10, a de dezembro de 2021. O ACS reconhece pelo nome. Reparem
+> na coluna BLOQ.: vocês decidem o que **para** o build e o que só **avisa**. Aqui, a regra 'CVE
+> corrigível Importante ou Crítica' para; a política nativa de Log4Shell, hoje, só avisa. É uma
+> decisão de vocês, por PR."
 
 Em seguida, mostre o contraste com a imagem atual, que passa:
 ```bash
@@ -193,13 +210,18 @@ Em seguida, mostre o contraste com a imagem atual, que passa:
 > "O desenvolvedor recebe isso no PR, com a versão que corrige. Segurança não precisou abrir ticket."
 
 ### A.2 · No deploy — mesmo vindo do GitOps
+Contexto: o `pagamentos-api` legado está rodando, e o time de desenvolvimento fez merge da "versão
+nova" no Git. O Argo CD mostra `OutOfSync`.
 1. No Argo CD, clique **Sync** em `pagamentos-demo`.
-2. O Deployment é **recusado** pelo admission controller (ou escalado para zero, conforme a versão):
+2. O Sync **falha**: o admission controller recusa o update, e a mensagem no Argo CD lista as CVEs,
+   incluindo `CVE-2021-44228 (CVSS 10) ... log4j 2.14.1 ... resolved by version 2.15.0`. O legado
+   continua rodando, intacto:
    ```bash
-   oc -n pagamentos-demo get deploy,pods
-   oc -n pagamentos-demo get events --sort-by=.lastTimestamp | tail
+   oc -n pagamentos-demo get deploy pagamentos-api -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
+   # registry.access.redhat.com/ubi8/ubi:8.0  (a versão com Log4Shell não entrou)
    ```
-3. ACS › Violations: violação `DEMO - CVE corrigível...`, estágio **Deploy**, ação de enforcement registrada.
+3. ACS › **Violations**, filtro `Namespace: pagamentos-demo`: `DEMO - CVE corrigível...`, estágio
+   **Deploy**, com a ação de enforcement registrada.
    > "O GitOps não é um atalho para fugir da política. Ou o Argo entrega algo seguro, ou não entrega."
 
 ### A.3 · Tentativas "manuais"
@@ -207,7 +229,7 @@ Em seguida, mostre o contraste com a imagem atual, que passa:
 oc apply -f seguranca/demo-apps/variacoes/privilegiado.yaml   # recusado: container privilegiado
 oc apply -f seguranca/demo-apps/variacoes/tag-latest.yaml     # recusado: tag latest
 ```
-Saída esperada: `Failed currently enforced policies from StackRox` com o nome da política.
+Saída esperada: `Failed currently enforced policies from RHACS` com o nome da política.
 
 **Gancho:** "Cada recusa dessas soma no RSK-03. E como foram pegas em build ou deploy, e não em
 runtime, elas melhoram o RSK-04, o shift-left."
@@ -219,9 +241,11 @@ runtime, elas melhoram o RSK-04, o shift-left."
 ### C.1 · Vulnerabilidades com contexto
 ACS › **Vulnerability Management › Results**, aba **User Workloads**. Na barra de filtros:
 `Namespace` = `pagamentos-demo`; em *CVE status*, **Fixable**; em *CVE severity*, **Critical** e
-**Important**. Clique na imagem `ubi8/ubi:8.0` para ver CVE por CVE, com a versão que corrige.
-> "Não é uma lista de 300 CVEs. É: quais têm correção, em que imagem, em que deployment de
-> produção, e qual versão resolve. Esse é o RSK-05 — a fila de trabalho real."
+**Important**. Aparece o **legado** (`ubi8/ubi:8.0`): ~1.270 CVEs, ~850 corrigíveis. Clique na imagem
+para ver CVE por CVE, com a versão que corrige.
+> "A versão nova não entrou; mas e o que já estava rodando? Aqui está. Não é uma lista de 1.270
+> CVEs para pânico: é quais têm correção, em que deployment e qual versão resolve. Esse é o RSK-05,
+> a fila de trabalho real."
 
 Mostre também *Vulnerability Management › Reports*: relatório agendado por e-mail para o dono da
 aplicação.
@@ -234,13 +258,13 @@ A coluna **Priority** é um ranking: **1 = maior risco**. Clique no deployment p
 > ferramentas úteis para um atacante dentro da imagem. O time de segurança começa pelo topo."
 
 Se o `pagamentos-api` aparecer **no fim** do ranking, o ACS não está enxergando as CVEs da imagem
-(ver passo 11 da preparação).
+(ver passos 11 e 13 da preparação).
 
 ### C.2 · Corrigir é um PR (RSK-06)
 Em `seguranca/demo-apps/pagamentos-demo/10-deployment.yaml`, troque a imagem para
-`registry.access.redhat.com/ubi9/ubi-minimal:9.8` (já está no comentário do arquivo), commit, **Sync**.
-O deploy passa e o Argo CD fica `Synced`; se a versão do ACS tiver aplicado *scale-to-zero*, a violação
-vai para *Resolved*.
+`registry.access.redhat.com/ubi9/ubi-minimal:9.8` e o `command` indicado (os dois estão no comentário
+do arquivo), commit, **Sync**. O deploy passa, o Argo CD fica `Synced`, e as violações de CVE do
+legado vão para *Resolved*.
 > "Detecção → correção → deploy, com rastro no Git. O tempo entre essas duas marcas é o RSK-06."
 
 ### C.3 · Runtime: alguém entrou no pod (RSK-09)

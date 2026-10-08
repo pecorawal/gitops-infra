@@ -18,7 +18,7 @@ on:
       image:
         description: Imagem a avaliar
         required: true
-        default: registry.access.redhat.com/ubi8/ubi:8.0
+        default: ghcr.io/christophetd/log4shell-vulnerable-app@sha256:6f88430688108e512f7405ac3c73d47f5c370780b94182854ea2cddc6bd59929
       namespace:
         description: Namespace de destino do deploy (contexto das políticas com scope)
         required: true

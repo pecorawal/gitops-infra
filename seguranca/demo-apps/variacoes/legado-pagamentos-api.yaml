@@ -1,0 +1,49 @@
+# ---------------------------------------------------------------------------
+#  ESTADO INICIAL da demo · pagamentos-api "legado"
+#
+#  Simula a aplicação que já estava em produção antes das políticas: UBI 8.0
+#  (2019, ~1.270 CVEs, ~850 corrigíveis). Criada com break-glass porque o
+#  admission controller já a bloquearia — o bypass é permitido
+#  (bypass: BreakGlassAnnotation) e fica registrado como violação no ACS.
+#
+#    oc apply -f seguranca/demo-apps/variacoes/legado-pagamentos-api.yaml
+#
+#  Depois disso o Argo CD (app pagamentos-demo) fica OutOfSync: o Git já traz a
+#  "versão nova" (Log4Shell). O Sync ao vivo é BARRADO no update (Demo A.2), e
+#  este legado aparece na fila de CVEs (Demo C.1) até ser corrigido por PR (C.2).
+#  Não use fora do namespace pagamentos-demo.
+# ---------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pagamentos-api
+  namespace: pagamentos-demo
+  labels:
+    app: pagamentos-api
+  annotations:
+    admission.stackrox.io/break-glass: "estado inicial da demo: aplicação legada anterior às políticas"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pagamentos-api
+  template:
+    metadata:
+      labels:
+        app: pagamentos-api
+    spec:
+      containers:
+        - name: api
+          image: registry.access.redhat.com/ubi8/ubi:8.0
+          command: ["/bin/sh", "-c", "while true; do echo pagamentos-api ok; sleep 30; done"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]

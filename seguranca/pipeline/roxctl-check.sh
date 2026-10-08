@@ -5,7 +5,7 @@
 #
 #    export ROX_ENDPOINT=central-rhacs-operator.apps.<cluster>:443
 #    export ROX_API_TOKEN=<token>          # ou ROX_ADMIN_PASSWORD=<senha do admin>
-#    ./roxctl-check.sh                                   # imagem vulnerável  -> BARRADA
+#    ./roxctl-check.sh                                   # Log4Shell (padrão) -> BARRADA
 #    ./roxctl-check.sh registry.access.redhat.com/ubi9/ubi-minimal:9.8   -> APROVADA
 #
 #  CRITÉRIO
@@ -26,7 +26,7 @@
 #    0 = APROVADA · 1 = BARRADA · 2 = ERRO (o check não rodou; não conta como barrada)
 # ---------------------------------------------------------------------------
 set -uo pipefail
-IMAGE="${1:-registry.access.redhat.com/ubi8/ubi:8.0}"
+IMAGE="${1:-ghcr.io/christophetd/log4shell-vulnerable-app@sha256:6f88430688108e512f7405ac3c73d47f5c370780b94182854ea2cddc6bd59929}"   # Log4Shell
 : "${ROX_ENDPOINT:?defina ROX_ENDPOINT}"
 if [[ -z "${ROX_API_TOKEN:-}" && -z "${ROX_ADMIN_PASSWORD:-}" ]]; then
   echo "defina ROX_API_TOKEN ou ROX_ADMIN_PASSWORD" >&2; exit 2
