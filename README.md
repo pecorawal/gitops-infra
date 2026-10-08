@@ -54,6 +54,7 @@ garantida pelo ACM e os 8 KPIs de segurança do Scorecard DevSecOps coletados ao
 .
 ├── .github
 │   └── workflows
+│       ├── acs-image-check.yaml
 │       └── readme-tree.yaml
 ├── .gitignore
 ├── README.md
@@ -202,11 +203,50 @@ garantida pelo ACM e os 8 KPIs de segurança do Scorecard DevSecOps coletados ao
 ├── policies
 │   ├── enforce-gitops-labels.yaml
 │   └── pci-compliance-policy.yaml
+├── seguranca
+│   ├── README.md
+│   ├── acm
+│   │   ├── policy-acs-cobertura.yaml
+│   │   └── policy-compliance-pci.yaml
+│   ├── acs
+│   │   ├── policies
+│   │   │   ├── 10-cve-corrigivel-bloqueada.yaml
+│   │   │   ├── 20-tag-latest-proibida.yaml
+│   │   │   ├── 30-container-privilegiado.yaml
+│   │   │   ├── 40-exec-em-pod-pci.yaml
+│   │   │   └── 50-ferramenta-de-rede-em-runtime.yaml
+│   │   └── rbac
+│   │       └── argocd-securitypolicies.yaml
+│   ├── argocd
+│   │   ├── app-acs-policies.yaml
+│   │   └── app-pagamentos-demo.yaml
+│   ├── demo-apps
+│   │   ├── etapa.sh
+│   │   ├── etapas
+│   │   │   ├── 00-inicial.yaml
+│   │   │   ├── 01-cve-log4shell.yaml
+│   │   │   ├── 02-tag-latest.yaml
+│   │   │   ├── 03-privilegiado.yaml
+│   │   │   ├── 04-ferramenta-de-rede.yaml
+│   │   │   └── 06-final.yaml
+│   │   ├── pagamentos-demo
+│   │   │   ├── 00-namespace.yaml
+│   │   │   └── 10-deployment.yaml
+│   │   └── variacoes
+│   │       ├── privilegiado.yaml
+│   │       └── tag-latest.yaml
+│   ├── docs
+│   │   ├── kpis-seguranca.md
+│   │   └── roteiro-demo.md
+│   ├── kpis
+│   │   └── coletar-kpis.sh
+│   └── pipeline
+│       └── roxctl-check.sh
 ├── tree.bak
 └── workloads
     ├── checkout-frontend-api-appset.yaml
     └── pagamentos-api-appset.yaml
 
-37 directories, 118 files
+50 directories, 145 files
 ```
 <!-- readme-tree end -->
