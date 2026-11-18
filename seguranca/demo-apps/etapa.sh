@@ -16,7 +16,11 @@
 #    ./seguranca/demo-apps/etapa.sh status
 #
 #  Requisitos: clone da branch 'seguranca' com permissão de push; oc no hub
-#  (ou OC_CONTEXT=<contexto do hub>). Rodar a partir da raiz do repositório.
+#  (ou OC_CONTEXT=<contexto do hub>) e um contexto do oc logado no cluster
+#  SECURED, onde o Argo CD entrega o workload (APP_CONTEXT=<contexto>).
+#  Rodar a partir da raiz do repositório.
+#
+#    APP_CONTEXT=stackrox/api-rosa-...:443/cluster-admin ./seguranca/demo-apps/etapa.sh status
 # ---------------------------------------------------------------------------
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
@@ -25,7 +29,9 @@ ETAPAS=seguranca/demo-apps/etapas
 ALVO=seguranca/demo-apps/pagamentos-demo/10-deployment.yaml
 APP=pagamentos-demo
 NS=pagamentos-demo
-oc() { command oc ${OC_CONTEXT:+--context="$OC_CONTEXT"} "$@"; }
+oc() { command oc ${OC_CONTEXT:+--context="$OC_CONTEXT"} "$@"; }          # hub: Application do Argo CD
+oc_app() { command oc ${APP_CONTEXT:+--context="$APP_CONTEXT"} "$@"; }   # cluster secured: workload
+[[ -n "${APP_CONTEXT:-}" ]] || echo "AVISO: APP_CONTEXT vazio — os comandos no namespace $NS vão para o contexto atual do oc, que precisa ser o cluster secured." >&2
 
 titulo() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 mostrar() { printf '\n\033[1;36mNo ACS:\033[0m %s\n' "$*"; }
@@ -35,10 +41,10 @@ status() {
   oc -n openshift-gitops get applications.argoproj.io "$APP" \
     -o jsonpath='  sync={.status.sync.status} saúde={.status.health.status} revisão={.status.sync.revision}{"\n"}'
   titulo "Cluster ($NS)"
-  oc -n "$NS" get deploy pagamentos-api \
+  oc_app -n "$NS" get deploy pagamentos-api \
     -o jsonpath='  etapa={.metadata.annotations.demo\.acs/etapa}{"\n"}  imagem={.spec.template.spec.containers[0].image}{"\n"}  réplicas={.status.readyReplicas}/{.spec.replicas}{"\n"}'
   # só eventos recentes (2 min): FailedCreate de etapas anteriores não confundem
-  oc -n "$NS" get events -o json 2>/dev/null | jq -r --arg d "$(date -u -d '-2 min' +%FT%TZ)" \
+  oc_app -n "$NS" get events -o json 2>/dev/null | jq -r --arg d "$(date -u -d '-2 min' +%FT%TZ)" \
     '[.items[] | select(.reason=="FailedCreate" and ((.lastTimestamp // .eventTime // "") >= $d))]
      | last | select(.) | "  FailedCreate: \(.message[0:140])"' || true
 }
@@ -89,15 +95,15 @@ case "${1:-}" in
   03) aplicar 03
       mostrar "Active: 'DEMO - Container privilegiado…' (CRITICAL). No cluster: FailedCreate pela SCC —
          a versão anterior segue atendendo. Contraste humano:
-         oc apply -f seguranca/demo-apps/variacoes/privilegiado.yaml → NEGADO pelo ACS (aba Attempted)." ;;
+         oc ${APP_CONTEXT:+--context=$APP_CONTEXT }apply -f seguranca/demo-apps/variacoes/privilegiado.yaml → NEGADO pelo ACS (aba Attempted)." ;;
   04) aplicar 04
       echo "(o Collector precisa ver o curl rodar: aguarde ~1 minuto)"
       mostrar "Active: 'DEMO - Ferramenta de rede…' (estágio Runtime), com processo, argumentos e horário.
          Resolved: a de privilégio." ;;
   05) titulo "Etapa 05 - viola em runtime: exec no pod (mudança fora do Git)"
       echo "  Alguém tenta 'consertar' direto em produção:"
-      echo "  \$ oc -n $NS exec deploy/pagamentos-api -- cat /etc/redhat-release"
-      oc -n "$NS" exec deploy/pagamentos-api -- cat /etc/redhat-release || true
+      echo "  \$ oc ${APP_CONTEXT:+--context=$APP_CONTEXT }-n $NS exec deploy/pagamentos-api -- cat /etc/redhat-release"
+      oc_app -n "$NS" exec deploy/pagamentos-api -- cat /etc/redhat-release || true
       mostrar "Violations › Attempted: 'DEMO - Exec em pod de pagamentos' — o comando foi recusado
          e a tentativa ficou registrada (quem, quando, em qual pod)." ;;
   06) aplicar 06

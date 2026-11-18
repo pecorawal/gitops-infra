@@ -5,6 +5,8 @@
 #  etapa.sh) e o Argo CD aplica; o ACS mostra o que cada versão violou.
 #  selfHeal: mudança manual no cluster volta ao estado do Git.
 #
+#  Destino: o cluster SECURED (securerosa), não o hub. Pré-requisito:
+#    oc apply -f seguranca/argocd/00-cluster-secured.yaml   # registra o cluster no Argo CD
 #    oc apply -f seguranca/argocd/app-pagamentos-demo.yaml
 #
 #  ATENÇÃO: esta instância (openshift-gitops) roda em namespace openshift-*, que
@@ -25,7 +27,7 @@ spec:
     targetRevision: seguranca
     path: seguranca/demo-apps/pagamentos-demo
   destination:
-    server: 'https://kubernetes.default.svc'
+    name: securerosa            # Secret de cluster criado pelo GitOpsCluster
     namespace: pagamentos-demo
   syncPolicy:
     automated:

@@ -1,0 +1,53 @@
+# ---------------------------------------------------------------------------
+#  Registra o cluster SECURED da demo como destino do Argo CD do hub
+#
+#  O workload pagamentos-demo NÃO roda no hub (local-cluster): roda no cluster
+#  gerenciado onde está o SecuredCluster do ACS. Para o Argo CD do hub conseguir
+#  entregar lá, o ACM precisa criar o Secret de cluster em openshift-gitops — é
+#  o que o GitOpsCluster faz a partir da Placement abaixo.
+#
+#  Aplicar ANTES de app-pagamentos-demo.yaml:
+#    oc apply -f seguranca/argocd/00-cluster-secured.yaml
+#
+#  Conferir (deve aparecer um Secret com name=<cluster secured>):
+#    oc -n openshift-gitops get secret -l argocd.argoproj.io/secret-type=cluster
+#
+#  Trocar de cluster: altere o valor de "name" na Placement e o
+#  destination.name em app-pagamentos-demo.yaml.
+# ---------------------------------------------------------------------------
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSetBinding
+metadata:
+  name: default
+  namespace: openshift-gitops
+spec:
+  clusterSet: default
+---
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: demo-seguranca-secured
+  namespace: openshift-gitops
+spec:
+  clusterSets:
+    - default
+  predicates:
+    - requiredClusterSelector:
+        labelSelector:
+          matchLabels:
+            name: securerosa
+---
+apiVersion: apps.open-cluster-management.io/v1beta1
+kind: GitOpsCluster
+metadata:
+  name: demo-seguranca-secured
+  namespace: openshift-gitops
+spec:
+  argoServer:
+    cluster: local-cluster
+    argoNamespace: openshift-gitops
+  placementRef:
+    kind: Placement
+    apiVersion: cluster.open-cluster-management.io/v1beta1
+    name: demo-seguranca-secured
+    namespace: openshift-gitops
