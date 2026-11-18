@@ -1,0 +1,42 @@
+# ---------------------------------------------------------------------------
+#  Placement das políticas de governança da demo (Demos D e E)
+#
+#  Espelha o Placement que o Argo CD já usa para entregar o pagamentos-demo
+#  (seguranca/argocd/00-cluster-secured.yaml): o MESMO seletor, o mesmo nome,
+#  só que em acm-policies — um Placement só decide para Policies do próprio
+#  namespace. Assim governança e entrega olham para o mesmo cluster secured, e
+#  nenhum Placement existente (global, demo-seguranca-secured em
+#  openshift-gitops) é criado, alterado ou sobrescrito por este diretório.
+#
+#  Trocar de cluster: altere "name" aqui E em seguranca/argocd/00-cluster-secured.yaml.
+# ---------------------------------------------------------------------------
+# Um Placement só enxerga clusters de ClusterSets ligados ao SEU namespace.
+# Sem este binding: PlacementSatisfied=False, NoManagedClusterSetBindings.
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSetBinding
+metadata:
+  name: default
+  namespace: acm-policies
+spec:
+  clusterSet: default
+---
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: demo-seguranca-secured
+  namespace: acm-policies
+spec:
+  clusterSets:
+    - default
+  predicates:
+    - requiredClusterSelector:
+        labelSelector:
+          matchLabels:
+            name: securerosa
+  # A política continua avaliando (e o KPI continua contando) mesmo com o
+  # cluster fora do ar: cluster indisponível é justamente o que se quer ver.
+  tolerations:
+    - key: cluster.open-cluster-management.io/unreachable
+      operator: Exists
+    - key: cluster.open-cluster-management.io/unavailable
+      operator: Exists

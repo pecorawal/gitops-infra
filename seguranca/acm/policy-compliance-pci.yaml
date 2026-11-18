@@ -1,13 +1,13 @@
 # ---------------------------------------------------------------------------
 #  Demo E · Conformidade contínua  (C02 · RSK-01 RSK-11)
 #
-#  Compliance Operator + varredura PCI-DSS agendada em toda a frota.
+#  Compliance Operator + varredura PCI-DSS agendada no cluster secured da demo.
 #  O resultado aparece em dois lugares, e os dois contam a mesma história:
 #    - ACS > Compliance (visão do time de segurança: controle por controle)
 #    - ACM > Governance  (visão da plataforma: cluster por cluster)
 #
-#  Aplicar no hub:  oc apply -f seguranca/acm/policy-compliance-pci.yaml
-#  Reaproveita o Placement de policy-acs-cobertura.yaml.
+#  Entrega: Argo CD (seguranca/argocd/app-acm-governanca.yaml).
+#  Usa o Placement demo-seguranca-secured (00-placement-secured.yaml).
 # ---------------------------------------------------------------------------
 apiVersion: policy.open-cluster-management.io/v1
 kind: Policy
@@ -77,7 +77,7 @@ metadata:
   name: binding-compliance-pci-dss
   namespace: acm-policies
 placementRef:
-  name: placement-acs-frota
+  name: demo-seguranca-secured           # 00-placement-secured.yaml
   apiGroup: cluster.open-cluster-management.io
   kind: Placement
 subjects:

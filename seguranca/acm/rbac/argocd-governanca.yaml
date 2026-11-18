@@ -1,0 +1,64 @@
+# ---------------------------------------------------------------------------
+#  Permite ao Argo CD (OpenShift GitOps) entregar as políticas de governança
+#  da demo (seguranca/acm) no namespace acm-policies do hub.
+#
+#  Fica FORA do que o Argo CD sincroniza (a Application não lê subdiretórios):
+#  uma ServiceAccount não pode conceder a si mesma permissões que não tem.
+#  Aplicar uma vez no hub, como cluster-admin:  oc apply -f seguranca/acm/rbac/
+# ---------------------------------------------------------------------------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: acm-policies
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argocd-governanca
+  namespace: acm-policies
+rules:
+  - apiGroups: ["policy.open-cluster-management.io"]
+    resources: ["policies", "placementbindings", "policysets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["cluster.open-cluster-management.io"]
+    resources: ["placements", "managedclustersetbindings"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argocd-governanca
+  namespace: acm-policies
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: argocd-governanca
+subjects:
+  - kind: ServiceAccount
+    name: openshift-gitops-argocd-application-controller
+    namespace: openshift-gitops
+---
+# Criar um ManagedClusterSetBinding exige "bind" no ClusterSet (cluster-scoped).
+# Restrito ao ClusterSet usado pelo Placement da demo.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argocd-governanca-bind-clusterset
+rules:
+  - apiGroups: ["cluster.open-cluster-management.io"]
+    resources: ["managedclustersets/bind"]
+    resourceNames: ["default"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argocd-governanca-bind-clusterset
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argocd-governanca-bind-clusterset
+subjects:
+  - kind: ServiceAccount
+    name: openshift-gitops-argocd-application-controller
+    namespace: openshift-gitops

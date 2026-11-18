@@ -1,0 +1,34 @@
+# ---------------------------------------------------------------------------
+#  Demos D e E · Governança do ACM como código
+#  As Policies do ACM da demo (cobertura do ACS e compliance PCI) nascem de
+#  commit nesta branch e o Argo CD as aplica em acm-policies no hub. O ACM
+#  propaga para os clusters do Placement demo-seguranca-secured.
+#
+#  Pré-requisitos no hub (uma vez, como cluster-admin):
+#    oc apply -f seguranca/acm/rbac/      # namespace + permissões do Argo CD
+#    # secret acs-crs e ConfigMap acs-central: ver cabeçalho de
+#    # seguranca/acm/policy-acs-cobertura.yaml (valores do ambiente, fora do Git)
+#
+#    oc apply -f seguranca/argocd/app-acm-governanca.yaml
+#
+#  O diretório NÃO é recursivo: seguranca/acm/rbac/ fica de fora de propósito.
+#  O acs-crs e o acs-central não estão no Git, então o prune não os toca.
+# ---------------------------------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: acm-governanca-seguranca
+  namespace: openshift-gitops
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/pecorawal/gitops-infra.git'
+    targetRevision: seguranca
+    path: seguranca/acm
+  destination:
+    server: 'https://kubernetes.default.svc'   # hub: Policies vivem no hub
+    namespace: acm-policies
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

@@ -62,23 +62,31 @@ mede e gera evidência — em todos os clusters, sem virar gargalo da entrega.*
 6. **GitHub Actions (opcional):** cadastre `ROX_ENDPOINT` e `ROX_API_TOKEN` como secrets e
    `ROX_CLUSTER` como variable do repositório (nome do cluster no ACS).
    O Central precisa ser alcançável pela internet; se não for, use o script local.
-7. **Demo D (cobertura):** no hub, siga os pré-requisitos do cabeçalho de
-   `seguranca/acm/policy-acs-cobertura.yaml`: secret `acs-crs` e ConfigMap `acs-central`, ambos em
-   `acm-policies`. Depois aplique o arquivo. Confira:
+7. **Demos D e E (governança do ACM, entregue pelo Argo CD):** no hub, como cluster-admin:
    ```bash
-   oc -n acm-policies get placement placement-acs-frota      # SUCCEEDED=True, SELECTEDCLUSTERS >= 1
-   oc -n acm-policies get policy acs-secured-cluster         # Compliant
+   oc apply -f seguranca/acm/rbac/                       # namespace acm-policies + permissões do Argo CD
+   # secret acs-crs e ConfigMap acs-central: cabeçalho de seguranca/acm/policy-acs-cobertura.yaml
+   oc apply -f seguranca/argocd/app-acm-governanca.yaml  # Application acm-governanca-seguranca
    ```
-   - `NoManagedClusterSetBindings` no Placement = falta o `ManagedClusterSetBinding` (já vem no arquivo,
-     ligando o ClusterSet `global` ao namespace `acm-policies`).
+   Confira:
+   ```bash
+   oc -n acm-policies get placement demo-seguranca-secured   # SUCCEEDED=True, SELECTEDCLUSTERS = 1
+   oc -n acm-policies get policy                             # acs-secured-cluster e compliance-pci-dss Compliant
+   ```
+   - As políticas usam o Placement `demo-seguranca-secured` de `acm-policies`, com o mesmo seletor do
+     Placement homônimo em `openshift-gitops` (o que entrega o workload). Nenhum Placement existente
+     é alterado. Para trocar de cluster, mude o `name` nos dois arquivos `00-*`.
+   - `NoManagedClusterSetBindings` no Placement = falta o `ManagedClusterSetBinding` `default`
+     (vem em `seguranca/acm/00-placement-secured.yaml`).
+   - Mudança em política é commit: o `selfHeal` desfaz edição feita na console do ACM.
    - Cluster que **já tem ACS** converge sem reinstalar: o CR usa o mesmo nome
      (`stackrox-secured-cluster`) e o `OperatorPolicy` aceita o OperatorGroup existente. A política
      aplica, porém, a configuração do admission controller (`enforcement: Enabled`) nesses clusters.
    - Para mostrar a **instalação acontecendo** é preciso um cluster gerenciado ainda sem ACS
      (~10 min até o Sensor ficar saudável). Sem ele, a demo mostra a cobertura já `Compliant`.
    - A CRS vale 30 dias (`roxctl central crs list`); gere outra antes de importar clusters novos depois disso.
-8. **Demo E:** aplique `seguranca/acm/policy-compliance-pci.yaml` na véspera — a primeira varredura
-   leva alguns minutos e você quer resultado pronto.
+8. **Demo E:** a política `compliance-pci-dss` entra junto com a Application do item 7. Faça isso na
+   véspera: a primeira varredura leva alguns minutos e você quer resultado pronto.
 9. **Linha de base dos KPIs:**
    ```bash
    export ROX_ENDPOINT=central-rhacs-operator.apps.<hub>:443
@@ -147,7 +155,8 @@ Mostre o **Scorecard DevSecOps · Segurança**, seção *Resumo executivo* e *Jo
 > *informa* se o Sensor está de pé — isso vira o RSK-02, cobertura de segurança."
 
 - Abra `seguranca/acm/policy-acs-cobertura.yaml` no GitHub: 3 templates (operador, CRS + `SecuredCluster`,
-  Sensor saudável) e um Placement com toda a frota, exceto o hub.
+  Sensor saudável), entregues pelo Argo CD (Application `acm-governanca-seguranca`) e ligadas ao mesmo
+  Placement que define onde o workload roda.
 - ACM › Governance › `acs-secured-cluster`: aba *Clusters*, com `<cluster-gerenciado>` `Compliant` nos 3 templates.
 - ACS › Platform Configuration › Clusters: o mesmo cluster `Healthy`. São duas ferramentas contando a
   mesma história.
