@@ -1,0 +1,60 @@
+# ---------------------------------------------------------------------------
+#  Fecha a esteira de CI e abre a de CD: grava a nova tag no values do
+#  ambiente DEV e faz push. Daí em diante quem age é o Argo CD (no hub), que
+#  vê o commit e atualiza o cluster gerenciado. A pipeline NUNCA fala com o
+#  cluster gerenciado — só com o Git.
+#
+#  Evolução de pagamentos-api-app-gitops/ci/02-update-gitops-task.yaml:
+#  token lido de Secret (nada no YAML), branch e arquivo parametrizados,
+#  commit com o SHA de origem (usado pelo script de KPIs para o lead time)
+#  e retry com rebase caso outro commit chegue no meio.
+# ---------------------------------------------------------------------------
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: update-gitops
+  namespace: devops-ci
+spec:
+  params:
+    - name: GITOPS_REPO
+      description: URL https do repositório GitOps
+    - name: GITOPS_BRANCH
+      default: devops
+    - name: VALUES_FILE
+      default: devops/gitops/values-dev.yaml
+    - name: NEW_TAG
+    - name: SOURCE_COMMIT
+      description: SHA completo do código que gerou a imagem
+  steps:
+    - name: git-commit-push
+      image: docker.io/alpine/git:v2.47.2
+      env:
+        - name: GIT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: github-token
+              key: token
+      script: |
+        #!/bin/sh
+        set -eu
+        REPO_AUTH=$(echo "$(params.GITOPS_REPO)" | sed "s#https://#https://x-access-token:${GIT_TOKEN}@#")
+        git clone --quiet --branch "$(params.GITOPS_BRANCH)" "$REPO_AUTH" /tmp/gitops
+        cd /tmp/gitops
+        git config user.email "pipeline@tekton.local"
+        git config user.name  "Tekton Pipeline"
+
+        sed -i -E "s|^(\s*tag:).*|\1 \"$(params.NEW_TAG)\"|" "$(params.VALUES_FILE)"
+        if git diff --quiet; then
+          echo "tag $(params.NEW_TAG) já está no Git; nada a fazer"; exit 0
+        fi
+        git add "$(params.VALUES_FILE)"
+        git commit -q -m "ci(dev): pagamentos-api $(params.NEW_TAG)" \
+                      -m "origem: $(params.SOURCE_COMMIT)"
+
+        for i in 1 2 3; do
+          git push -q origin "HEAD:$(params.GITOPS_BRANCH)" && break
+          echo "push recusado (tentativa $i); rebase e nova tentativa"
+          git pull -q --rebase origin "$(params.GITOPS_BRANCH)"
+        done
+        echo ">> $(params.VALUES_FILE) agora aponta para a tag $(params.NEW_TAG)"
+        grep -n 'tag:' "$(params.VALUES_FILE)"

@@ -1,0 +1,44 @@
+# ---------------------------------------------------------------------------
+#  DEV · auto-sync: a pipeline grava a tag, o Argo CD implanta sozinho.
+#
+#  Generator "clusters": o Argo CD do HUB escolhe os destinos pelos labels
+#  que o ACM copia do ManagedCluster para o Secret de cluster (GitOpsCluster
+#  em devops/acm/). Hoje é 1 cluster; amanhã, marcar outro cluster com
+#  devops=gerenciado já o faz receber a aplicação — sem tocar neste arquivo.
+# ---------------------------------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: pagamentos-dev
+  namespace: openshift-gitops
+spec:
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            devops: gerenciado
+  template:
+    metadata:
+      name: 'pagamentos-dev-{{name}}'
+      labels:
+        app.kubernetes.io/part-of: demo-devops
+        ambiente: dev
+    spec:
+      project: default
+      source:
+        repoURL: 'https://github.com/pecorawal/gitops-infra.git'
+        targetRevision: devops
+        path: devops/gitops/chart
+        helm:
+          valueFiles:
+            - ../values-dev.yaml
+      destination:
+        server: '{{server}}'
+        namespace: pagamentos-dev
+      syncPolicy:
+        # DEV: commit = deploy. selfHeal desfaz qualquer mudança manual no cluster.
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

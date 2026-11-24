@@ -1,0 +1,128 @@
+# ---------------------------------------------------------------------------
+#  ACM · o cluster gerenciado preparado para puxar do Quay, sem "oc" nele
+#
+#  Uma Policy, dois templates, aplicados em todo cluster com devops=gerenciado:
+#
+#  1. quay-pull-secret  namespaces pagamentos-dev / pagamentos-prod e o
+#                       Secret quay-pull (robot READ do Quay). O valor vem do
+#                       HUB por hub template: o Secret mora só em devops-policies
+#                       e o ACM o distribui. Trocou o token? Troque no hub.
+#  2. quay-ca-confiavel o CRI-O dos nós precisa confiar no certificado da rota
+#                       do Quay. Em laboratório a rota usa o certificado do
+#                       ingress do próprio cluster: o template LÊ esse CA no
+#                       cluster gerenciado e o registra em image.config.
+#                       Se o Quay tiver certificado de CA pública, desabilite.
+#
+#  Pré-requisito no hub (feito por ./devops/scripts/preparar.sh secrets):
+#    oc -n devops-policies create secret docker-registry quay-pull \
+#      --docker-server=<QUAY_HOST> --docker-username='<org>+devops_pull' --docker-password='<token>'
+#
+#  ATENÇÃO (2): se o cluster já tiver outro additionalTrustedCA em
+#  image.config.openshift.io/cluster, junte as chaves num ConfigMap só.
+# ---------------------------------------------------------------------------
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: devops-acesso-quay
+  namespace: devops-policies
+  annotations:
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+    policy.open-cluster-management.io/categories: CM Configuration Management
+    policy.open-cluster-management.io/controls: CM-2 Baseline Configuration
+spec:
+  remediationAction: enforce
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: quay-pull-secret
+        spec:
+          severity: medium
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: Namespace
+                metadata:
+                  name: pagamentos-dev
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: Namespace
+                metadata:
+                  name: pagamentos-prod
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: Secret
+                metadata:
+                  name: quay-pull
+                  namespace: pagamentos-dev
+                type: kubernetes.io/dockerconfigjson
+                data:
+                  .dockerconfigjson: '{{hub fromSecret "devops-policies" "quay-pull" ".dockerconfigjson" hub}}'
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: Secret
+                metadata:
+                  name: quay-pull
+                  namespace: pagamentos-prod
+                type: kubernetes.io/dockerconfigjson
+                data:
+                  .dockerconfigjson: '{{hub fromSecret "devops-policies" "quay-pull" ".dockerconfigjson" hub}}'
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: quay-ca-confiavel
+        spec:
+          severity: medium
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: ConfigMap
+                metadata:
+                  name: quay-ca
+                  namespace: openshift-config
+                data:
+                  # chave = host do registry (porta, se houver, vira "..": host..8443)
+                  <QUAY_HOST>: '{{ fromConfigMap "openshift-config-managed" "default-ingress-cert" "ca-bundle.crt" | autoindent }}'
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: config.openshift.io/v1
+                kind: Image
+                metadata:
+                  name: cluster
+                spec:
+                  additionalTrustedCA:
+                    name: quay-ca
+---
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: devops-gerenciado
+  namespace: devops-policies
+spec:
+  predicates:
+    - requiredClusterSelector:
+        labelSelector:
+          matchLabels:
+            devops: gerenciado
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: devops-acesso-quay
+  namespace: devops-policies
+placementRef:
+  apiGroup: cluster.open-cluster-management.io
+  kind: Placement
+  name: devops-gerenciado
+subjects:
+  - apiGroup: policy.open-cluster-management.io
+    kind: Policy
+    name: devops-acesso-quay

@@ -1,0 +1,5 @@
+apiVersion: v2
+name: pagamentos-api
+description: pagamentos-api da demo DevOps — implantado pelo Argo CD do hub no cluster gerenciado
+type: application
+version: 0.1.0

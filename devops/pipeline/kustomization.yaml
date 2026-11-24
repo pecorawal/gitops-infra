@@ -1,0 +1,12 @@
+# Esteira de CI completa no HUB:   oc apply -k devops/pipeline
+# (os Secrets ficam fora: ./devops/scripts/preparar.sh secrets)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - 00-namespace.yaml
+  - tasks/generate-short-sha.yaml
+  - tasks/npm-test.yaml
+  - tasks/update-gitops.yaml
+  - pipeline.yaml
+  - triggers/10-rbac.yaml
+  - triggers/20-trigger.yaml

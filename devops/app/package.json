@@ -1,0 +1,14 @@
+{
+  "name": "pagamentos-api",
+  "version": "1.0.0",
+  "description": "API de pagamentos da demo DevOps (Tekton no hub + Argo CD no cluster gerenciado)",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/app.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

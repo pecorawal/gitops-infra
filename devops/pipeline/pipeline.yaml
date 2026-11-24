@@ -1,0 +1,85 @@
+# ---------------------------------------------------------------------------
+#  ESTEIRA DE CI  (roda no HUB)
+#
+#    fetch-source ─▶ unit-tests ─▶ build-and-push ─▶ update-gitops
+#      git-clone      npm test       buildah → Quay     tag no Git
+#                                    (cluster 2)
+#
+#  A imagem vai para o Quay que roda no CLUSTER GERENCIADO, e é de lá que o
+#  próprio cluster gerenciado a puxa no deploy: build num lugar, reuso no outro.
+# ---------------------------------------------------------------------------
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: pagamentos-api
+  namespace: devops-ci
+spec:
+  params:
+    - name: GIT_REPO
+      default: https://github.com/pecorawal/gitops-infra.git
+    - name: GIT_REVISION
+      description: branch ou SHA a construir (o webhook passa o SHA do push)
+      default: devops
+    - name: GITOPS_BRANCH
+      description: branch onde a nova tag é gravada
+      default: devops
+    - name: IMAGE
+      description: repositório da imagem, sem tag
+      default: <QUAY_HOST>/<QUAY_ORG>/pagamentos-api
+    - name: TLS_VERIFY
+      description: '"false" em laboratório, quando o hub não confia no certificado da rota do Quay'
+      default: "false"
+  workspaces:
+    - name: source        # código clonado (PVC por execução)
+    - name: dockerconfig  # Secret quay-push
+  tasks:
+    - name: fetch-source
+      taskRef:
+        resolver: cluster
+        params:
+          - { name: kind, value: task }
+          - { name: name, value: git-clone }
+          - { name: namespace, value: openshift-pipelines }
+      params:
+        - { name: URL, value: $(params.GIT_REPO) }
+        - { name: REVISION, value: $(params.GIT_REVISION) }
+      workspaces:
+        - { name: output, workspace: source }
+
+    - name: short-sha
+      runAfter: [fetch-source]
+      taskRef: { name: generate-short-sha }
+      params:
+        - { name: COMMIT, value: $(tasks.fetch-source.results.COMMIT) }
+
+    - name: unit-tests
+      runAfter: [fetch-source]
+      taskRef: { name: npm-test }
+      workspaces:
+        - { name: source, workspace: source }
+
+    - name: build-and-push
+      runAfter: [unit-tests, short-sha]
+      taskRef:
+        resolver: cluster
+        params:
+          - { name: kind, value: task }
+          - { name: name, value: buildah }
+          - { name: namespace, value: openshift-pipelines }
+      params:
+        - { name: IMAGE, value: "$(params.IMAGE):$(tasks.short-sha.results.short-sha)" }
+        - { name: DOCKERFILE, value: ./devops/app/Dockerfile }
+        - { name: CONTEXT, value: ./devops/app }
+        - { name: TLS_VERIFY, value: $(params.TLS_VERIFY) }
+      workspaces:
+        - { name: source, workspace: source }
+        - { name: dockerconfig, workspace: dockerconfig }
+
+    - name: update-gitops
+      runAfter: [build-and-push]
+      taskRef: { name: update-gitops }
+      params:
+        - { name: GITOPS_REPO, value: $(params.GIT_REPO) }
+        - { name: GITOPS_BRANCH, value: $(params.GITOPS_BRANCH) }
+        - { name: NEW_TAG, value: $(tasks.short-sha.results.short-sha) }
+        - { name: SOURCE_COMMIT, value: $(tasks.fetch-source.results.COMMIT) }

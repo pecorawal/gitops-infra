@@ -1,0 +1,25 @@
+# ---------------------------------------------------------------------------
+#  Testes unitários da aplicação. Falhou aqui = a pipeline para e NADA é
+#  construído nem implantado (etapa 02 da demo).
+# ---------------------------------------------------------------------------
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: npm-test
+  namespace: devops-ci
+spec:
+  params:
+    - name: APP_DIR
+      description: diretório da aplicação dentro do repositório
+      default: devops/app
+  workspaces:
+    - name: source
+  steps:
+    - name: test
+      image: registry.access.redhat.com/ubi9/nodejs-20-minimal:latest
+      workingDir: $(workspaces.source.path)/$(params.APP_DIR)
+      script: |
+        #!/bin/sh
+        set -e
+        echo ">> node $(node --version)"
+        npm test

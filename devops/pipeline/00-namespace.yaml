@@ -1,0 +1,15 @@
+# ---------------------------------------------------------------------------
+#  Namespace da esteira de CI no HUB
+#
+#  O OpenShift Pipelines cria sozinho a ServiceAccount "pipeline" em todo
+#  namespace novo. As Tasks git-clone e buildah vêm do próprio operador
+#  (namespace openshift-pipelines, resolvidas por "cluster resolver").
+#
+#    oc apply -f devops/pipeline/          # tudo deste diretório, no hub
+# ---------------------------------------------------------------------------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: devops-ci
+  labels:
+    app.kubernetes.io/part-of: demo-devops

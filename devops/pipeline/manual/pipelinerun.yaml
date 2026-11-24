@@ -1,0 +1,31 @@
+# ---------------------------------------------------------------------------
+#  Execução manual da esteira (build inicial no D-1 e plano B sem webhook):
+#
+#    oc create -f devops/pipeline/manual/pipelinerun.yaml
+#    tkn -n devops-ci pipelinerun logs -f --last
+#
+#  "create" (e não "apply") por causa do generateName.
+# ---------------------------------------------------------------------------
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: pagamentos-api-manual-
+  namespace: devops-ci
+  labels:
+    app.kubernetes.io/part-of: demo-devops
+spec:
+  pipelineRef:
+    name: pagamentos-api
+  taskRunTemplate:
+    serviceAccountName: pipeline
+  workspaces:
+    - name: source
+      volumeClaimTemplate:
+        spec:
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 1Gi
+    - name: dockerconfig
+      secret:
+        secretName: quay-push

@@ -1,0 +1,34 @@
+# ServiceAccount do EventListener e as permissões padrão do Tekton Triggers
+# (ClusterRoles criadas pelo próprio operador).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: devops-triggers
+  namespace: devops-ci
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: devops-triggers-eventlistener
+  namespace: devops-ci
+subjects:
+  - kind: ServiceAccount
+    name: devops-triggers
+    namespace: devops-ci
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tekton-triggers-eventlistener-roles
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: devops-triggers-eventlistener-clusterroles
+subjects:
+  - kind: ServiceAccount
+    name: devops-triggers
+    namespace: devops-ci
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tekton-triggers-eventlistener-clusterroles

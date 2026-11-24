@@ -1,0 +1,42 @@
+# ---------------------------------------------------------------------------
+#  PROD · sync manual: promoção controlada, mesma imagem validada em DEV.
+#
+#  Generator "clusters": o Argo CD do HUB escolhe os destinos pelos labels
+#  que o ACM copia do ManagedCluster para o Secret de cluster (GitOpsCluster
+#  em devops/acm/). Hoje é 1 cluster; amanhã, marcar outro cluster com
+#  devops=gerenciado já o faz receber a aplicação — sem tocar neste arquivo.
+# ---------------------------------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: pagamentos-prod
+  namespace: openshift-gitops
+spec:
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            devops: gerenciado
+  template:
+    metadata:
+      name: 'pagamentos-prod-{{name}}'
+      labels:
+        app.kubernetes.io/part-of: demo-devops
+        ambiente: prod
+    spec:
+      project: default
+      source:
+        repoURL: 'https://github.com/pecorawal/gitops-infra.git'
+        targetRevision: devops
+        path: devops/gitops/chart
+        helm:
+          valueFiles:
+            - ../values-prod.yaml
+      destination:
+        server: '{{server}}'
+        namespace: pagamentos-prod
+      syncPolicy:
+        # PROD: SEM automated. O Argo CD mostra OutOfSync e espera alguém
+        # aprovar com Sync — é o "botão de go-live" auditado no Git.
+        syncOptions:
+          - CreateNamespace=true

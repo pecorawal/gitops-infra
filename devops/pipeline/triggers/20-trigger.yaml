@@ -1,0 +1,114 @@
+# ---------------------------------------------------------------------------
+#  WEBHOOK DO GITHUB → PIPELINE
+#
+#  O EventListener só dispara a pipeline quando:
+#    1. a assinatura do webhook confere (Secret github-webhook);
+#    2. é um push na branch devops;
+#    3. o push mexeu em devops/app/** (código da aplicação).
+#  O item 3 evita o loop: o commit que a própria pipeline faz em
+#  devops/gitops/values-dev.yaml NÃO dispara um novo build.
+#
+#  Configurar no GitHub (Settings › Webhooks › Add webhook):
+#    Payload URL : https://$(oc -n devops-ci get route el-devops-webhook -o jsonpath='{.spec.host}')
+#    Content type: application/json · Secret: o mesmo de github-webhook · Just the push event
+# ---------------------------------------------------------------------------
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: github-push
+  namespace: devops-ci
+spec:
+  params:
+    - name: git-repo
+      value: $(body.repository.clone_url)
+    - name: git-revision
+      value: $(body.after)
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: pagamentos-api
+  namespace: devops-ci
+spec:
+  params:
+    - name: git-repo
+    - name: git-revision
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        generateName: pagamentos-api-webhook-
+        labels:
+          app.kubernetes.io/part-of: demo-devops
+      spec:
+        pipelineRef:
+          name: pagamentos-api
+        params:
+          - name: GIT_REPO
+            value: $(tt.params.git-repo)
+          # Constrói o commit exato do push (rastreabilidade); o update-gitops
+          # sempre grava na ponta da branch devops.
+          - name: GIT_REVISION
+            value: $(tt.params.git-revision)
+        taskRunTemplate:
+          serviceAccountName: pipeline
+        workspaces:
+          - name: source
+            volumeClaimTemplate:
+              spec:
+                accessModes: [ReadWriteOnce]
+                resources:
+                  requests:
+                    storage: 1Gi
+          - name: dockerconfig
+            secret:
+              secretName: quay-push
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: devops-webhook
+  namespace: devops-ci
+spec:
+  serviceAccountName: devops-triggers
+  triggers:
+    - name: push-app
+      interceptors:
+        - ref:
+            name: github
+          params:
+            - name: secretRef
+              value:
+                secretName: github-webhook
+                secretKey: secret
+            - name: eventTypes
+              value: [push]
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: >-
+                body.ref == 'refs/heads/devops' &&
+                body.commits.exists(c,
+                  c.added.exists(f, f.startsWith('devops/app/')) ||
+                  c.modified.exists(f, f.startsWith('devops/app/')) ||
+                  c.removed.exists(f, f.startsWith('devops/app/')))
+      bindings:
+        - ref: github-push
+      template:
+        ref: pagamentos-api
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: el-devops-webhook
+  namespace: devops-ci
+spec:
+  to:
+    kind: Service
+    name: el-devops-webhook
+  port:
+    targetPort: http-listener
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

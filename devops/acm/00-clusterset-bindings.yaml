@@ -1,0 +1,31 @@
+# ---------------------------------------------------------------------------
+#  ACM · onde as Placements da demo podem procurar clusters
+#
+#  "global" é o ManagedClusterSet padrão do ACM e contém TODOS os clusters.
+#  O binding o expõe para os dois namespaces da demo:
+#    openshift-gitops  → Placement do GitOpsCluster (registro no Argo CD)
+#    devops-policies   → Placement das Policies (acesso ao Quay)
+#  A seleção de verdade é feita pelo label devops=gerenciado.
+#
+#    oc apply -f devops/acm/        # no HUB, uma vez
+# ---------------------------------------------------------------------------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: devops-policies
+---
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSetBinding
+metadata:
+  name: global
+  namespace: openshift-gitops
+spec:
+  clusterSet: global
+---
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSetBinding
+metadata:
+  name: global
+  namespace: devops-policies
+spec:
+  clusterSet: global

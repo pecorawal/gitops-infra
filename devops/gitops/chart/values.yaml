@@ -1,0 +1,14 @@
+# Padrões do chart. Cada ambiente sobrescreve em ../values-<ambiente>.yaml
+ambiente: dev
+replicaCount: 1
+image:
+  repository: <QUAY_HOST>/<QUAY_ORG>/pagamentos-api
+  tag: ""
+  pullSecret: quay-pull      # criado pela Policy do ACM (devops/acm/10-policy-acesso-quay.yaml)
+service:
+  port: 8080
+route:
+  enabled: true
+resources:
+  requests: { cpu: 50m, memory: 64Mi }
+  limits: { cpu: 250m, memory: 128Mi }

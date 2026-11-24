@@ -49,6 +49,14 @@ garantida pelo ACM e os 8 KPIs de segurança do Scorecard DevSecOps coletados ao
 📖 **[`seguranca/`](seguranca/README.md)** — [roteiro da demo](seguranca/docs/roteiro-demo.md) ·
 [os 8 KPIs](seguranca/docs/kpis-seguranca.md)
 
+## Branch `devops` — esteira Pipelines + esteira GitOps com dois clusters
+
+OpenShift Pipelines no hub testa, constrói e publica a imagem no Quay do cluster gerenciado; o Argo CD do hub,
+integrado ao ACM, implanta no cluster gerenciado (DEV com auto-sync, PROD com sync manual), com drift e rollback por Git.
+
+📖 **[`devops/`](devops/README.md)** — [guion de la demo](devops/docs/guion-demo.md) ·
+[métricas DORA](devops/docs/kpis-devops.md)
+
 <!-- readme-tree start -->
 ```
 .

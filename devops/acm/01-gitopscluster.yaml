@@ -1,0 +1,42 @@
+# ---------------------------------------------------------------------------
+#  A COLA ENTRE O ACM E O ARGO CD  (mesmo papel de bootstrap/01-gitops-cluster.yaml)
+#
+#  Todo ManagedCluster com o label devops=gerenciado vira um destino do Argo CD
+#  do hub: o ACM cria o Secret de cluster em openshift-gitops, copiando os
+#  labels do ManagedCluster — é neles que os ApplicationSets se baseiam.
+#
+#  Marcar o cluster 2 (feito pelo ./devops/scripts/preparar.sh cluster):
+#    oc label managedcluster <cluster-gerenciado> devops=gerenciado
+#
+#  Se o bootstrap da main já estiver aplicado neste hub e o cluster tiver
+#  replicate-to-argocd=true, ele já está registrado: este arquivo é inofensivo.
+#
+#  Conferir:
+#    oc -n openshift-gitops get secret -l argocd.argoproj.io/secret-type=cluster --show-labels
+# ---------------------------------------------------------------------------
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: devops-gerenciado
+  namespace: openshift-gitops
+spec:
+  predicates:
+    - requiredClusterSelector:
+        labelSelector:
+          matchLabels:
+            devops: gerenciado
+---
+apiVersion: apps.open-cluster-management.io/v1beta1
+kind: GitOpsCluster
+metadata:
+  name: devops-gitops-cluster
+  namespace: openshift-gitops
+spec:
+  argoServer:
+    cluster: local-cluster
+    argoNamespace: openshift-gitops
+  placementRef:
+    kind: Placement
+    apiVersion: cluster.open-cluster-management.io/v1beta1
+    name: devops-gerenciado
+    namespace: openshift-gitops

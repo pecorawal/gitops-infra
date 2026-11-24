@@ -1,0 +1,26 @@
+# ---------------------------------------------------------------------------
+#  APLICAÇÃO RAIZ DA ESTEIRA GITOPS (aplicar uma vez no HUB)
+#
+#    oc apply -f devops/argocd/root-devops.yaml
+#
+#  Ela sincroniza devops/gitops/argocd/ — os ApplicationSets de DEV e PROD.
+#  Padrão de argocd/root-main.yaml da branch main.
+# ---------------------------------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: devops-bootstrap
+  namespace: openshift-gitops
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/pecorawal/gitops-infra.git'
+    targetRevision: devops
+    path: devops/gitops/argocd
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: openshift-gitops
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

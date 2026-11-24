@@ -1,0 +1,13 @@
+# ---------------------------------------------------------------------------
+#  AMBIENTE PROD no cluster gerenciado (namespace pagamentos-prod)
+#
+#  Promoção = copiar para cá a tag já validada em DEV (mesma imagem, sem novo
+#  build) e fazer commit/PR. O Argo CD NÃO sincroniza sozinho em prod: alguém
+#  aprova clicando em Sync. Rollback = git revert deste arquivo + Sync.
+#
+#    ./devops/demo/etapa.sh promover
+# ---------------------------------------------------------------------------
+ambiente: prod
+replicaCount: 2
+image:
+  tag: "<TAG_INICIAL>"

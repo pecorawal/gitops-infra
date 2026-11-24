@@ -1,0 +1,25 @@
+# ---------------------------------------------------------------------------
+#  Tag da imagem = 7 primeiros dígitos do commit de origem.
+#  Mesma ideia de pagamentos-api-app-gitops/ci/01-git-task-pagamentos-api.yaml,
+#  agora lendo o resultado COMMIT do git-clone (sem precisar de git aqui).
+# ---------------------------------------------------------------------------
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: generate-short-sha
+  namespace: devops-ci
+spec:
+  params:
+    - name: COMMIT
+      description: SHA completo devolvido pelo git-clone
+  results:
+    - name: short-sha
+      description: os 7 primeiros dígitos do commit
+  steps:
+    - name: shorten
+      image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+      script: |
+        #!/bin/sh
+        SHORT=$(echo -n "$(params.COMMIT)" | cut -c1-7)
+        echo -n "$SHORT" > $(results.short-sha.path)
+        echo "tag da imagem: $SHORT"

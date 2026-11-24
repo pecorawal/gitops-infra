@@ -1,0 +1,10 @@
+# ---------------------------------------------------------------------------
+#  AMBIENTE DEV no cluster gerenciado (namespace pagamentos-dev)
+#
+#  A linha "tag:" é escrita pela PIPELINE (task update-gitops) a cada build
+#  bem-sucedido. O Argo CD sincroniza sozinho (auto-sync): commit = deploy.
+# ---------------------------------------------------------------------------
+ambiente: dev
+replicaCount: 1
+image:
+  tag: "<TAG_INICIAL>"
